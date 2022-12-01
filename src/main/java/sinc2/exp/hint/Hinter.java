@@ -1,5 +1,6 @@
 package sinc2.exp.hint;
 
+import sinc2.common.Argument;
 import sinc2.common.Predicate;
 import sinc2.kb.KbException;
 import sinc2.kb.SimpleRelation;
@@ -98,10 +99,10 @@ public class Hinter {
     protected HinterKb kb;
     /** The numeration map */
     protected NumerationMap numMap;
-    /** The numerations of the relations in the KB */
-    protected int[] kbRelationNums;
-    /** The arities of the relations in the KB (correspond to the relation numeration) */
-    protected int[] kbRelationArities;
+//    /** The numerations of the relations in the KB */
+//    protected int[] kbRelationNums;
+//    /** The arities of the relations in the KB (correspond to the relation numeration) */
+//    protected int[] kbRelationArities;
     /** "Fact Coverage" and "τ" */
     protected double factCoverageThreshold, compRatioThreshold;
     /** The list of collected rules and the evaluation details */
@@ -170,14 +171,14 @@ public class Hinter {
             /* Load KB */
             kb = new HinterKb(kbName, kbPath, factCoverageThreshold);
             numMap = new NumerationMap(Paths.get(kbPath, kbName).toString());
-            kbRelationNums = new int[kb.totalRelations()];
-            kbRelationArities = new int[kb.totalRelations()];
-            int idx = 0;
-            for (SimpleRelation relation: kb.getRelations()) {
-                kbRelationNums[idx] = relation.id;
-                kbRelationArities[idx] = relation.totalCols();
-                idx++;
-            }
+//            kbRelationNums = new int[kb.totalRelations()];
+//            kbRelationArities = new int[kb.totalRelations()];
+//            int idx = 0;
+//            for (SimpleRelation relation: kb.getRelations()) {
+//                kbRelationNums[idx] = relation.id;
+//                kbRelationArities[idx] = relation.totalCols();
+//                idx++;
+//            }
             long time_kb_loaded = System.currentTimeMillis();
             System.out.printf("KB Loaded: %d ms\n", time_kb_loaded - time_temp_loaded);
             System.out.flush();
@@ -185,10 +186,9 @@ public class Hinter {
             /* Instantiate templates */
             int total_covered_records = 0;
             int rules_idx = 0;
-            for (int i = 0; i < kbRelationNums.length; i++) {
+            for (int head_functor = 0; head_functor < kb.totalRelations(); head_functor++) {
                 /* Create the initial rule */
-                int head_functor = kbRelationNums[i];
-                int head_arity = kbRelationArities[i];
+                int head_arity = kb.getRelationArity(head_functor);
 
                 /* Create a relation for all positive entailments */
                 SimpleRelation pos_entails = new SimpleRelation(
@@ -204,7 +204,7 @@ public class Hinter {
                         continue;
                     }
                     Set<Fingerprint> fingerprint_cache = new HashSet<>();
-                    EntailmentExtractiveRule rule = new EntailmentExtractiveRule(head_functor, head_arity, fingerprint_cache, tabu_set, kb);
+                    HinterRule rule = new HinterRule(head_functor, head_arity, fingerprint_cache, tabu_set, kb);
                     int totalFunctors = hint.functorRestrictionCounterLink.length;
                     int[] template_functor_instantiation = ArrayOperation.initArrayWithValue(totalFunctors, UNDETERMINED);
                     int[] restriction_counters = ArrayOperation.initArrayWithValue(hint.restrictions.size(), 1);
@@ -228,7 +228,7 @@ public class Hinter {
                     System.out.flush();
                 }
 
-                System.out.printf("Relation Done (%d/%d): %s\n", i+1, kbRelationNums.length, kb.getRelation(head_functor).name);
+                System.out.printf("Relation Done (%d/%d): %s\n", head_functor+1, kb.totalRelations(), kb.getRelation(head_functor).name);
                 int covered_records = pos_entails.totalEntailedRecords();
                 int total_records = kb.getRelation(head_functor).totalRows();
                 total_covered_records += covered_records;
@@ -270,7 +270,7 @@ public class Hinter {
      * @param positiveEntailments            The relation object that holds all the entailed records in one relation
      */
     protected void specializeByOperations(
-            EntailmentExtractiveRule rule, List<SpecOpr> operations, int oprStartIdx,
+            HinterRule rule, List<SpecOpr> operations, int oprStartIdx,
             int[] templateFunctorInstantiation, int[] templateFunctorArities,
             int[][] functorRestrictionCounterLinks, int[] restrictionCounterBounds, int[] restrictionCounters,
             int[] restrictionTargets, SimpleRelation positiveEntailments
@@ -279,26 +279,84 @@ public class Hinter {
             SpecOpr opr = operations.get(opr_idx);
             rule.updateCacheIndices();
             switch (opr.getSpecCase()) {
-                case CASE1:
-                case CASE3:
+                case CASE1: {
+                    SpecOprCase1 opr_case1 = (SpecOprCase1) opr;
+                    final int var_arg = Argument.variable(opr_case1.varId);
+                    final int target_pred_symbol = rule.getPredicate(opr_case1.predIdx).predSymbol;
+
+                    /* Specialize only if the new variable are similar to all others assigned by the same LV */
+                    for (int pred_idx = 0; pred_idx < rule.predicates(); pred_idx++) {
+                        Predicate predicate = rule.getPredicate(pred_idx);
+                        for (int arg_idx = 0; arg_idx < predicate.arity(); arg_idx++) {
+                            if (var_arg == predicate.args[arg_idx]) {
+                                if (!columnInSimilarList(target_pred_symbol, opr_case1.argIdx, kb.similarCols(predicate.predSymbol, arg_idx)) ||
+                                        !columnInSimilarList(target_pred_symbol, opr_case1.argIdx, kb.inverseSimilarCols(predicate.predSymbol, arg_idx))) {
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                    if (UpdateStatus.NORMAL != opr.specialize(rule)) {
+                        return;
+                    }
+                    break;
+                }
+                case CASE3: {
+                    SpecOprCase3 opr_case3 = (SpecOprCase3) opr;
+                    final int target_pred_symbol1 = rule.getPredicate(opr_case3.predIdx1).predSymbol;
+                    final int target_pred_symbol2 = rule.getPredicate(opr_case3.predIdx2).predSymbol;
+                    /* Specialize only if the two columns are similar to each other */
+                    if (!columnInSimilarList(target_pred_symbol2, opr_case3.argIdx2, kb.similarCols(target_pred_symbol1, opr_case3.argIdx1)) ||
+                            !columnInSimilarList(target_pred_symbol2, opr_case3.argIdx2, kb.inverseSimilarCols(target_pred_symbol1, opr_case3.argIdx1)) ||
+                            UpdateStatus.NORMAL != opr.specialize(rule)) {
+                        return;
+                    }
+                    break;
+                }
                 case CASE5:
                     if (UpdateStatus.NORMAL != opr.specialize(rule)) {
                         return;
                     }
                     break;
-                case CASE2:
+                case CASE2: {
                     SpecOprCase2 opr_case2 = (SpecOprCase2) opr;
-                    if (UNDETERMINED == templateFunctorInstantiation[opr_case2.functor]) {
-                        for (int i = 0; i < kbRelationNums.length; i++) {
-                            /* Try every possible functor with the same arity of the template one */
-                            if (templateFunctorArities[opr_case2.functor] != kbRelationArities[i]) {  // Check whether arity matches
-                                continue;
+                    final int target_var_arg = Argument.variable(opr_case2.varId);
+                    final int target_pred_symbol = templateFunctorInstantiation[opr_case2.functor];
+                    final int expected_arity = templateFunctorArities[opr_case2.functor];
+                    if (UNDETERMINED == target_pred_symbol) {
+                        /* Filter applicable relations for case 2 */
+                        Set<Integer> similar_rels = new HashSet<>();
+                        boolean first_set = true;
+                        for (int pred_idx = 0; pred_idx < rule.predicates(); pred_idx++) {
+                            Predicate predicate = rule.getPredicate(pred_idx);
+                            for (int arg_idx = 0; arg_idx < predicate.arity(); arg_idx++) {
+                                if (target_var_arg == predicate.args[arg_idx]) {
+                                    if (first_set) {
+                                        first_set = false;
+                                        for (HinterKb.ColInfo col_info : kb.similarCols(predicate.predSymbol, arg_idx)) {
+                                            if (opr_case2.argIdx == col_info.colIdx && expected_arity == kb.getRelationArity(col_info.relIdx)) {
+                                                similar_rels.add(col_info.relIdx);
+                                            }
+                                        }
+                                    } else {
+                                        Set<Integer> _tmp = new HashSet<>();
+                                        for (HinterKb.ColInfo col_info : kb.similarCols(predicate.predSymbol, arg_idx)) {
+                                            if (opr_case2.argIdx == col_info.colIdx && expected_arity == kb.getRelationArity(col_info.relIdx)) {
+                                                _tmp.add(col_info.relIdx);
+                                            }
+                                        }
+                                        similar_rels.removeIf(e -> !_tmp.contains(e));
+                                    }
+                                }
                             }
-                            final int new_functor = kbRelationNums[i];
+                        }
+
+                        for (int new_functor : similar_rels) {
+                            /* Check predicate symbol restrictions of the template */
                             boolean valid = true;
                             int[] new_restriction_counters = restrictionCounters.clone();
                             int[] new_restriction_targets = restrictionTargets.clone();
-                            for (int counter_idx: functorRestrictionCounterLinks[opr_case2.functor]) {  // Add counters
+                            for (int counter_idx : functorRestrictionCounterLinks[opr_case2.functor]) {  // Add counters
                                 if (new_restriction_targets[counter_idx] == new_functor) {
                                     new_restriction_counters[counter_idx]++;
                                 } else {
@@ -312,10 +370,10 @@ public class Hinter {
                             if (valid) {
                                 /* DFS to the next step */
                                 templateFunctorInstantiation[opr_case2.functor] = new_functor;
-                                EntailmentExtractiveRule specialized_rule = rule.clone();
+                                HinterRule specialized_rule = rule.clone();
                                 if (UpdateStatus.NORMAL == specialized_rule.cvt1Uv2ExtLv(   // Can't use the method "specialize" of "SpecOpr",
                                         new_functor,                                        // because the functor in the objects denotes the
-                                        templateFunctorArities[opr_case2.functor],          // template index instead of the real numeration of the functors
+                                        expected_arity,                                     // template index instead of the real numeration of the functors
                                         opr_case2.argIdx, opr_case2.varId)
                                 ) {
                                     specializeByOperations(
@@ -332,27 +390,50 @@ public class Hinter {
                         /* If it goes here, all following operations are done in the recursive call above, just return */
                         return;
                     } else {
-                        if (UpdateStatus.NORMAL != rule.cvt1Uv2ExtLv(
-                                templateFunctorInstantiation[opr_case2.functor], templateFunctorArities[opr_case2.functor],
-                                opr_case2.argIdx, opr_case2.varId
-                        )) {
+                        /* Specialize only if the new variable are similar to all others assigned by the same LV */
+                        for (int pred_idx = 0; pred_idx < rule.predicates(); pred_idx++) {
+                            Predicate predicate = rule.getPredicate(pred_idx);
+                            for (int arg_idx = 0; arg_idx < predicate.arity(); arg_idx++) {
+                                if (target_var_arg == predicate.args[arg_idx]) {
+                                    if (!columnInSimilarList(target_pred_symbol, opr_case2.argIdx, kb.similarCols(predicate.predSymbol, arg_idx)) ||
+                                            !columnInSimilarList(target_pred_symbol, opr_case2.argIdx, kb.inverseSimilarCols(predicate.predSymbol, arg_idx))) {
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                        if (UpdateStatus.NORMAL != rule.cvt1Uv2ExtLv(target_pred_symbol, expected_arity, opr_case2.argIdx, opr_case2.varId)) {
                             return;
                         }
                     }
                     break;
-                case CASE4:
+                }
+                case CASE4: {
                     SpecOprCase4 opr_case4 = (SpecOprCase4) opr;
-                    if (UNDETERMINED == templateFunctorInstantiation[opr_case4.functor]) {
-                        for (int i = 0; i < kbRelationNums.length; i++) {
-                            /* Try every possible functor with the same arity of the template one */
-                            if (templateFunctorArities[opr_case4.functor] != kbRelationArities[i]) {  // Check whether arity matches
-                                continue;
+                    final int expected_arity = templateFunctorArities[opr_case4.functor];
+                    final int target_pred_symbol = templateFunctorInstantiation[opr_case4.functor];
+                    if (UNDETERMINED == target_pred_symbol) {
+                        /* Filter applicable relations for case 4 */
+                        Set<Integer> similar_rels = new HashSet<>();
+                        for (HinterKb.ColInfo col_info : kb.similarCols(opr_case4.predIdx2, opr_case4.argIdx2)) {
+                            if (opr_case4.argIdx1 == col_info.colIdx && expected_arity == kb.getRelationArity(col_info.relIdx)) {
+                                similar_rels.add(col_info.relIdx);
                             }
-                            final int new_functor = kbRelationNums[i];
+                        }
+                        Set<Integer> _tmp = new HashSet<>();
+                        for (HinterKb.ColInfo col_info : kb.inverseSimilarCols(opr_case4.predIdx2, opr_case4.argIdx2)) {
+                            if (opr_case4.argIdx1 == col_info.colIdx && expected_arity == kb.getRelationArity(col_info.relIdx)) {
+                                _tmp.add(col_info.relIdx);
+                            }
+                        }
+                        similar_rels.removeIf(e -> !_tmp.contains(e));
+
+                        for (int new_functor: similar_rels) {
+                            /* Check predicate symbol restrictions of the template */
                             boolean valid = true;
                             int[] new_restriction_counters = restrictionCounters.clone();
                             int[] new_restriction_targets = restrictionTargets.clone();
-                            for (int counter_idx: functorRestrictionCounterLinks[opr_case4.functor]) {  // Add counters
+                            for (int counter_idx : functorRestrictionCounterLinks[opr_case4.functor]) {  // Add counters
                                 if (new_restriction_targets[counter_idx] == new_functor) {
                                     new_restriction_counters[counter_idx]++;
                                 } else {
@@ -366,10 +447,10 @@ public class Hinter {
                             if (valid) {
                                 /* DFS to the next step */
                                 templateFunctorInstantiation[opr_case4.functor] = new_functor;
-                                EntailmentExtractiveRule specialized_rule = rule.clone();
+                                HinterRule specialized_rule = rule.clone();
                                 if (UpdateStatus.NORMAL == specialized_rule.cvt2Uvs2NewLv(  // Can't use the method "specialize" of "SpecOpr",
                                         new_functor,                                        // because the functor in the objects denotes the
-                                        templateFunctorArities[opr_case4.functor],          // template index instead of the real numeration of the functors
+                                        expected_arity,                                     // template index instead of the real numeration of the functors
                                         opr_case4.argIdx1, opr_case4.predIdx2, opr_case4.argIdx2)
                                 ) {
                                     specializeByOperations(
@@ -386,14 +467,22 @@ public class Hinter {
                         /* If it goes here, all following operations are done in the recursive call above, just return */
                         return;
                     } else {
+                        final int target_pred_symbol2 = rule.getPredicate(opr_case4.predIdx2).predSymbol;
+
+                        /* Specialize only if the two columns are similar to each other */
+                        if (!columnInSimilarList(target_pred_symbol2, opr_case4.argIdx2, kb.similarCols(target_pred_symbol, opr_case4.argIdx1)) ||
+                                !columnInSimilarList(target_pred_symbol2, opr_case4.argIdx2, kb.inverseSimilarCols(target_pred_symbol, opr_case4.argIdx1)) ||
+                                UpdateStatus.NORMAL != opr.specialize(rule)) {
+                            return;
+                        }
                         if (UpdateStatus.NORMAL != rule.cvt2Uvs2NewLv(
-                                templateFunctorInstantiation[opr_case4.functor], templateFunctorArities[opr_case4.functor],
-                                opr_case4.argIdx1, opr_case4.predIdx2, opr_case4.argIdx2
+                                target_pred_symbol, expected_arity, opr_case4.argIdx1, opr_case4.predIdx2, opr_case4.argIdx2
                         )) {
                             return;
                         }
                     }
                     break;
+                }
             }
         }
 
@@ -408,6 +497,17 @@ public class Hinter {
             collectedRuleInfos.add(new CollectedRuleInfo(rule_info, eval.value(EvalMetric.CompressionRatio)));
             rule.extractPositiveEntailments(positiveEntailments);
         }
+    }
+
+    protected boolean columnInSimilarList(int relIdx, int colIdx, List<HinterKb.ColInfo> similarList) {
+        boolean in_list = false;
+        for (HinterKb.ColInfo col_info: similarList) {
+            if (col_info.relIdx == relIdx && col_info.colIdx == colIdx) {
+                in_list = true;
+                break;
+            }
+        }
+        return in_list;
     }
 
     protected String rule2String(List<Predicate> structure) {

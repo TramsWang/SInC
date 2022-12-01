@@ -197,4 +197,8 @@ public class SimpleKb {
         }
         return constants.size();
     }
+
+    public int getRelationArity(int relId) {
+        return relations[relId].totalCols();
+    }
 }

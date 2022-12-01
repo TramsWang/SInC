@@ -51,8 +51,10 @@ public class Hint {
             int[] args = new int[parsed_pred.args.length];
             for (int i = 0; i < args.length; i++) {
                 ParsedArg parsed_arg = parsed_pred.args[i];
-                args[i] = (null == parsed_arg.name) ? Argument.variable(parsed_arg.id) :
-                        Argument.constant(numMap.name2Num(parsed_arg.name));
+                args[i] = (null == parsed_arg) ? Argument.EMPTY_VALUE : (
+                        (null == parsed_arg.name) ? Argument.variable(parsed_arg.id) :
+                        Argument.constant(numMap.name2Num(parsed_arg.name))
+                );
             }
             template.add(new Predicate(functor, args));
         }

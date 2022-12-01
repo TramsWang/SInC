@@ -100,7 +100,7 @@ public class HinterMultiThread {
     protected final Path outputFilePath;
 
     /** The target KB */
-    protected SimpleKb kb;
+    protected HinterKb kb;
     /** The numeration map */
     protected NumerationMap numMap;
     /** The numerations of the relations in the KB */
@@ -151,19 +151,6 @@ public class HinterMultiThread {
      */
     public void run() throws ExperimentException {
         try {
-            /* Load KB */
-            long time_start = System.currentTimeMillis();
-            kb = new SimpleKb(kbName, kbPath);
-            numMap = new NumerationMap(Paths.get(kbPath, kbName).toString());
-            kbRelationNums = new int[kb.totalRelations()];
-            kbRelationArities = new int[kb.totalRelations()];
-            int idx = 0;
-            for (SimpleRelation relation: kb.getRelations()) {
-                kbRelationNums[idx] = relation.id;
-                kbRelationArities[idx] = relation.totalCols();
-                idx++;
-            }
-
             /* Load hint file */
             /* Read "Fact Coverage" and "τ" */
             BufferedReader reader = new BufferedReader(new FileReader(hintFilePath));
@@ -184,6 +171,19 @@ public class HinterMultiThread {
             List<Hint> hints = new ArrayList<>();
             while (null != (line = reader.readLine())) {
                 hints.add(new Hint(line, numMap));
+            }
+
+            /* Load KB */
+            long time_start = System.currentTimeMillis();
+            kb = new HinterKb(kbName, kbPath, factCoverageThreshold);
+            numMap = new NumerationMap(Paths.get(kbPath, kbName).toString());
+            kbRelationNums = new int[kb.totalRelations()];
+            kbRelationArities = new int[kb.totalRelations()];
+            int idx = 0;
+            for (SimpleRelation relation: kb.getRelations()) {
+                kbRelationNums[idx] = relation.id;
+                kbRelationArities[idx] = relation.totalCols();
+                idx++;
             }
 
             /* Instantiate templates */
@@ -208,7 +208,7 @@ public class HinterMultiThread {
                         continue;
                     }
                     Set<Fingerprint> fingerprint_cache = Collections.synchronizedSet(new HashSet<>());
-                    EntailmentExtractiveRule rule = new EntailmentExtractiveRule(head_functor, head_arity, fingerprint_cache, tabu_set, kb);
+                    HinterRule rule = new HinterRule(head_functor, head_arity, fingerprint_cache, tabu_set, kb);
                     int totalFunctors = hint.functorRestrictionCounterLink.length;
                     int[] template_functor_instantiation = ArrayOperation.initArrayWithValue(totalFunctors, UNDETERMINED);
                     int[] restriction_counters = ArrayOperation.initArrayWithValue(hint.restrictions.size(), 1);
@@ -273,7 +273,7 @@ public class HinterMultiThread {
      * @param positiveEntailments            The relation object that holds all the entailed records in one relation
      */
     protected void specializeByOperations(
-            EntailmentExtractiveRule rule, List<SpecOpr> operations, int oprStartIdx,
+            HinterRule rule, List<SpecOpr> operations, int oprStartIdx,
             int[] templateFunctorInstantiation, int[] templateFunctorArities,
             int[][] functorRestrictionCounterLinks, int[] restrictionCounterBounds, int[] restrictionCounters,
             int[] restrictionTargets, SimpleRelation positiveEntailments
@@ -317,7 +317,7 @@ public class HinterMultiThread {
                                 final int new_opr_idx = opr_idx + 1;
                                 threadPool.submit(() -> {
                                     /* Copy arguments */
-                                    EntailmentExtractiveRule specialized_rule = rule.clone();
+                                    HinterRule specialized_rule = rule.clone();
                                     int[] new_template_functor_instantiation = templateFunctorInstantiation.clone();
                                     new_template_functor_instantiation[opr_case2.functor] = new_functor;
 
@@ -377,7 +377,7 @@ public class HinterMultiThread {
                                 final int new_opr_idx = opr_idx + 1;
                                 threadPool.submit(() -> {
                                     /* Copy arguments */
-                                    EntailmentExtractiveRule specialized_rule = rule.clone();
+                                    HinterRule specialized_rule = rule.clone();
                                     int[] new_template_functor_instantiation = templateFunctorInstantiation.clone();
                                     new_template_functor_instantiation[opr_case4.functor] = new_functor;
 

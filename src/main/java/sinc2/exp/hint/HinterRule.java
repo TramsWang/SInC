@@ -5,7 +5,6 @@ import sinc2.common.Record;
 import sinc2.impl.base.CachedRule;
 import sinc2.impl.base.CompliedBlock;
 import sinc2.kb.KbException;
-import sinc2.kb.SimpleKb;
 import sinc2.kb.SimpleRelation;
 import sinc2.rule.Fingerprint;
 import sinc2.rule.Rule;
@@ -18,29 +17,29 @@ import java.util.*;
  *
  * @since 2.0
  */
-public class EntailmentExtractiveRule extends CachedRule {
+public class HinterRule extends CachedRule {
 
-    public EntailmentExtractiveRule(
+    public HinterRule(
             int headRelNum, int arity, Set<Fingerprint> fingerprintCache,
-            Map<MultiSet<Integer>, Set<Fingerprint>> category2TabuSetMap, SimpleKb kb
+            Map<MultiSet<Integer>, Set<Fingerprint>> category2TabuSetMap, HinterKb kb
     ) {
         super(headRelNum, arity, fingerprintCache, category2TabuSetMap, kb);
     }
 
-    public EntailmentExtractiveRule(
+    public HinterRule(
             List<Predicate> structure, Set<Fingerprint> fingerprintCache,
-            Map<MultiSet<Integer>, Set<Fingerprint>> category2TabuSetMap, SimpleKb kb
+            Map<MultiSet<Integer>, Set<Fingerprint>> category2TabuSetMap, HinterKb kb
     ) {
         super(structure, fingerprintCache, category2TabuSetMap, kb);
     }
 
-    public EntailmentExtractiveRule(CachedRule another) {
+    public HinterRule(CachedRule another) {
         super(another);
     }
 
     @Override
-    public EntailmentExtractiveRule clone() {
-        return new EntailmentExtractiveRule(this);
+    public HinterRule clone() {
+        return new HinterRule(this);
     }
 
     /**
