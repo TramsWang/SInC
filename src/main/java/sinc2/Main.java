@@ -181,7 +181,7 @@ public class Main {
         /* Create SInC Object */
         SincConfig config = new SincConfig(
                 input_path, input_kb_name, output_path, output_kb_name,
-                threads, validation, beam, metric, fc, cc, scr
+                threads, validation, beam, metric, fc, cc, scr, 1.0
         );
         return new SincBasic(config);
     }
