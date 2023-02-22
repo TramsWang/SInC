@@ -174,6 +174,18 @@ public class MultiSet<T> {
         return true;
     }
 
+    public int itemCount(T item) {
+        return cntMap.getOrDefault(item, 0);
+    }
+
+    public int itemCount(Collection<T> items) {
+        int cnt = 0;
+        for (T item: items) {
+            cnt += cntMap.getOrDefault(item, 0);
+        }
+        return cnt;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
