@@ -80,6 +80,7 @@ public class TypeRulesMiner {
         NumerationMap num_map = new NumerationMap(kb_dir_path);
         long time_map_loaded = System.currentTimeMillis();
         logger.printf("Done (%d ms)\n", time_map_loaded - time_start);
+        logger.flush();
 
         /* Load type & other normal relations */
         logger.println("Loading relations ...");
@@ -145,6 +146,7 @@ public class TypeRulesMiner {
         });
         long time_relation_loaded = System.currentTimeMillis();
         logger.printf("Done (%d s)\n", (time_relation_loaded - time_map_loaded) / 1000);
+        logger.flush();
 
         /* Compare sub-types */
         logger.println("Comparing subtypes ...");
@@ -168,6 +170,7 @@ public class TypeRulesMiner {
                             eval.getPosEtls() / typed_entities2.entities.length, eval.value(EvalMetric.CompressionRatio),
                             (int) eval.value(EvalMetric.CompressionCapacity)
                     );
+                    typed_entities2.entailAll(intersection);
                 }
                 if (intersection.length + intersection.length > typed_entities2.entities.length) {
                     /* type1 <- type2 */
@@ -179,15 +182,17 @@ public class TypeRulesMiner {
                             eval.getPosEtls() / typed_entities1.entities.length, eval.value(EvalMetric.CompressionRatio),
                             (int) eval.value(EvalMetric.CompressionCapacity)
                     );
+                    typed_entities1.entailAll(intersection);
                 }
             }
         }
         sub_type_writer.close();
         long time_sub_types_found = System.currentTimeMillis();
         logger.printf("Done (%d s)\n", (time_sub_types_found - time_relation_loaded) / 1000);
+        logger.flush();
 
         /* Find type inferences */
-        logger.printf("Finding type inferences ...");
+        logger.println("Finding type inferences ...");
         PrintWriter type_inference_writer = new PrintWriter(Paths.get(output_dir_path, TYPE_INFERENCE_FILE_NAME).toFile());
         type_inference_writer.println(RULE_FILE_TITLE_LINE);
         for (int rel_idx = 0; rel_idx < relations.size(); rel_idx++) {
@@ -217,6 +222,7 @@ public class TypeRulesMiner {
                                 eval.getPosEtls() / type.entities.length, eval.value(EvalMetric.CompressionRatio),
                                 (int) eval.value(EvalMetric.CompressionCapacity)
                         );
+                        type.entailAll(intersection);
                     }
                 }
             }
@@ -224,6 +230,7 @@ public class TypeRulesMiner {
         type_inference_writer.close();
         long time_type_inference_found = System.currentTimeMillis();
         logger.printf("Done (%d s)\n", (time_type_inference_found - time_sub_types_found) / 1000);
+        logger.flush();
 
         /* Calculate total coverage of types */
         int total_covered = 0;
@@ -239,6 +246,7 @@ public class TypeRulesMiner {
         }
         logger.printf("Total Coverage: %.2f%% (%d/%d)\n", total_covered * 100.0 / total, total_covered, total);
         logger.printf("Total Time: %d s\n", (System.currentTimeMillis() - time_start) / 1000);
+        logger.flush();
         logger.close();
     }
 
