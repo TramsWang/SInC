@@ -498,7 +498,7 @@ public class CachedRule extends Rule {
         
         /* Update evaluation score */
         /* Those already proved should be excluded from the entire entailment set. Otherwise, they are counted as negative ones */
-        return new Eval(eval, newly_proved.size(), all_entails - already_proved.size(), length);
+        return new Eval(newly_proved.size(), all_entails - already_proved.size(), length);
     }
 
     /**

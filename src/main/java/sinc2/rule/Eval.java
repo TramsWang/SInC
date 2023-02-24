@@ -14,7 +14,7 @@ public class Eval {
      */
     private static class EvalMin extends Eval {
         private EvalMin() {
-            super(null, 0, Double.POSITIVE_INFINITY, Integer.MAX_VALUE);
+            super(0, Double.POSITIVE_INFINITY, Integer.MAX_VALUE);
         }
 
         @Override
@@ -58,12 +58,11 @@ public class Eval {
     /**
      * Initialize a evaluation score.
      *
-     * @param previousEval The evaluation of the rule that is specialized to the rule of this evaluation Todo: this should be removed from the calculation
      * @param posEtls The total number of positive entailments
      * @param allEtls The total number of entailments
      * @param ruleLength The length of the rule
      */
-    public Eval(Eval previousEval, double posEtls, double allEtls, int ruleLength) {
+    public Eval(double posEtls, double allEtls, int ruleLength) {
         this.posEtls = posEtls;
         this.negEtls = allEtls - posEtls;
         this.allEtls = allEtls;
@@ -71,14 +70,8 @@ public class Eval {
 
         double tmp_ratio = posEtls / (allEtls + ruleLength);
         this.compRatio = Double.isNaN(tmp_ratio) ? 0 : tmp_ratio;
-
         this.compCapacity = posEtls - negEtls - ruleLength;
-
-        double delta_info = (0 == posEtls) ? 0 : ((null == previousEval || 0 == previousEval.posEtls) ?
-                posEtls * Math.log(posEtls / allEtls) :
-                posEtls * (Math.log(posEtls / allEtls) - Math.log(previousEval.posEtls / previousEval.allEtls))
-        );
-        this.infoGain = ((null == previousEval) ? 0 : previousEval.infoGain) + delta_info;
+        this.infoGain = (0 == posEtls || 0 == compRatio) ? 0 : posEtls * Math.log(compRatio);
     }
 
     /**

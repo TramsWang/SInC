@@ -158,7 +158,7 @@ class CachedRuleTest {
         final CachedRule rule = new CachedRule(NUM_PARENT, 2, fp_cache, tabu_map, kb);
         assertEquals("parent(?,?):-", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 9, 16 * 16, 0),
+                new Eval(9, 16 * 16, 0),
                 rule.getEval()
         );
         assertEquals(0, rule.usedLimitedVars());
@@ -171,7 +171,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule.cvt2Uvs2NewLv(NUM_FATHER, 2, 0, 0, 0));
         assertEquals("parent(X0,?):-father(X0,?)", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 4, 4 * 16, 1),
+                new Eval(4, 4 * 16, 1),
                 rule.getEval()
         );
         assertEquals(1, rule.usedLimitedVars());
@@ -219,7 +219,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule.cvt2Uvs2NewLv(0, 1, 1, 1));
         assertEquals("parent(X0,X1):-father(X0,X1)", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 0, 2, 2),
+                new Eval(0, 2, 2),
                 rule.getEval()
         );
         assertEquals(2, rule.usedLimitedVars());
@@ -244,7 +244,7 @@ class CachedRuleTest {
         final CachedRule rule = new CachedRule(NUM_PARENT, 2, fp_cache, tabu_map, kb);
         assertEquals("parent(?,?):-", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 9, 16 * 16, 0),
+                new Eval(9, 16 * 16, 0),
                 rule.getEval()
         );
         assertEquals(0, rule.usedLimitedVars());
@@ -257,7 +257,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule.cvt2Uvs2NewLv(NUM_FATHER, 2, 1, 0, 1));
         assertEquals("parent(?,X0):-father(?,X0)", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 4, 5 * 16, 1),
+                new Eval(4, 5 * 16, 1),
                 rule.getEval()
         );
         assertEquals(1, rule.usedLimitedVars());
@@ -288,7 +288,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule.cvt2Uvs2NewLv(0, 0, 1, 0));
         assertEquals("parent(X1,X0):-father(X1,X0)", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 0, 2, 2),
+                new Eval(0, 2, 2),
                 rule.getEval()
         );
         assertEquals(2, rule.usedLimitedVars());
@@ -313,7 +313,7 @@ class CachedRuleTest {
         final CachedRule rule = new CachedRule(NUM_GRANDPARENT, 2, fp_cache, tabu_map, kb);
         assertEquals("grandParent(?,?):-", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 3, 16 * 16, 0),
+                new Eval(3, 16 * 16, 0),
                 rule.getEval()
         );
         assertEquals(0, rule.usedLimitedVars());
@@ -326,7 +326,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule.cvt2Uvs2NewLv(NUM_PARENT, 2, 0, 0, 0));
         assertEquals("grandParent(X0,?):-parent(X0,?)", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 2, 6 * 16, 1),
+                new Eval(2, 6 * 16, 1),
                 rule.getEval()
         );
         assertEquals(1, rule.usedLimitedVars());
@@ -339,7 +339,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule.cvt2Uvs2NewLv(NUM_PARENT, 2, 1, 0, 1));
         assertEquals("grandParent(X0,X1):-parent(X0,?),parent(?,X1)", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 2, 6 * 8, 2),
+                new Eval(2, 6 * 8, 2),
                 rule.getEval()
         );
         assertEquals(2, rule.usedLimitedVars());
@@ -377,7 +377,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule.cvt2Uvs2NewLv(1, 1, 2, 0));
         assertEquals("grandParent(X0,X1):-parent(X0,X2),parent(X2,X1)", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 0, 2, 3),
+                new Eval(0, 2, 3),
                 rule.getEval()
         );
         assertEquals(3, rule.usedLimitedVars());
@@ -402,7 +402,7 @@ class CachedRuleTest {
         final CachedRule rule = new CachedRule(NUM_GRANDPARENT, 2, fp_cache, tabu_map, kb);
         assertEquals("grandParent(?,?):-", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 3, 16 * 16, 0),
+                new Eval(3, 16 * 16, 0),
                 rule.getEval()
         );
         assertEquals(0, rule.usedLimitedVars());
@@ -415,7 +415,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule.cvt2Uvs2NewLv(NUM_PARENT, 2, 0, 0, 0));
         assertEquals("grandParent(X0,?):-parent(X0,?)", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 2, 6 * 16, 1),
+                new Eval(2, 6 * 16, 1),
                 rule.getEval()
         );
         assertEquals(1, rule.usedLimitedVars());
@@ -428,7 +428,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule.cvt2Uvs2NewLv(NUM_PARENT, 2, 0, 1, 1));
         assertEquals("grandParent(X0,?):-parent(X0,X1),parent(X1,?)", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 2, 2 * 16, 2),
+                new Eval(2, 2 * 16, 2),
                 rule.getEval()
         );
         assertEquals(2, rule.usedLimitedVars());
@@ -441,7 +441,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule.cvt2Uvs2NewLv(2, 1, 0, 1));
         assertEquals("grandParent(X0,X2):-parent(X0,X1),parent(X1,X2)", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 2, 4, 3),
+                new Eval(2, 4, 3),
                 rule.getEval()
         );
         assertEquals(3, rule.usedLimitedVars());
@@ -479,7 +479,7 @@ class CachedRuleTest {
         final CachedRule rule = new CachedRule(NUM_GRANDPARENT, 2, fp_cache, tabu_map, kb);
         assertEquals("grandParent(?,?):-", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 3, 16 * 16, 0),
+                new Eval(3, 16 * 16, 0),
                 rule.getEval()
         );
         assertEquals(0, rule.usedLimitedVars());
@@ -492,7 +492,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule.cvt2Uvs2NewLv(NUM_PARENT, 2, 0, 0, 0));
         assertEquals("grandParent(X0,?):-parent(X0,?)", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 2, 6 * 16, 1),
+                new Eval(2, 6 * 16, 1),
                 rule.getEval()
         );
         assertEquals(1, rule.usedLimitedVars());
@@ -505,7 +505,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule.cvt2Uvs2NewLv(NUM_FATHER, 2, 0, 1, 1));
         assertEquals("grandParent(X0,?):-parent(X0,X1),father(X1,?)", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 2, 3 * 16, 2),
+                new Eval(2, 3 * 16, 2),
                 rule.getEval()
         );
         assertEquals(2, rule.usedLimitedVars());
@@ -518,7 +518,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule.cvt2Uvs2NewLv(2, 1, 0, 1));
         assertEquals("grandParent(X0,X2):-parent(X0,X1),father(X1,X2)", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 2, 4, 3),
+                new Eval(2, 4, 3),
                 rule.getEval()
         );
         assertEquals(3, rule.usedLimitedVars());
@@ -545,7 +545,7 @@ class CachedRuleTest {
         final CachedRule rule = new CachedRule(NUM_GRANDPARENT, 2, fp_cache, tabu_map, kb);
         assertEquals("grandParent(?,?):-", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 3, 16 * 16, 0),
+                new Eval(3, 16 * 16, 0),
                 rule.getEval()
         );
         assertEquals(0, rule.usedLimitedVars());
@@ -558,7 +558,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule.cvt2Uvs2NewLv(NUM_FATHER, 2, 1, 0, 1));
         assertEquals("grandParent(?,X0):-father(?,X0)", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 2, 5 * 16, 1),
+                new Eval(2, 5 * 16, 1),
                 rule.getEval()
         );
         assertEquals(1, rule.usedLimitedVars());
@@ -571,7 +571,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule.cvt1Uv2Const(0, 0, NUM_G1));
         assertEquals(String.format("grandParent(%d,X0):-father(?,X0)", NUM_G1), rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 1, 5, 2),
+                new Eval(1, 5, 2),
                 rule.getEval()
         );
         assertEquals(1, rule.usedLimitedVars());
@@ -593,7 +593,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule.cvt1Uv2Const(1, 0, NUM_F2));
         assertEquals(String.format("grandParent(%d,X0):-father(%d,X0)", NUM_G1, NUM_F2), rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 0, 2, 3),
+                new Eval(0, 2, 3),
                 rule.getEval()
         );
         assertEquals(1, rule.usedLimitedVars());
@@ -618,7 +618,7 @@ class CachedRuleTest {
         final CachedRule rule = new CachedRule(NUM_PARENT, 2, fp_cache, tabu_map, kb);
         assertEquals("parent(?,?):-", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 9, 16 * 16, 0),
+                new Eval(9, 16 * 16, 0),
                 rule.getEval()
         );
         assertEquals(0, rule.usedLimitedVars());
@@ -631,7 +631,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule.cvt2Uvs2NewLv(0, 0, 0, 1));
         assertEquals("parent(X0,X0):-", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 0, 16, 1),
+                new Eval(0, 16, 1),
                 rule.getEval()
         );
         assertEquals(1, rule.usedLimitedVars());
@@ -658,7 +658,7 @@ class CachedRuleTest {
         final CachedRule rule = new CachedRule(NUM_FATHER, 2, fp_cache, tabu_map, kb);
         assertEquals("father(?,?):-", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 5, 16 * 16, 0),
+                new Eval(5, 16 * 16, 0),
                 rule.getEval()
         );
         assertEquals(0, rule.usedLimitedVars());
@@ -671,7 +671,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule.cvt2Uvs2NewLv(NUM_PARENT, 2, 1, 0, 0));
         assertEquals("father(X0,?):-parent(?,X0)", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 4, 8 * 16, 1),
+                new Eval(4, 8 * 16, 1),
                 rule.getEval()
         );
         assertEquals(1, rule.usedLimitedVars());
@@ -684,7 +684,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule.cvt1Uv2ExtLv(NUM_PARENT, 2, 0, 0));
         assertEquals("father(X0,?):-parent(?,X0),parent(X0,?)", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 3, 3 * 16, 2),
+                new Eval(3, 3 * 16, 2),
                 rule.getEval()
         );
         assertEquals(1, rule.usedLimitedVars());
@@ -750,7 +750,7 @@ class CachedRuleTest {
         final CachedRule rule1 = new CachedRule(NUM_FATHER, 2, fp_cache, tabu_map, kb);
         assertEquals("father(?,?):-", rule1.toDumpString(KB));
         assertEquals(
-                new Eval(null, 5, 16 * 16, 0),
+                new Eval(5, 16 * 16, 0),
                 rule1.getEval()
         );
         assertEquals(0, rule1.usedLimitedVars());
@@ -763,7 +763,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule1.cvt1Uv2Const(0, 0, NUM_F2));
         assertEquals(String.format("father(%d,?):-", NUM_F2), rule1.toDumpString(KB));
         assertEquals(
-                new Eval(null, 2, 16, 1),
+                new Eval(2, 16, 1),
                 rule1.getEval()
         );
         assertEquals(0, rule1.usedLimitedVars());
@@ -778,7 +778,7 @@ class CachedRuleTest {
         final CachedRule rule2 = new CachedRule(NUM_FATHER, 2, fp_cache2, tabu_map2, kb);
         assertEquals("father(?,?):-", rule2.toDumpString(KB));
         assertEquals(
-                new Eval(null, 3, 16 * 16 - 2, 0),
+                new Eval(3, 16 * 16 - 2, 0),
                 rule2.getEval()
         );
         assertEquals(0, rule2.usedLimitedVars());
@@ -814,7 +814,7 @@ class CachedRuleTest {
         final CachedRule rule = new CachedRule(NUM_PARENT, 2, fp_cache, tabu_map, kb);
         assertEquals("parent(?,?):-", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 9, 16 * 16, 0),
+                new Eval(9, 16 * 16, 0),
                 rule.getEval()
         );
         assertEquals(0, rule.usedLimitedVars());
@@ -827,7 +827,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule.cvt2Uvs2NewLv(0, 0, 0, 1));
         assertEquals("parent(X0,X0):-", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 0, 16, 1),
+                new Eval(0, 16, 1),
                 rule.getEval()
         );
         assertEquals(1, rule.usedLimitedVars());
@@ -854,7 +854,7 @@ class CachedRuleTest {
         final CachedRule rule = new CachedRule(NUM_FATHER, 2, fp_cache, tabu_map, kb);
         assertEquals("father(?,?):-", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 5, 16 * 16, 0),
+                new Eval(5, 16 * 16, 0),
                 rule.getEval()
         );
         assertEquals(0, rule.usedLimitedVars());
@@ -883,7 +883,7 @@ class CachedRuleTest {
         final CachedRule rule = new CachedRule(NUM_GRANDPARENT, 2, fp_cache, tabu_map, kb);
         assertEquals("grandParent(?,?):-", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 3, 16 * 16, 0),
+                new Eval(3, 16 * 16, 0),
                 rule.getEval()
         );
         assertEquals(0, rule.usedLimitedVars());
@@ -897,7 +897,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule1.cvt2Uvs2NewLv(NUM_PARENT, 2, 0, 0, 0));
         assertEquals("grandParent(X0,?):-parent(X0,?)", rule1.toDumpString(KB));
         assertEquals(
-                new Eval(null, 2, 6 * 16, 1),
+                new Eval(2, 6 * 16, 1),
                 rule1.getEval()
         );
         assertEquals(1, rule1.usedLimitedVars());
@@ -910,7 +910,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule1.cvt2Uvs2NewLv(NUM_FATHER, 2, 0, 1, 1));
         assertEquals("grandParent(X0,?):-parent(X0,X1),father(X1,?)", rule1.toDumpString(KB));
         assertEquals(
-                new Eval(null, 2, 3 * 16, 2),
+                new Eval(2, 3 * 16, 2),
                 rule1.getEval()
         );
         assertEquals(2, rule1.usedLimitedVars());
@@ -923,7 +923,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule1.cvt2Uvs2NewLv(0, 1, 2, 1));
         assertEquals("grandParent(X0,X2):-parent(X0,X1),father(X1,X2)", rule1.toDumpString(KB));
         assertEquals(
-                new Eval(null, 2, 4, 3),
+                new Eval(2, 4, 3),
                 rule1.getEval()
         );
         assertEquals(3, rule1.usedLimitedVars());
@@ -951,7 +951,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule3.cvt2Uvs2NewLv(NUM_FATHER, 2, 1, 0, 1));
         assertEquals("grandParent(?,X0):-father(?,X0)", rule3.toDumpString(KB));
         assertEquals(
-                new Eval(null, 0, 5 * 16 - 2, 1),
+                new Eval(0, 5 * 16 - 2, 1),
                 rule3.getEval()
         );
         assertEquals(1, rule3.usedLimitedVars());
@@ -964,7 +964,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule3.cvt2Uvs2NewLv(NUM_PARENT, 2, 0, 0, 0));
         assertEquals("grandParent(X1,X0):-father(?,X0),parent(X1,?)", rule3.toDumpString(KB));
         assertEquals(
-                new Eval(null, 0, 5 * 6 - 2, 2),
+                new Eval(0, 5 * 6 - 2, 2),
                 rule3.getEval()
         );
         assertEquals(2, rule3.usedLimitedVars());
@@ -1001,7 +1001,7 @@ class CachedRuleTest {
         final CachedRule rule1 = new CachedRule(NUM_PARENT, 2, fp_cache, tabu_map, kb);
         assertEquals("parent(?,?):-", rule1.toDumpString(KB));
         assertEquals(
-                new Eval(null, 9, 16 * 16, 0),
+                new Eval(9, 16 * 16, 0),
                 rule1.getEval()
         );
         assertEquals(0, rule1.usedLimitedVars());
@@ -1014,7 +1014,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule1.cvt1Uv2Const(0, 0, NUM_F2));
         assertEquals(String.format("parent(%d,?):-", NUM_F2), rule1.toDumpString(KB));
         assertEquals(
-                new Eval(null, 2, 16, 1),
+                new Eval(2, 16, 1),
                 rule1.getEval()
         );
         assertEquals(0, rule1.usedLimitedVars());
@@ -1028,7 +1028,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule2.cvt1Uv2Const(0, 1, NUM_D2));
         assertEquals(String.format("parent(%d,%d):-", NUM_F2, NUM_D2), rule2.toDumpString(KB));
         assertEquals(
-                new Eval(null, 1, 1, 2),
+                new Eval(1, 1, 2),
                 rule2.getEval()
         );
         assertEquals(0, rule2.usedLimitedVars());
@@ -1045,7 +1045,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule3.cvt2Uvs2NewLv(NUM_FATHER, 2, 1, 0, 1));
         assertEquals(String.format("parent(%d,X0):-father(?,X0)", NUM_F2), rule3.toDumpString(KB));
         assertEquals(
-                new Eval(null, 1, 4, 2),
+                new Eval(1, 4, 2),
                 rule3.getEval()
         );
         assertEquals(1, rule3.usedLimitedVars());
@@ -1144,7 +1144,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule.cvt2Uvs2NewLv(NUM_FATHER, 2, 0, 0, 0));
         assertEquals("parent(X0,?):-father(X0,?)", rule.toDumpString(KB));
         assertEquals(
-                new Eval(null, 4, 4 * 16, 1),
+                new Eval(4, 4 * 16, 1),
                 rule.getEval()
         );
     }
@@ -1201,7 +1201,7 @@ class CachedRuleTest {
         rule.updateCacheIndices();
         assertEquals(UpdateStatus.NORMAL, rule.cvt1Uv2Const(1, 2, plus));
         assertEquals("h(X0,X0,X1,X1):-p(X0,X1,3)", rule.toDumpString(kb));
-        assertEquals(new Eval(null, 2, 2, 5), rule.getEval());
+        assertEquals(new Eval(2, 2, 5), rule.getEval());
         assertEquals(2, rule.usedLimitedVars());
         assertEquals(5, rule.length());
         final Set<ComparableArray<Record>> expected_grounding_set = new HashSet<>();
@@ -1241,7 +1241,7 @@ class CachedRuleTest {
         rule.updateCacheIndices();
         assertEquals(UpdateStatus.NORMAL, rule.cvt1Uv2ExtLv(1, 1, 0));
         assertEquals("h(X0):-p(X0,X0),q(X0)", rule.toDumpString(kb));
-        assertEquals(new Eval(null, 1, 1, 3), rule.getEval());
+        assertEquals(new Eval(1, 1, 3), rule.getEval());
         assertEquals(1, rule.usedLimitedVars());
         assertEquals(3, rule.length());
         final Set<ComparableArray<Record>> expected_grounding_set = new HashSet<>();
@@ -1268,7 +1268,7 @@ class CachedRuleTest {
         rule.updateCacheIndices();
         assertEquals(UpdateStatus.NORMAL, rule.cvt2Uvs2NewLv(0, 0, 0, 1));
         assertEquals("h(X0,X0):-", rule.toDumpString(kb));
-        assertEquals(new Eval(null, 2, 3, 1), rule.getEval());
+        assertEquals(new Eval(2, 3, 1), rule.getEval());
         assertEquals(1, rule.usedLimitedVars());
         assertEquals(1, rule.length());
         final Set<ComparableArray<Record>> expected_grounding_set = new HashSet<>();
@@ -1299,7 +1299,7 @@ class CachedRuleTest {
         rule.updateCacheIndices();
         assertEquals(UpdateStatus.NORMAL, rule.cvt2Uvs2NewLv(0, 0, 0, 1));
         assertEquals("h(X0,X0,?):-", rule.toDumpString(kb));
-        assertEquals(new Eval(null, 2, 4, 1), rule.getEval());
+        assertEquals(new Eval(2, 4, 1), rule.getEval());
         assertEquals(1, rule.usedLimitedVars());
         assertEquals(1, rule.length());
         final Set<ComparableArray<Record>> expected_grounding_set = new HashSet<>();
@@ -1351,7 +1351,7 @@ class CachedRuleTest {
                 new HashSet<>(), new HashMap<>(), kb
         );
         assertEquals("h(X0,X1,X0,?,1,?):-p(X1,X2,X2)", rule.toDumpString(kb));
-        assertEquals(new Eval(null, 1, 4 * 5 * 5 * 5, 4), rule.getEval());
+        assertEquals(new Eval(1, 4 * 5 * 5 * 5, 4), rule.getEval());
         assertEquals(3, rule.usedLimitedVars());
         assertEquals(4, rule.length());
         final Set<ComparableArray<Record>> expected_grounding_set = new HashSet<>();
@@ -1429,7 +1429,7 @@ class CachedRuleTest {
                 new HashSet<>(), new HashMap<>(), kb
         );
         assertEquals("h(?,X0,X0,?):-p(1,X0,?),q(X0,?,X0),s(1),r(X0)", rule.toDumpString(kb));
-        assertEquals(new Eval(null, 1, 1 * 5 * 5, 7), rule.getEval());
+        assertEquals(new Eval(1, 1 * 5 * 5, 7), rule.getEval());
         assertEquals(1, rule.usedLimitedVars());
         assertEquals(7, rule.length());
         final Set<ComparableArray<Record>> expected_grounding_set1 = new HashSet<>();

@@ -98,7 +98,7 @@ abstract public class TemplateMinerMT extends TemplateMiner {
         }
         int[][] positive_entailments = headRelation.intersectionWithSortedRows(entailments);
         double coverage = ((double) positive_entailments.length) / headRelation.totalRows();
-        Eval eval = new Eval(null, positive_entailments.length, entailments.length, templateLength());
+        Eval eval = new Eval(positive_entailments.length, entailments.length, templateLength());
         if (COVERAGE_THRESHOLD <= coverage && TAU_THRESHOLD <= eval.value(EvalMetric.CompressionRatio)) {
             /* Add result */
             synchronized (matchedRules) {

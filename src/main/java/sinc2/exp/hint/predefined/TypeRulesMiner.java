@@ -160,7 +160,7 @@ public class TypeRulesMiner {
                 int[] intersection = intersection(typed_entities1.entities, typed_entities2.entities);
                 if (intersection.length + intersection.length > typed_entities1.entities.length) {
                     /* type2 <- type1 */
-                    Eval eval = new Eval(null, intersection.length, typed_entities1.entities.length, 1);
+                    Eval eval = new Eval(intersection.length, typed_entities1.entities.length, 1);
                     sub_type_writer.printf(
                             "%s(X0):-%s(X0)\t%d\t%d\t%d\t%.2f\t%.2f\t%d\n",
                             num_map.num2Name(typed_entities2.type), num_map.num2Name(typed_entities1.type),
@@ -171,7 +171,7 @@ public class TypeRulesMiner {
                 }
                 if (intersection.length + intersection.length > typed_entities2.entities.length) {
                     /* type1 <- type2 */
-                    Eval eval = new Eval(null, intersection.length, typed_entities2.entities.length, 1);
+                    Eval eval = new Eval(intersection.length, typed_entities2.entities.length, 1);
                     sub_type_writer.printf(
                             "%s(X0):-%s(X0)\t%d\t%d\t%d\t%.2f\t%.2f\t%d\n",
                             num_map.num2Name(typed_entities1.type), num_map.num2Name(typed_entities2.type),
@@ -205,7 +205,7 @@ public class TypeRulesMiner {
                     int[] intersection = intersection(arg_values, type.entities);
                     if (intersection.length + intersection.length > arg_values.length) {
                         /* type(X) <- relation(..., X, ...) */
-                        Eval eval = new Eval(null, intersection.length, arg_values.length, 1);
+                        Eval eval = new Eval(intersection.length, arg_values.length, 1);
                         type_inference_writer.printf("%s(X0):-%s(", num_map.num2Name(type.type), relation_names.get(rel_idx));
                         if (0 == arg_idx) {
                             type_inference_writer.print("X0,?)");

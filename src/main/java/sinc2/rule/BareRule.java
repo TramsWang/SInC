@@ -18,7 +18,7 @@ import java.util.Set;
  */
 public class BareRule extends Rule {
 
-    public Eval returningEval = new Eval(null, 0, 0, length);
+    public Eval returningEval = new Eval(0, 0, length);
     public double coverage = 1.0;
     public UpdateStatus case1PreUpdateStatus = UpdateStatus.NORMAL;
     public UpdateStatus case1PostUpdateStatus = UpdateStatus.NORMAL;
