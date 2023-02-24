@@ -27,15 +27,22 @@ public class EstRule extends CachedRule {
         super(structure, fingerprintCache, category2TabuSetMap, kb);
     }
 
-    public EstRule(CachedRule another) {
+    public EstRule(EstRule another) {
         super(another);
+    }
+
+    @Override
+    public EstRule clone() {
+        return new EstRule(this);
     }
 
     public List<SpecOprWithScore> estimateSpecializations() {
         /* Gather values in columns */
         List<MultiSet<Integer>[]> column_values_in_pos_cache = new ArrayList<>();
         List<MultiSet<Integer>[]> column_values_in_all_cache = new ArrayList<>();
-        for (Predicate predicate: structure) {
+        boolean[][] vars_in_preds = new boolean[structure.size()][];
+        for (int pred_idx = HEAD_PRED_IDX; pred_idx < structure.size(); pred_idx++) {
+            Predicate predicate = structure.get(pred_idx);
             MultiSet<Integer>[] arg_sets_pos = new MultiSet[predicate.arity()];
             MultiSet<Integer>[] arg_sets_all = new MultiSet[predicate.arity()];
             for (int i = 0; i < arg_sets_pos.length; i++) {
@@ -44,6 +51,13 @@ public class EstRule extends CachedRule {
             }
             column_values_in_pos_cache.add(arg_sets_pos);
             column_values_in_all_cache.add(arg_sets_all);
+            boolean[] vars_in_pred = new boolean[usedLimitedVars()];
+            for (int arg: predicate.args) {
+                if (Argument.isVariable(arg)) {
+                    vars_in_pred[Argument.decode(arg)] = true;
+                }
+            }
+            vars_in_preds[pred_idx] = vars_in_pred;
         }
         for (List<CompliedBlock> cache_entry: posCache) {
             for (int pred_idx = HEAD_PRED_IDX; pred_idx < structure.size(); pred_idx++) {
@@ -150,8 +164,26 @@ public class EstRule extends CachedRule {
                     est_pos_ent = estimateRatiosInPosCache(est_pos_ratio1, est_pos_ratio2) * eval.getPosEtls();
 
                     if (HEAD_PRED_IDX == vacant.predIdx) {
-                        est_all_ent = ((double) column_values_in_all_cache.get(last_arg_of_var.predIdx)[last_arg_of_var.argIdx].differentValues())
-                                / kb.totalConstants() * eval.getAllEtls();
+                        boolean exist_combined_var = false;
+                        boolean[] vars_in_head = vars_in_preds[HEAD_PRED_IDX];
+                        for (int pred_idx = FIRST_BODY_PRED_IDX; pred_idx < structure.size(); pred_idx++) {
+                            boolean[] vars_in_body_pred = vars_in_preds[pred_idx];
+                            if (vars_in_preds[pred_idx][var_id]) {
+                                int vid = 0;
+                                for (; vid < usedLimitedVars() && !(vars_in_head[vid] && vars_in_body_pred[vid]); vid++);
+                                if (vid < usedLimitedVars()) {
+                                    exist_combined_var = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (exist_combined_var) {
+                            /* There are variable combinations in head and another body predicate */
+                            est_all_ent = eval.getAllEtls() / kb.totalConstants();  // Todo: Not very accurate here
+                        } else {
+                            est_all_ent = ((double) column_values_in_all_cache.get(last_arg_of_var.predIdx)[last_arg_of_var.argIdx].differentValues())
+                                    / kb.totalConstants() * eval.getAllEtls();
+                        }
                     } else {
                         double est_all_ratio1 = ((double) column_values_in_all_cache.get(last_arg_of_var.predIdx)[last_arg_of_var.argIdx].itemCount(
                                 column_values_in_all_cache.get(vacant.predIdx)[vacant.argIdx].distinctValues()
@@ -211,13 +243,19 @@ public class EstRule extends CachedRule {
                     if (HEAD_PRED_IDX == empty_arg_loc_2.predIdx) {
                         est_all_ent = eval.getNegEtls() / kb.totalConstants();
                     } else {
-                        est_all_ent = eval.getNegEtls() / kb.totalConstants() *
-                                column_values_in_all_cache.get(empty_arg_loc_2.predIdx)[empty_arg_loc_2.argIdx].differentValues();
+                        boolean[] vars_in_head = vars_in_preds[HEAD_PRED_IDX];
+                        boolean[] vars_in_body_pred = vars_in_preds[empty_arg_loc_2.predIdx];
+                        int vid = 0;
+                        for (; vid < usedLimitedVars() && !(vars_in_head[vid] && vars_in_body_pred[vid]); vid++);
+                        if (vid < usedLimitedVars()) {
+                            /* There are variable combinations in head and another body predicate */
+                            est_all_ent = eval.getAllEtls() / kb.totalConstants();  // Todo: Not very accurate here
+                        } else {
+                            est_all_ent = eval.getNegEtls() / kb.totalConstants() *
+                                    column_values_in_all_cache.get(empty_arg_loc_2.predIdx)[empty_arg_loc_2.argIdx].differentValues();
+                        }
                     }
-                } else if (HEAD_PRED_IDX == empty_arg_loc_2.predIdx) {
-                    est_all_ent = eval.getNegEtls() / kb.totalConstants() *
-                            column_values_in_all_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].differentValues();
-                } else {
+                } else  {   // here, "empty_arg_loc_2" cannot be in the head
                     double est_neg_ratio1 = ((double) column_values_in_all_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].itemCount(
                             column_values_in_all_cache.get(empty_arg_loc_2.predIdx)[empty_arg_loc_2.argIdx].distinctValues()
                     )) / column_values_in_all_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].size();
@@ -266,15 +304,27 @@ public class EstRule extends CachedRule {
             /* Case 5 */
             final Predicate predicate1 = structure.get(empty_arg_loc_1.predIdx);
             final int[] const_list = kb.getPromisingConstants(predicate1.predSymbol)[empty_arg_loc_1.argIdx];
-            for (int constant: const_list) {
-                double est_pos_ent = ((double) column_values_in_pos_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].itemCount(constant))
-                        / column_values_in_pos_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].size() * eval.getPosEtls();
-                double est_all_ent = ((double) column_values_in_all_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].itemCount(constant))
-                        / column_values_in_all_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].size() * eval.getAllEtls();
-                results.add(new SpecOprWithScore(
-                        new SpecOprCase5(empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx, constant),
-                        new Eval(null, est_pos_ent, est_all_ent, length + 1)
-                ));
+            if (HEAD_PRED_IDX == empty_arg_loc_1.predIdx) {
+                double est_all_ent = eval.getAllEtls() / kb.totalConstants();
+                for (int constant: const_list) {
+                    double est_pos_ent = ((double) column_values_in_pos_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].itemCount(constant))
+                            / column_values_in_pos_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].size() * eval.getPosEtls();
+                    results.add(new SpecOprWithScore(
+                            new SpecOprCase5(empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx, constant),
+                            new Eval(null, est_pos_ent, est_all_ent, length + 1)
+                    ));
+                }
+            } else {
+                for (int constant: const_list) {
+                    double est_pos_ent = ((double) column_values_in_pos_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].itemCount(constant))
+                            / column_values_in_pos_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].size() * eval.getPosEtls();
+                    double est_all_ent = ((double) column_values_in_all_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].itemCount(constant))
+                            / column_values_in_all_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].size() * eval.getAllEtls();
+                    results.add(new SpecOprWithScore(
+                            new SpecOprCase5(empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx, constant),
+                            new Eval(null, est_pos_ent, est_all_ent, length + 1)
+                    ));
+                }
             }
         }
         return results;

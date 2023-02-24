@@ -18,8 +18,8 @@ public class EstSinc extends SincBasic {
     @Override
     protected RelationMiner createRelationMiner(int targetRelationNum) {
         return new EstRelationMiner(
-                kb, targetRelationNum, config.evalMetric, config.beamwidth, config.stopCompressionRatio,
-                config.observationRatio, predicate2NodeMap, dependencyGraph, logger
+                kb, targetRelationNum, config.evalMetric, config.beamwidth, config.observationRatio,
+                config.stopCompressionRatio, predicate2NodeMap, dependencyGraph, logger
         );
     }
 }
