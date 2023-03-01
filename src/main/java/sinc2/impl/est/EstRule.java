@@ -19,21 +19,44 @@ import java.util.*;
  * @since 2.1
  */
 public class EstRule extends CachedRule {
+    protected final BodyVarLinkManager bodyVarLinkManager;
+
     public EstRule(int headPredSymbol, int arity, Set<Fingerprint> fingerprintCache, Map<MultiSet<Integer>, Set<Fingerprint>> category2TabuSetMap, SimpleKb kb) {
         super(headPredSymbol, arity, fingerprintCache, category2TabuSetMap, kb);
+        bodyVarLinkManager = new BodyVarLinkManager(structure, 0);
     }
 
     public EstRule(List<Predicate> structure, Set<Fingerprint> fingerprintCache, Map<MultiSet<Integer>, Set<Fingerprint>> category2TabuSetMap, SimpleKb kb) {
         super(structure, fingerprintCache, category2TabuSetMap, kb);
+        bodyVarLinkManager = new BodyVarLinkManager(structure, usedLimitedVars());
     }
 
     public EstRule(EstRule another) {
         super(another);
+        this.bodyVarLinkManager = new BodyVarLinkManager(another.bodyVarLinkManager, structure);
     }
 
     @Override
     public EstRule clone() {
         return new EstRule(this);
+    }
+
+    @Override
+    protected void cvt1Uv2ExtLvUpdStrc(int predIdx, int argIdx, int varId) {
+        super.cvt1Uv2ExtLvUpdStrc(predIdx, argIdx, varId);
+        bodyVarLinkManager.specOprCase1(predIdx, argIdx, varId);
+    }
+
+    @Override
+    protected void cvt2Uvs2NewLvUpdStrc(int predIdx1, int argIdx1, int predIdx2, int argIdx2) {
+        super.cvt2Uvs2NewLvUpdStrc(predIdx1, argIdx1, predIdx2, argIdx2);
+        bodyVarLinkManager.specOprCase3(predIdx1, argIdx1, predIdx2, argIdx2);
+    }
+
+    @Override
+    protected void cvt2Uvs2NewLvUpdStrc(int functor, int arity, int argIdx1, int predIdx2, int argIdx2) {
+        super.cvt2Uvs2NewLvUpdStrc(functor, arity, argIdx1, predIdx2, argIdx2);
+        bodyVarLinkManager.specOprCase4(predIdx2, argIdx2);
     }
 
     public List<SpecOprWithScore> estimateSpecializations() {
@@ -95,41 +118,29 @@ public class EstRule extends CachedRule {
             }
         }
 
-        /* Find the arg that appears the last for each var */
-        ArgLocation[] last_arg_of_vars = new ArgLocation[usedLimitedVars()];
-        for (int var_id = 0; var_id < last_arg_of_vars.length; var_id++) {
-            final int var_arg = Argument.variable(var_id);
-            for (int pred_idx = structure.size() - 1; pred_idx >= HEAD_PRED_IDX; pred_idx--) {
-                Predicate predicate = structure.get(pred_idx);
-                for (int arg_idx = 0; arg_idx < predicate.arity(); arg_idx++) {
-                    if (var_arg == predicate.args[arg_idx]) {
-                        last_arg_of_vars[var_id] = new ArgLocation(pred_idx, arg_idx);
-                        break;
-                    }
-                }
-            }
-        }
-
         /* Estimate case 1 & 2 */   // Todo: How to estimate the number of records that have already been entailed?
         List<SpecOprWithScore> results = new ArrayList<>();
         for (int var_id = 0; var_id < usedLimitedVars(); var_id++) {
-            ArgLocation last_arg_of_var = last_arg_of_vars[var_id];
+            List<ArgLocation> var_arg_locs = limitedVarArgs.get(var_id);
             final int var_arg = Argument.variable(var_id);
 
             /* Case 1 */
             for (ArgLocation vacant: empty_args) {
                 int another_arg_idx = -1;   // another arg in the same predicate with 'vacant' that shares the same var
-                Predicate vacant_pred = structure.get(vacant.predIdx);
-                for (int arg_idx = 0; arg_idx < vacant_pred.arity(); arg_idx++) {
-                    if (vacant_pred.args[arg_idx] == var_arg) {
-                        another_arg_idx = arg_idx;
-                        break;
+                {
+                    Predicate vacant_pred = structure.get(vacant.predIdx);
+                    for (int arg_idx = 0; arg_idx < vacant_pred.arity(); arg_idx++) {
+                        if (var_arg == vacant_pred.args[arg_idx]) {
+                            another_arg_idx = arg_idx;
+                            break;
+                        }
                     }
                 }
 
                 double est_pos_ent, est_all_ent;
                 if (-1 != another_arg_idx) {
                     /* There is another occurrence of var in the same predicate */
+                    // Todo: Random sampling may be applied here
                     int remaining_rows = 0;
                     for (List<CompliedBlock> cache_entry: posCache) {
                         CompliedBlock cb = cache_entry.get(vacant.predIdx);
@@ -143,6 +154,7 @@ public class EstRule extends CachedRule {
                     if (HEAD_PRED_IDX == vacant.predIdx) {
                         est_all_ent = eval.getAllEtls() / kb.totalConstants();
                     } else {
+                        // Todo: Random sampling may be applied here
                         remaining_rows = 0;
                         for (List<CompliedBlock> cache_entry: allCache) {
                             CompliedBlock cb = cache_entry.get(vacant.predIdx);
@@ -155,43 +167,82 @@ public class EstRule extends CachedRule {
                     }
                 } else {
                     /* Other occurrences of the var are in different predicates */
-                    double est_pos_ratio1 = ((double) column_values_in_pos_cache.get(last_arg_of_var.predIdx)[last_arg_of_var.argIdx].itemCount(
-                            column_values_in_pos_cache.get(vacant.predIdx)[vacant.argIdx].distinctValues()
-                    )) / column_values_in_pos_cache.get(last_arg_of_var.predIdx)[last_arg_of_var.argIdx].size();
-                    double est_pos_ratio2 = ((double) column_values_in_pos_cache.get(vacant.predIdx)[vacant.argIdx].itemCount(
-                            column_values_in_pos_cache.get(last_arg_of_var.predIdx)[last_arg_of_var.argIdx].distinctValues()
-                    )) / column_values_in_pos_cache.get(vacant.predIdx)[vacant.argIdx].size();
-                    est_pos_ent = estimateRatiosInPosCache(est_pos_ratio1, est_pos_ratio2) * eval.getPosEtls();
+                    double[] est_pos_ratios = new double[var_arg_locs.size() + 1];
+                    {
+                        MultiSet<Integer> vacant_column_values = column_values_in_pos_cache.get(vacant.predIdx)[vacant.argIdx];
+                        for (int i = 0; i < est_pos_ratios.length; i++) {
+                            ArgLocation var_arg_loc = var_arg_locs.get(i);
+                            MultiSet<Integer> var_column_values = column_values_in_pos_cache.get(var_arg_loc.predIdx)[var_arg_loc.argIdx];
+                            est_pos_ratios[i] = ((double) var_column_values.itemCount(vacant_column_values.distinctValues())) / var_column_values.size();
+                        }
+                        ArgLocation _arg_loc_of_var = var_arg_locs.get(0);
+                        est_pos_ratios[est_pos_ratios.length - 1] = ((double) vacant_column_values.itemCount(
+                                column_values_in_pos_cache.get(_arg_loc_of_var.predIdx)[_arg_loc_of_var.argIdx].distinctValues()
+                        )) / vacant_column_values.size();
+                    }
+                    est_pos_ent = estimateRatiosInPosCache(est_pos_ratios) * eval.getPosEtls();
 
+                    boolean[] vars_in_head = vars_in_preds[HEAD_PRED_IDX];
                     if (HEAD_PRED_IDX == vacant.predIdx) {
-                        boolean exist_combined_var = false;
-                        boolean[] vars_in_head = vars_in_preds[HEAD_PRED_IDX];
-                        for (int pred_idx = FIRST_BODY_PRED_IDX; pred_idx < structure.size(); pred_idx++) {
-                            boolean[] vars_in_body_pred = vars_in_preds[pred_idx];
-                            if (vars_in_preds[pred_idx][var_id]) {
-                                int vid = 0;
-                                for (; vid < usedLimitedVars() && !(vars_in_head[vid] && vars_in_body_pred[vid]); vid++);
-                                if (vid < usedLimitedVars()) {
-                                    exist_combined_var = true;
-                                    break;
+                        /* Find a linked var with this one both in head and body (with the shortest path) */
+                        VarLink[] var_link_path = null;
+                        for (int head_vid = 0; head_vid < vars_in_head.length; head_vid++) {
+                            if (vars_in_head[head_vid]) {
+                                VarLink[] _var_link_path = bodyVarLinkManager.shortestPath(head_vid, var_id);
+                                if (null != _var_link_path && (null == var_link_path || _var_link_path.length < var_link_path.length)) {
+                                    var_link_path = _var_link_path;
                                 }
                             }
                         }
-                        if (exist_combined_var) {
-                            /* There are variable combinations in head and another body predicate */
-                            est_all_ent = eval.getAllEtls() / kb.totalConstants();  // Todo: Not very accurate here
-                        } else {
-                            est_all_ent = ((double) column_values_in_all_cache.get(last_arg_of_var.predIdx)[last_arg_of_var.argIdx].differentValues())
-                                    / kb.totalConstants() * eval.getAllEtls();
-                        }
+                        /* Theoretically, var_link_path != null */
+                        /* The new var is body-linked with some vars in the head, estimate according to the shortest path */
+                        est_all_ent = eval.getAllEtls() / kb.totalConstants() * estimateLinkVarRatio(var_link_path, column_values_in_all_cache);
+//                        if (null == var_link_path) {
+//                            /* The new var is not body-linked with any of the vars in the head */
+//                            ArgLocation arg_loc_of_var = args_of_var.get(0);
+//                            est_all_ent = ((double) column_values_in_all_cache.get(arg_loc_of_var.predIdx)[arg_loc_of_var.argIdx].differentValues())
+//                                    / kb.totalConstants() * eval.getAllEtls();
+//                        }
                     } else {
-                        double est_all_ratio1 = ((double) column_values_in_all_cache.get(last_arg_of_var.predIdx)[last_arg_of_var.argIdx].itemCount(
-                                column_values_in_all_cache.get(vacant.predIdx)[vacant.argIdx].distinctValues()
-                        )) / column_values_in_all_cache.get(last_arg_of_var.predIdx)[last_arg_of_var.argIdx].size();
-                        double est_all_ratio2 = ((double) column_values_in_all_cache.get(vacant.predIdx)[vacant.argIdx].itemCount(
-                                column_values_in_all_cache.get(last_arg_of_var.predIdx)[last_arg_of_var.argIdx].distinctValues()
-                        )) / column_values_in_all_cache.get(vacant.predIdx)[vacant.argIdx].size();
-                        est_all_ent = estimateRatiosInAllCache(est_all_ratio1, est_all_ratio2) * eval.getAllEtls();
+                        Set<VarPair> new_linked_var_pairs = bodyVarLinkManager.assumeSpecOprCase1(vacant.predIdx, vacant.argIdx, var_id);
+                        est_all_ent = eval.getAllEtls();
+                        for (VarPair new_linked_var_pair: new_linked_var_pairs) {
+                            if (vars_in_head[new_linked_var_pair.vid1] && vars_in_head[new_linked_var_pair.vid2]) {
+                                for (ArgLocation arg_loc_of_v2: limitedVarArgs.get(new_linked_var_pair.vid2)) {
+                                    if (HEAD_PRED_IDX != arg_loc_of_v2.predIdx) {
+                                        /* Find an occurrence of vid2 in the body to get the number of values assigned to that var */
+                                        VarLink[] var_link_path = bodyVarLinkManager.assumeShortestPathCase1(
+                                                vacant.predIdx, vacant.argIdx, var_id, new_linked_var_pair.vid1, new_linked_var_pair.vid2
+                                        );
+                                        est_all_ent = est_all_ent / column_values_in_all_cache.get(arg_loc_of_v2.predIdx)[arg_loc_of_v2.argIdx].differentValues()
+                                                * estimateLinkVarRatio(var_link_path, column_values_in_all_cache);
+                                        break;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                        /* Find other occurrences of this var in the body */
+                        List<ArgLocation> var_arg_locs_in_body = new ArrayList<>();
+                        for (ArgLocation arg_loc: var_arg_locs) {
+                            if (HEAD_PRED_IDX != arg_loc.predIdx) {
+                                var_arg_locs_in_body.add(arg_loc);
+                            }
+                        }
+                        if (!var_arg_locs_in_body.isEmpty()) {
+                            double[] est_all_ratios = new double[var_arg_locs_in_body.size() + 1];
+                            MultiSet<Integer> vacant_column_values = column_values_in_all_cache.get(vacant.predIdx)[vacant.argIdx];
+                            for (int i = 0; i < est_all_ratios.length; i++) {
+                                ArgLocation arg_loc_of_var = var_arg_locs_in_body.get(i);
+                                MultiSet<Integer> var_column_values = column_values_in_all_cache.get(arg_loc_of_var.predIdx)[arg_loc_of_var.argIdx];
+                                est_all_ratios[i] = ((double) var_column_values.itemCount(vacant_column_values.distinctValues())) / var_column_values.size();
+                            }
+                            ArgLocation _arg_loc_of_var = var_arg_locs_in_body.get(0);
+                            est_pos_ratios[est_pos_ratios.length - 1] = ((double) vacant_column_values.itemCount(
+                                    column_values_in_all_cache.get(_arg_loc_of_var.predIdx)[_arg_loc_of_var.argIdx].distinctValues()
+                            )) / vacant_column_values.size();
+                            est_all_ent *= estimateRatiosInAllCache(est_all_ratios);
+                        }
                     }
                 }
                 results.add(new SpecOprWithScore(
@@ -203,16 +254,33 @@ public class EstRule extends CachedRule {
             /* Case 2 */
             for (SimpleRelation relation: kb.getRelations()) {
                 for (int arg_idx = 0; arg_idx < relation.totalCols(); arg_idx++) {
-                    double est_pos_ent = ((double) column_values_in_pos_cache.get(last_arg_of_var.predIdx)[last_arg_of_var.argIdx].itemCount(
-                            ArrayOperation.toCollection(relation.valuesInColumn(arg_idx))
-                    )) / column_values_in_pos_cache.get(last_arg_of_var.predIdx)[last_arg_of_var.argIdx].size() * eval.getPosEtls();
+                    double[] est_pos_ratios = new double[var_arg_locs.size()];
+                    Collection<Integer> relation_column_values = ArrayOperation.toCollection(relation.valuesInColumn(arg_idx));
+                    for (int i = 0; i < est_pos_ratios.length; i++) {
+                        ArgLocation arg_loc_of_var = var_arg_locs.get(i);
+                        MultiSet<Integer> var_column_values = column_values_in_pos_cache.get(arg_loc_of_var.predIdx)[arg_loc_of_var.argIdx];
+                        est_pos_ratios[i] = ((double) var_column_values.itemCount(relation_column_values)) / var_column_values.size();
+                    }
+                    double est_pos_ent = estimateRatiosInPosCache(est_pos_ratios) * eval.getPosEtls();
+
                     double est_all_ent;
-                    if (HEAD_PRED_IDX == last_arg_of_var.predIdx) {
-                        est_all_ent = ((double) relation.valuesInColumn(arg_idx).length / kb.totalConstants()) * eval.getAllEtls();
+                    List<ArgLocation> var_arg_locs_in_body = new ArrayList<>();
+                    for (ArgLocation arg_loc: var_arg_locs) {
+                        if (HEAD_PRED_IDX != arg_loc.predIdx) {
+                            var_arg_locs_in_body.add(arg_loc);
+                        }
+                    }
+                    if (var_arg_locs_in_body.isEmpty()) {
+                        /* All occurrences of the var are in the head */
+                        est_all_ent = eval.getAllEtls() / kb.totalConstants() * relation.valuesInColumn(arg_idx).length;
                     } else {
-                        est_all_ent = ((double) column_values_in_all_cache.get(last_arg_of_var.predIdx)[last_arg_of_var.argIdx].itemCount(
-                                ArrayOperation.toCollection(relation.valuesInColumn(arg_idx))
-                        )) / column_values_in_all_cache.get(last_arg_of_var.predIdx)[last_arg_of_var.argIdx].size() * eval.getAllEtls();
+                        double[] est_all_ratios = new double[var_arg_locs_in_body.size()];
+                        for (int i = 0; i < est_all_ratios.length; i++) {
+                            ArgLocation arg_loc_of_var = var_arg_locs_in_body.get(i);
+                            MultiSet<Integer> var_column_values = column_values_in_all_cache.get(arg_loc_of_var.predIdx)[arg_loc_of_var.argIdx];
+                            est_all_ratios[i] = ((double) var_column_values.itemCount(relation_column_values)) / var_column_values.size();
+                        }
+                        est_all_ent = estimateRatiosInAllCache(est_all_ratios) * eval.getAllEtls();
                     }
                     results.add(new SpecOprWithScore(
                             new SpecOprCase2(relation.id, relation.totalCols(), arg_idx, var_id),
@@ -222,47 +290,94 @@ public class EstRule extends CachedRule {
             }
         }
 
-        /* Estimate case 3 & 4 */
+        /* Estimate case 3 & 4 & 5 */
         for (int i = 0; i < empty_args.size(); i++) {
             /* Find the first empty argument */
             final ArgLocation empty_arg_loc_1 = empty_args.get(i);
+            MultiSet<Integer> empty_arg1_pos_column_values = column_values_in_pos_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx];
+            MultiSet<Integer> empty_arg1_all_column_values = column_values_in_all_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx];
 
             /* Case 3 */
             for (int j = i + 1; j < empty_args.size(); j++) {
                 /* Find another empty argument */
                 final ArgLocation empty_arg_loc_2 = empty_args.get(j);
-                double est_pos_ratio1 = ((double) column_values_in_pos_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].itemCount(
-                        column_values_in_pos_cache.get(empty_arg_loc_2.predIdx)[empty_arg_loc_2.argIdx].distinctValues()
-                )) / column_values_in_pos_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].size();
-                double est_pos_ratio2 = ((double) column_values_in_pos_cache.get(empty_arg_loc_2.predIdx)[empty_arg_loc_2.argIdx].itemCount(
-                        column_values_in_pos_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].distinctValues()
-                )) / column_values_in_pos_cache.get(empty_arg_loc_2.predIdx)[empty_arg_loc_2.argIdx].size();
-                double est_pos_ent = estimateRatiosInPosCache(est_pos_ratio1, est_pos_ratio2) * eval.getPosEtls();
-                double est_all_ent;
-                if (HEAD_PRED_IDX == empty_arg_loc_1.predIdx) {
-                    if (HEAD_PRED_IDX == empty_arg_loc_2.predIdx) {
-                        est_all_ent = eval.getNegEtls() / kb.totalConstants();
-                    } else {
-                        boolean[] vars_in_head = vars_in_preds[HEAD_PRED_IDX];
-                        boolean[] vars_in_body_pred = vars_in_preds[empty_arg_loc_2.predIdx];
-                        int vid = 0;
-                        for (; vid < usedLimitedVars() && !(vars_in_head[vid] && vars_in_body_pred[vid]); vid++);
-                        if (vid < usedLimitedVars()) {
-                            /* There are variable combinations in head and another body predicate */
-                            est_all_ent = eval.getAllEtls() / kb.totalConstants();  // Todo: Not very accurate here
-                        } else {
-                            est_all_ent = eval.getNegEtls() / kb.totalConstants() *
-                                    column_values_in_all_cache.get(empty_arg_loc_2.predIdx)[empty_arg_loc_2.argIdx].differentValues();
+                MultiSet<Integer> empty_arg2_pos_column_values = column_values_in_pos_cache.get(empty_arg_loc_2.predIdx)[empty_arg_loc_2.argIdx];
+                MultiSet<Integer> empty_arg2_all_column_values = column_values_in_all_cache.get(empty_arg_loc_2.predIdx)[empty_arg_loc_2.argIdx];
+
+                double est_pos_ent, est_all_ent;
+                if (empty_arg_loc_1.predIdx == empty_arg_loc_2.predIdx) {
+                    /* The new args are in the same predicate */
+                    // Todo: Random sampling may be applied here
+                    int remaining_rows = 0;
+                    for (List<CompliedBlock> cache_entry: posCache) {
+                        CompliedBlock cb = cache_entry.get(empty_arg_loc_1.predIdx);
+                        for (int[] record: cb.complSet) {
+                            remaining_rows += record[empty_arg_loc_1.argIdx] == record[empty_arg_loc_2.argIdx] ? 1 : 0;
                         }
                     }
-                } else  {   // here, "empty_arg_loc_2" cannot be in the head
-                    double est_neg_ratio1 = ((double) column_values_in_all_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].itemCount(
-                            column_values_in_all_cache.get(empty_arg_loc_2.predIdx)[empty_arg_loc_2.argIdx].distinctValues()
-                    )) / column_values_in_all_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].size();
-                    double est_neg_ratio2 = ((double) column_values_in_all_cache.get(empty_arg_loc_2.predIdx)[empty_arg_loc_2.argIdx].itemCount(
-                            column_values_in_all_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].distinctValues()
-                    )) / column_values_in_all_cache.get(empty_arg_loc_2.predIdx)[empty_arg_loc_2.argIdx].size();
-                    est_all_ent = Math.min(est_neg_ratio1, est_neg_ratio2) * eval.getAllEtls();
+                    est_pos_ent = ((double) remaining_rows) / empty_arg1_pos_column_values.size() * eval.getPosEtls();
+
+                    if (HEAD_PRED_IDX == empty_arg_loc_1.predIdx) {
+                        est_all_ent = eval.getAllEtls() / kb.totalConstants();
+                    } else {
+                        // Todo: Random sampling may be applied here
+                        remaining_rows = 0;
+                        for (List<CompliedBlock> cache_entry: allCache) {
+                            CompliedBlock cb = cache_entry.get(empty_arg_loc_1.predIdx);
+                            for (int[] record: cb.complSet) {
+                                remaining_rows += record[empty_arg_loc_1.argIdx] == record[empty_arg_loc_2.argIdx] ? 1 : 0;
+                            }
+                        }
+                        est_all_ent = ((double) remaining_rows) / empty_arg1_all_column_values.size() * eval.getAllEtls();
+                    }
+                } else {
+                    /* The new args are in different predicates */
+                    double est_pos_ratio1 = ((double) empty_arg1_pos_column_values.itemCount(empty_arg2_pos_column_values.distinctValues())) / empty_arg1_pos_column_values.size();
+                    double est_pos_ratio2 = ((double) empty_arg2_pos_column_values.itemCount(empty_arg1_pos_column_values.distinctValues())) / empty_arg2_pos_column_values.size();
+                    est_pos_ent = estimateRatiosInPosCache(new double[]{est_pos_ratio1, est_pos_ratio2}) * eval.getPosEtls();
+
+                    boolean[] vars_in_head = vars_in_preds[HEAD_PRED_IDX];
+                    if (HEAD_PRED_IDX == empty_arg_loc_1.predIdx) {
+                        /* HEAD_PRED_IDX != empty_arg_loc_2.predIdx */
+                        est_all_ent = eval.getAllEtls() / kb.totalConstants();
+                        for (int head_vid = 0; head_vid < vars_in_head.length; head_vid++) {
+                            if (vars_in_head[head_vid]) {
+                                VarLink[] var_link_path = bodyVarLinkManager.assumeShortestPathCase3(empty_arg_loc_2.predIdx, empty_arg_loc_2.argIdx, head_vid);
+                                if (null != var_link_path) {
+                                    /* Estimate for linked vars */
+                                    est_all_ent *= estimateLinkVarRatio(var_link_path, column_values_in_all_cache);
+                                    break;
+                                }
+                            }
+                        }
+                        /* Theoretically, 'est_all_ent' will always be estimated in the above loop */
+                    } else  {
+                        /* Here, both the arguments are in the body and in different predicates */
+                        Set<VarPair> new_linked_var_pairs = bodyVarLinkManager.assumeSpecOprCase3(
+                                empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx, empty_arg_loc_2.predIdx, empty_arg_loc_2.argIdx
+                        );
+                        est_all_ent = eval.getAllEtls();
+                        for (VarPair new_linked_var_pair: new_linked_var_pairs) {
+                            if (vars_in_head[new_linked_var_pair.vid1] && vars_in_head[new_linked_var_pair.vid2]) {
+                                for (ArgLocation arg_loc_of_v2_in_body: limitedVarArgs.get(new_linked_var_pair.vid2)) {
+                                    if (HEAD_PRED_IDX != arg_loc_of_v2_in_body.predIdx) {
+                                        VarLink[] var_link_path = bodyVarLinkManager.assumeShortestPathCase3(
+                                                empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx, empty_arg_loc_2.predIdx, empty_arg_loc_2.argIdx,
+                                                new_linked_var_pair.vid1, new_linked_var_pair.vid2
+                                        );
+                                        est_all_ent = est_all_ent
+                                                / column_values_in_all_cache.get(arg_loc_of_v2_in_body.predIdx)[arg_loc_of_v2_in_body.argIdx].differentValues()
+                                                * estimateLinkVarRatio(var_link_path, column_values_in_all_cache);
+                                        break;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                        double est_all_ratio1 = ((double) empty_arg1_all_column_values.itemCount(empty_arg2_all_column_values.distinctValues())) / empty_arg1_all_column_values.size();
+                        double est_all_ratio2 = ((double) empty_arg2_all_column_values.itemCount(empty_arg1_all_column_values.distinctValues())) / empty_arg2_all_column_values.size();
+                        est_all_ent *= estimateRatiosInAllCache(new double[]{est_all_ratio1, est_all_ratio2});
+                    }
                 }
                 results.add(new SpecOprWithScore(
                         new SpecOprCase3(empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx, empty_arg_loc_2.predIdx, empty_arg_loc_2.argIdx),
@@ -274,9 +389,9 @@ public class EstRule extends CachedRule {
             if (HEAD_PRED_IDX == empty_arg_loc_1.predIdx) {
                 for (SimpleRelation relation: kb.getRelations()) {
                     for (int arg_idx = 0; arg_idx < relation.totalCols(); arg_idx++) {
-                        double est_pos_ent = ((double) column_values_in_pos_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].itemCount(
+                        double est_pos_ent = ((double) empty_arg1_pos_column_values.itemCount(
                                 ArrayOperation.toCollection(relation.valuesInColumn(arg_idx))
-                        )) / column_values_in_pos_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].size() * eval.getPosEtls();
+                        )) / empty_arg1_pos_column_values.size() * eval.getPosEtls();
                         double est_all_ent = eval.getAllEtls() / kb.totalConstants() * relation.valuesInColumn(arg_idx).length;
                         results.add(new SpecOprWithScore(
                                 new SpecOprCase4(relation.id, relation.totalCols(), arg_idx, empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx),
@@ -287,12 +402,9 @@ public class EstRule extends CachedRule {
             } else {
                 for (SimpleRelation relation: kb.getRelations()) {
                     for (int arg_idx = 0; arg_idx < relation.totalCols(); arg_idx++) {
-                        double est_pos_ent = ((double) column_values_in_pos_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].itemCount(
-                                ArrayOperation.toCollection(relation.valuesInColumn(arg_idx))
-                        )) / column_values_in_pos_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].size() * eval.getPosEtls();
-                        double est_all_ent = ((double) column_values_in_all_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].itemCount(
-                                ArrayOperation.toCollection(relation.valuesInColumn(arg_idx))
-                        )) / column_values_in_all_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].size() * eval.getAllEtls();
+                        Collection<Integer> relation_column_values = ArrayOperation.toCollection(relation.valuesInColumn(arg_idx));
+                        double est_pos_ent = ((double) empty_arg1_pos_column_values.itemCount(relation_column_values)) / empty_arg1_pos_column_values.size() * eval.getPosEtls();
+                        double est_all_ent = ((double) empty_arg1_all_column_values.itemCount(relation_column_values)) / empty_arg1_all_column_values.size() * eval.getAllEtls();
                         results.add(new SpecOprWithScore(
                                 new SpecOprCase4(relation.id, relation.totalCols(), arg_idx, empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx),
                                 new Eval(null, est_pos_ent, est_all_ent, length + 1)
@@ -307,8 +419,7 @@ public class EstRule extends CachedRule {
             if (HEAD_PRED_IDX == empty_arg_loc_1.predIdx) {
                 double est_all_ent = eval.getAllEtls() / kb.totalConstants();
                 for (int constant: const_list) {
-                    double est_pos_ent = ((double) column_values_in_pos_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].itemCount(constant))
-                            / column_values_in_pos_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].size() * eval.getPosEtls();
+                    double est_pos_ent = eval.getPosEtls() / empty_arg1_pos_column_values.size() * empty_arg1_pos_column_values.itemCount(constant);
                     results.add(new SpecOprWithScore(
                             new SpecOprCase5(empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx, constant),
                             new Eval(null, est_pos_ent, est_all_ent, length + 1)
@@ -316,10 +427,8 @@ public class EstRule extends CachedRule {
                 }
             } else {
                 for (int constant: const_list) {
-                    double est_pos_ent = ((double) column_values_in_pos_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].itemCount(constant))
-                            / column_values_in_pos_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].size() * eval.getPosEtls();
-                    double est_all_ent = ((double) column_values_in_all_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].itemCount(constant))
-                            / column_values_in_all_cache.get(empty_arg_loc_1.predIdx)[empty_arg_loc_1.argIdx].size() * eval.getAllEtls();
+                    double est_pos_ent = eval.getPosEtls() / empty_arg1_pos_column_values.size() * empty_arg1_pos_column_values.itemCount(constant);
+                    double est_all_ent = eval.getAllEtls() / empty_arg1_all_column_values.size() * empty_arg1_all_column_values.itemCount(constant);
                     results.add(new SpecOprWithScore(
                             new SpecOprCase5(empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx, constant),
                             new Eval(null, est_pos_ent, est_all_ent, length + 1)
@@ -330,11 +439,29 @@ public class EstRule extends CachedRule {
         return results;
     }
 
-    protected double estimateRatiosInPosCache(double ratio1, double ratio2) {
-        return Math.min(ratio1, ratio2);
+    protected double estimateRatiosInPosCache(double[] ratios) {
+        double min = ratios[0];
+        for (double ratio: ratios) {
+            min = Math.min(min, ratio);
+        }
+        return min;
     }
 
-    protected double estimateRatiosInAllCache(double ratio1, double ratio2) {
-        return Math.min(ratio1, ratio2);
+    protected double estimateRatiosInAllCache(double[] ratios) {
+        double min = ratios[0];
+        for (double ratio: ratios) {
+            min = Math.min(min, ratio);
+        }
+        return min;
+    }
+
+    protected double estimateLinkVarRatio(VarLink[] varLinkPath, List<MultiSet<Integer>[]> columnValuesInCache) {
+        double ratio = 1.0;
+        for (VarLink link: varLinkPath) {
+            MultiSet<Integer>[] column_values_in_pred = columnValuesInCache.get(link.predIdx);
+            ratio = ratio * column_values_in_pred[link.fromArgIdx].size() /
+                    column_values_in_pred[link.fromArgIdx].differentValues();
+        }
+        return ratio;
     }
 }
