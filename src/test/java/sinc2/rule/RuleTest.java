@@ -315,7 +315,7 @@ class RuleTest {
 
     void structureIdentityCheck(BareRule expected, BareRule actual) {
         assertEquals(expected.structure, actual.structure);
-        assertEquals(expected.limitedVarCnts, actual.limitedVarCnts);
+        assertEquals(expected.limitedVarArgs, actual.limitedVarArgs);
         assertEquals(expected.fingerprint, actual.fingerprint);
         assertEquals(expected.length, actual.length);
     }

@@ -210,7 +210,7 @@ public class BodyVarLinkManager {
                 }
             }
         }
-        if (Rule.HEAD_PRED_IDX != predIdx2) {
+        if (Rule.HEAD_PRED_IDX != predIdx2 && predIdx1 != predIdx2) {
             Predicate predicate = rule.get(predIdx2);
             for (int arg_idx = 0; arg_idx < predicate.args.length; arg_idx++) {
                 int argument = predicate.args[arg_idx];
@@ -282,10 +282,9 @@ public class BodyVarLinkManager {
         if (var_label != var_label2) {
             for (int vid = 0; vid < varLabels.size(); vid++) {
                 if (var_label == varLabels.get(vid)) {
-                    for (int arg_idx2 = 0; arg_idx2 < predicate.args.length; arg_idx2++) {
-                        int argument2 = predicate.args[arg_idx2];
-                        if (Argument.isVariable(argument2) && arg_idx2 != argIdx) {
-                            new_linked_pairs.add(new VarPair(vid, Argument.decode(argument2)));
+                    for (int vid2 = 0; vid2 < varLabels.size(); vid2++) {
+                        if (var_label2 == varLabels.get(vid2)) {
+                            new_linked_pairs.add(new VarPair(vid, vid2));
                         }
                     }
                 }
@@ -320,6 +319,7 @@ public class BodyVarLinkManager {
             }
         }
         Set<VarPair> new_linked_pairs = new HashSet<>();
+        int new_vid = varLabels.size();
         if (var_label1 != var_label2) {
             for (int vid1 = 0; vid1 < varLabels.size(); vid1++) {
                 if (var_label1 == varLabels.get(vid1)) {
@@ -328,7 +328,13 @@ public class BodyVarLinkManager {
                             new_linked_pairs.add(new VarPair(vid1, vid2));
                         }
                     }
+                    new_linked_pairs.add(new VarPair(vid1, new_vid));
                 }
+            }
+        }
+        for (int vid2 = 0; vid2 < varLabels.size(); vid2++) {
+            if (var_label2 == varLabels.get(vid2)) {
+                new_linked_pairs.add(new VarPair(vid2, new_vid));
             }
         }
         return new_linked_pairs;
@@ -383,12 +389,12 @@ public class BodyVarLinkManager {
                         List<VarLink> reversed_path = new ArrayList<>();
                         reversed_path.add(next_link);
                         reversed_path.add(link);
-                        for (int path_idx = predecessorIdx.get(i); path_idx >= 0; path_idx = predecessorIdx.get(path_idx)) {
-                            reversed_path.add(bfs.get(path_idx));
+                        for (int edge_idx = predecessorIdx.get(i); edge_idx >= 0; edge_idx = predecessorIdx.get(edge_idx)) {
+                            reversed_path.add(bfs.get(edge_idx));
                         }
                         VarLink[] path = new VarLink[reversed_path.size()];
-                        for (int path_idx = 0; path_idx < path.length; path_idx++) {
-                            path[path_idx] = reversed_path.get(path.length - 1 - path_idx);
+                        for (int edge_idx = 0; edge_idx < path.length; edge_idx++) {
+                            path[edge_idx] = reversed_path.get(path.length - 1 - edge_idx);
                         }
                         return path;
                     }
@@ -412,11 +418,14 @@ public class BodyVarLinkManager {
      */
     protected VarLink[] assumeShortestPathHandler(int predIdx, int argIdx, int assumedFromVid, int toVid) {
         boolean[] visited_vid = new boolean[varLinkGraph.size()];
+        if (assumedFromVid >= 0 && assumedFromVid < visited_vid.length) {
+            visited_vid[assumedFromVid] = true;
+        }
         List<VarLink> bfs = new ArrayList<>();
         List<Integer> predecessor_idx = new ArrayList<>();
         int[] pred_args = rule.get(predIdx).args;
         for (int arg_idx = 0; arg_idx < pred_args.length; arg_idx++) {
-            int argument = pred_args[argIdx];
+            int argument = pred_args[arg_idx];
             if (Argument.isVariable(argument)) {
                 int vid = Argument.decode(argument);
                 if (!visited_vid[vid]) {
@@ -448,30 +457,43 @@ public class BodyVarLinkManager {
             end_vid = fromVid;
             reversed = true;
         }
-        VarLink[] start_2_vid = shortestPath(start_vid, varId);
-
-        /* Find the path from new arg to end_vid */
-        VarLink[] new_arg_2_end_vid = assumeShortestPathHandler(predIdx, argIdx, varId, end_vid);
-        if (null == new_arg_2_end_vid) {
+        VarLink[] path_start_2_varid;
+        if (start_vid == varId) {
+            path_start_2_varid = new VarLink[0];
+        } else {
+            path_start_2_varid = shortestPath(start_vid, varId);
+        }
+        if (null == path_start_2_varid) {
             return null;
         }
-        VarLink[] path = new VarLink[start_2_vid.length + new_arg_2_end_vid.length];
+
+        /* Find the path from new arg to end_vid */
+        VarLink[] path_new_arg_2_end_vid;
+        if (end_vid == varId) {
+            path_new_arg_2_end_vid = new VarLink[0];
+        } else {
+            path_new_arg_2_end_vid = assumeShortestPathHandler(predIdx, argIdx, varId, end_vid);
+        }
+        if (null == path_new_arg_2_end_vid) {
+            return null;
+        }
+        VarLink[] path = new VarLink[path_start_2_varid.length + path_new_arg_2_end_vid.length];
         if (reversed) {
-            for (int i = 0; i < new_arg_2_end_vid.length; i++) {
-                VarLink original_link = new_arg_2_end_vid[new_arg_2_end_vid.length - 1 - i];
+            for (int i = 0; i < path_new_arg_2_end_vid.length; i++) {
+                VarLink original_link = path_new_arg_2_end_vid[path_new_arg_2_end_vid.length - 1 - i];
                 path[i] = new VarLink(
                         original_link.predIdx, original_link.toVid, original_link.toArgIdx, original_link.fromVid, original_link.fromArgIdx
                 );
             }
-            for (int i = 0; i < start_2_vid.length; i++) {
-                VarLink original_link = start_2_vid[start_2_vid.length - 1 - i];
-                path[new_arg_2_end_vid.length + i] = new VarLink(
+            for (int i = 0; i < path_start_2_varid.length; i++) {
+                VarLink original_link = path_start_2_varid[path_start_2_varid.length - 1 - i];
+                path[path_new_arg_2_end_vid.length + i] = new VarLink(
                         original_link.predIdx, original_link.toVid, original_link.toArgIdx, original_link.fromVid, original_link.fromArgIdx
                 );
             }
         } else {
-            System.arraycopy(start_2_vid, 0, path, 0, start_2_vid.length);
-            System.arraycopy(new_arg_2_end_vid, 0, path, start_2_vid.length, new_arg_2_end_vid.length);
+            System.arraycopy(path_start_2_varid, 0, path, 0, path_start_2_varid.length);
+            System.arraycopy(path_new_arg_2_end_vid, 0, path, path_start_2_varid.length, path_new_arg_2_end_vid.length);
         }
         return path;
     }
@@ -492,8 +514,7 @@ public class BodyVarLinkManager {
             int[] pred_args = rule.get(predIdx1).args;
             for (int argument: pred_args) {
                 if (Argument.isVariable(argument)) {
-                    int var_label = varLabels.get(Argument.decode(argument));
-                    if (var_label == varLabels.get(toVid)) {
+                    if (Objects.equals(varLabels.get(Argument.decode(argument)), varLabels.get(toVid))) {
                         _from_pred_idx = predIdx2;
                         _from_arg_idx = argIdx2;
                         _to_pred_idx = predIdx1;
