@@ -2,6 +2,16 @@ package sinc2.impl.est;
 
 import java.util.Objects;
 
+/**
+ * This class is to denote the correspondence of two LVs in a certain predicate. E.g., the variables X and Y in the 2nd
+ * predicate of the following rule:
+ *
+ *   p(X, Y) :- q(X, Z), r(Z, Y)
+ *
+ * Such links compose link paths between LVs, such as "X->Z->Y" in the above rule.
+ *
+ * @since 2.1
+ */
 public class VarLink {
     public final int predIdx;
     public final int fromVid;

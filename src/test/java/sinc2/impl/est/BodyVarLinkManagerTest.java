@@ -604,8 +604,7 @@ class BodyVarLinkManagerTest {
         BodyVarLinkManager bvm = new BodyVarLinkManager(rule, 3);
 
         /* p(X, Y) :- q(X, Z), r(Z, Y), s(X, W), t(W, Y)*/
-        Set<VarPair> expected_pairs = new HashSet<>(List.of(new VarPair(0, 3), new VarPair(1, 3), new VarPair(2, 3)));
-        assertEqualVarPairs(expected_pairs, bvm.assumeSpecOprCase3(3, 1, 4, 0));
+        assertTrue(bvm.assumeSpecOprCase3(3, 1, 4, 0).isEmpty());
     }
 
     @Test
@@ -622,7 +621,6 @@ class BodyVarLinkManagerTest {
 
         /* p(X, Y, Z) :- q(X, W), r(W, Y), s(Y, R), t(R, Z)*/
         Set<VarPair> expected_pairs = new HashSet<>(List.of(
-                new VarPair(0, 4), new VarPair(1, 4), new VarPair(3, 4), new VarPair(2, 4),
                 new VarPair(0, 2), new VarPair(1, 2), new VarPair(3, 2)
         ));
         assertEqualVarPairs(expected_pairs, bvm.assumeSpecOprCase3(3, 1, 4, 0));

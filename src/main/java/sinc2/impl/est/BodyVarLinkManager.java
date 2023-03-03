@@ -296,6 +296,8 @@ public class BodyVarLinkManager {
     /**
      * Return the newly linked LV pairs if the rule is updated by a case-3 specialization.
      *
+     * NOTE: the new LV is not included in the returned set
+     *
      * @param predIdx1 NOTE: this parameter should not be 0 (Rule.HEAD_PRED_IDX) here, and predIdx1 != predIdx2
      * @param predIdx2 NOTE: this parameter should not be 0 (Rule.HEAD_PRED_IDX) here, and predIdx1 != predIdx2
      */
@@ -319,7 +321,6 @@ public class BodyVarLinkManager {
             }
         }
         Set<VarPair> new_linked_pairs = new HashSet<>();
-        int new_vid = varLabels.size();
         if (var_label1 != var_label2) {
             for (int vid1 = 0; vid1 < varLabels.size(); vid1++) {
                 if (var_label1 == varLabels.get(vid1)) {
@@ -328,13 +329,7 @@ public class BodyVarLinkManager {
                             new_linked_pairs.add(new VarPair(vid1, vid2));
                         }
                     }
-                    new_linked_pairs.add(new VarPair(vid1, new_vid));
                 }
-            }
-        }
-        for (int vid2 = 0; vid2 < varLabels.size(); vid2++) {
-            if (var_label2 == varLabels.get(vid2)) {
-                new_linked_pairs.add(new VarPair(vid2, new_vid));
             }
         }
         return new_linked_pairs;

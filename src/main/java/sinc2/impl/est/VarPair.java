@@ -2,6 +2,11 @@ package sinc2.impl.est;
 
 import java.util.Objects;
 
+/**
+ * A pair of LV IDs.
+ *
+ * @since 2.1
+ */
 public class VarPair {
     final int vid1;
     final int vid2;
