@@ -125,13 +125,17 @@ public class EstRelationMiner extends RelationMinerBasic {
         for (; num_beams < beamwidth && null != beams[num_beams]; num_beams++); // find the exact number of beams in the array
         int[] idxs = new int[num_beams];
         for (int i = 0; i < observations; i++) {
-            int best_rule_idx = 0;
-            double best_score = estimatedSpecLists[0].get(idxs[0]).estEval.value(evalMetric);
-            for (int rule_idx = 1; rule_idx < num_beams; rule_idx++) {
-                double score = estimatedSpecLists[rule_idx].get(idxs[rule_idx]).estEval.value(evalMetric);
-                if (best_score < score) {
-                    best_score = score;
-                    best_rule_idx = rule_idx;
+            int best_rule_idx = -1;
+            double best_score = Eval.MIN.value(evalMetric);
+            for (int rule_idx = 0; rule_idx < num_beams; rule_idx++) {
+                List<SpecOprWithScore> est_spec_list = estimatedSpecLists[rule_idx];
+                int idx = idxs[rule_idx];
+                if (idx < est_spec_list.size()) {
+                    double score = est_spec_list.get(idx).estEval.value(evalMetric);
+                    if (best_score < score) {
+                        best_score = score;
+                        best_rule_idx = rule_idx;
+                    }
                 }
             }
             SpecOprWithScore best_spec = estimatedSpecLists[best_rule_idx].get(idxs[best_rule_idx]);

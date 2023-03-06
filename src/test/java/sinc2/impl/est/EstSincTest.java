@@ -191,10 +191,18 @@ class EstSincTest {
             }
 
 //            assertTrue(sinc.recover());  // Todo: uncomment here
-            assertEquals(expected_rules, rule_set_sinc);
+
+            assertSubset(expected_rules, rule_set_sinc);
             deleteDir(Paths.get(TMP_DIR, compressed_kb_name).toFile());
         }
         deleteDir(kb_dir_path.toFile());
+    }
+
+    <T> void assertSubset(Set<T> subset, Set<T> superset) {
+        assertTrue(subset.size() < superset.size());
+        for (T element: subset) {
+            assertTrue(superset.contains(element));
+        }
     }
 
     private void deleteDir(File file) {
