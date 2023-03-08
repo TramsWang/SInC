@@ -23,7 +23,7 @@ public abstract class Rule {
     public static final int FIRST_BODY_PRED_IDX = HEAD_PRED_IDX + 1;
 
     /** Minimum rule length */
-    public static final int MIN_LENGTH = 0;
+    public static final int MIN_LENGTH = 0; // Todo: Should be 1
 
     /** The threshold of the coverage value for pruning */
     public static double MIN_FACT_COVERAGE = 0.0;
@@ -37,8 +37,8 @@ public abstract class Rule {
     /** The structure of the rule */
     protected final List<Predicate> structure;
 
-    /** The number of limited variables used in the rule */
-    protected final List<Integer> limitedVarCnts;   // Limited vars use non-negative ids (the list indices)
+    /** The arguments that are assigned to limited variables of certain IDs */
+    protected final List<List<ArgLocation>> limitedVarArgs;   // Limited vars use non-negative IDs (the list indices)
 
     /** The fingerprint of the rule */
     protected Fingerprint fingerprint;
@@ -434,7 +434,7 @@ public abstract class Rule {
         this.fingerprintCache = fingerprintCache;
         this.category2TabuSetMap = category2TabuSetMap;
         structure = new ArrayList<>();
-        limitedVarCnts = new ArrayList<>();
+        limitedVarArgs = new ArrayList<>();
         length = MIN_LENGTH;
         eval = null;
 
@@ -456,7 +456,7 @@ public abstract class Rule {
         this.fingerprintCache = fingerprintCache;
         this.category2TabuSetMap = category2TabuSetMap;
         this.structure = new ArrayList<>(structure.size());
-        limitedVarCnts = new ArrayList<>();
+        limitedVarArgs = new ArrayList<>();
         eval = null;
 
         /* Calculate the length and find the limited variables */
@@ -468,7 +468,7 @@ public abstract class Rule {
                 if (Argument.isVariable(argument)) {
                     int var_id = Argument.decode(argument);
                     old_vid_2_new_vid_map.computeIfAbsent(var_id, k -> {
-                        limitedVarCnts.add(0);
+                        limitedVarArgs.add(new ArrayList<>());
                         return old_vid_2_new_vid_map.size();
                     });
                 }
@@ -478,13 +478,14 @@ public abstract class Rule {
         this.length -= old_vid_2_new_vid_map.size();
 
         /* Normalize the variables */
-        for (Predicate p: this.structure) {
+        for (int pred_idx = HEAD_PRED_IDX; pred_idx < structure.size(); pred_idx++) {
+            Predicate p = structure.get(pred_idx);
             for (int arg_idx = 0; arg_idx < p.arity(); arg_idx++) {
                 int argument = p.args[arg_idx];
                 if (Argument.isVariable(argument)) {
                     int new_vid = old_vid_2_new_vid_map.get(Argument.decode(argument));
                     p.args[arg_idx] = Argument.variable(new_vid);
-                    limitedVarCnts.set(new_vid, limitedVarCnts.get(new_vid) + 1);
+                    limitedVarArgs.get(new_vid).add(new ArgLocation(pred_idx, arg_idx));
                 }
             }
         }
@@ -503,7 +504,10 @@ public abstract class Rule {
         for (Predicate predicate: another.structure) {
             this.structure.add(new Predicate(predicate));
         }
-        this.limitedVarCnts = new ArrayList<>(another.limitedVarCnts);
+        this.limitedVarArgs = new ArrayList<>(another.limitedVarArgs.size());
+        for (List<ArgLocation> var_args: another.limitedVarArgs) {
+            this.limitedVarArgs.add(new ArrayList<>(var_args));
+        }
         this.length = another.length;
         this.eval = another.eval;
         this.fingerprint = another.fingerprint;
@@ -732,7 +736,7 @@ public abstract class Rule {
     protected void cvt1Uv2ExtLvUpdStrc(final int predIdx, final int argIdx, final int varId) {
         final Predicate target_predicate = structure.get(predIdx);
         target_predicate.args[argIdx] = Argument.variable(varId);
-        limitedVarCnts.set(varId, limitedVarCnts.get(varId)+1);
+        limitedVarArgs.get(varId).add(new ArgLocation(predIdx, argIdx));
         length++;
         fingerprint = new Fingerprint(structure);
     }
@@ -794,7 +798,7 @@ public abstract class Rule {
         final Predicate target_predicate = new Predicate(functor, arity);
         structure.add(target_predicate);
         target_predicate.args[argIdx] = Argument.variable(varId);
-        limitedVarCnts.set(varId, limitedVarCnts.get(varId)+1);
+        limitedVarArgs.get(varId).add(new ArgLocation(structure.size() - 1, argIdx));
         length++;
         fingerprint = new Fingerprint(structure);
     }
@@ -865,10 +869,13 @@ public abstract class Rule {
     protected void cvt2Uvs2NewLvUpdStrc(final int predIdx1, final int argIdx1, final int predIdx2, final int argIdx2) {
         final Predicate target_predicate1 = structure.get(predIdx1);
         final Predicate target_predicate2 = structure.get(predIdx2);
-        final int new_var = Argument.variable(limitedVarCnts.size());
+        final int new_var = Argument.variable(limitedVarArgs.size());
         target_predicate1.args[argIdx1] = new_var;
         target_predicate2.args[argIdx2] = new_var;
-        limitedVarCnts.add(2);
+        List<ArgLocation> var_args = new ArrayList<>();
+        var_args.add(new ArgLocation(predIdx1, argIdx1));
+        var_args.add(new ArgLocation(predIdx2, argIdx2));
+        limitedVarArgs.add(var_args);
         length++;
         fingerprint = new Fingerprint(structure);
     }
@@ -940,10 +947,13 @@ public abstract class Rule {
         final Predicate target_predicate1 = new Predicate(functor, arity);
         structure.add(target_predicate1);
         final Predicate target_predicate2 = structure.get(predIdx2);
-        final int new_var = Argument.variable(limitedVarCnts.size());
+        final int new_var = Argument.variable(limitedVarArgs.size());
         target_predicate1.args[argIdx1] = new_var;
         target_predicate2.args[argIdx2] = new_var;
-        limitedVarCnts.add(2);
+        List<ArgLocation> var_args = new ArrayList<>();
+        var_args.add(new ArgLocation(structure.size() - 1, argIdx1));
+        var_args.add(new ArgLocation(predIdx2, argIdx2));
+        limitedVarArgs.add(var_args);
         length++;
         fingerprint = new Fingerprint(structure);
     }
@@ -1074,43 +1084,27 @@ public abstract class Rule {
         /* Rearrange the var ids if the removed argument is an LV */
         if (Argument.isVariable(removed_argument)) {
             int removed_var_id = Argument.decode(removed_argument);
-            final Integer var_uses_cnt = limitedVarCnts.get(removed_var_id);
-            if (2 >= var_uses_cnt) {
+            List<ArgLocation> var_args = limitedVarArgs.get(removed_var_id);
+            if (2 >= var_args.size()) {
                 /* The LV should be removed */
                 /* Change the id of the latest LV to the removed one */
                 /* Note that the removed one may also be the latest LV */
-                int latest_var_id = limitedVarCnts.size() - 1;
-                limitedVarCnts.set(removed_var_id, limitedVarCnts.get(latest_var_id));
-                limitedVarCnts.remove(latest_var_id);
+                int latest_var_id = limitedVarArgs.size() - 1;
+                limitedVarArgs.set(removed_var_id, limitedVarArgs.get(latest_var_id));
+                limitedVarArgs.remove(latest_var_id);
 
                 /* Clear the argument as well as the UV due to the remove (if applicable) */
-                boolean found = false;
-                for (Predicate another_predicate : structure) {
-                    for (int i = 0; i < another_predicate.arity(); i++) {
-                        if (removed_argument == another_predicate.args[i]) {
-                            another_predicate.args[i] = Argument.EMPTY_VALUE;
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (found) {
-                        break;
-                    }
+                for (ArgLocation var_arg: var_args) {
+                    structure.get(var_arg.predIdx).args[var_arg.argIdx] = Argument.EMPTY_VALUE;
                 }
-
-                int latest_var = Argument.variable(latest_var_id);
-                if (removed_argument != latest_var) {
-                    /* Rewrite the vars to the removed one */
-                    for (Predicate another_predicate : structure) {
-                        for (int i = 0; i < another_predicate.arity(); i++) {
-                            another_predicate.args[i] = (latest_var == another_predicate.args[i]) ?
-                                    removed_argument : another_predicate.args[i];
-                        }
+                if (removed_var_id != latest_var_id) {
+                    for (ArgLocation var_arg: limitedVarArgs.get(removed_var_id)) {
+                        structure.get(var_arg.predIdx).args[var_arg.argIdx] = removed_argument;
                     }
                 }
             } else {
                 /* Remove the occurrence only */
-                limitedVarCnts.set(removed_var_id, var_uses_cnt - 1);
+                limitedVarArgs.get(removed_var_id).remove(new ArgLocation(predIdx, argIdx));
             }
         }
         length--;
@@ -1179,7 +1173,7 @@ public abstract class Rule {
     }
 
     public int usedLimitedVars() {
-        return limitedVarCnts.size();
+        return limitedVarArgs.size();
     }
 
     public int predicates() {

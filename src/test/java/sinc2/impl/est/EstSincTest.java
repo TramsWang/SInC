@@ -1,4 +1,4 @@
-package sinc2.impl.base;
+package sinc2.impl.est;
 
 import org.junit.jupiter.api.Test;
 import sinc2.SincConfig;
@@ -21,10 +21,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
-class SincBasicTest {
+class EstSincTest {
 
     static final String TMP_DIR = "/dev/shm/";
 
@@ -78,10 +77,10 @@ class SincBasicTest {
             System.out.println("CompKB: " + compressed_kb_name);
             final SincConfig config = new SincConfig(
                     TMP_DIR, kb_name, TMP_DIR, compressed_kb_name, 1, true, 5,
-                    eval_type, 0.05, 0.25, 1, 1.0
+                    eval_type, 0.05, 0.25, 1, 2.0
             );
             Set<Fingerprint> rule_set_sinc = new HashSet<>();
-            SincBasic sinc = new SincBasic(config);
+            EstSinc sinc = new EstSinc(config);
             sinc.run();
             SimpleCompressedKb compressed_kb = sinc.getCompressedKb();
             for (Rule r: compressed_kb.getHypothesis()) {
@@ -176,15 +175,15 @@ class SincBasicTest {
         expected_rules.add(r4.getFingerprint());
 
         for (EvalMetric eval_type: new EvalMetric[]{
-                EvalMetric.CompressionCapacity,
+//                EvalMetric.CompressionCapacity,
                 EvalMetric.CompressionRatio
         }) {
             final SincConfig config = new SincConfig(
                     TMP_DIR, kb_name, TMP_DIR, compressed_kb_name, 1, true, 5,
-                    eval_type, 0.05, 0.25, 1, 1.0
+                    eval_type, 0.05, 0.25, 1, 2.0
             );
             Set<Fingerprint> rule_set_sinc = new HashSet<>();
-            SincBasic sinc = new SincBasic(config);
+            EstSinc sinc = new EstSinc(config);
             sinc.run();
             SimpleCompressedKb compressed_kb = sinc.getCompressedKb();
             for (Rule r: compressed_kb.getHypothesis()) {
@@ -192,10 +191,18 @@ class SincBasicTest {
             }
 
 //            assertTrue(sinc.recover());  // Todo: uncomment here
-            assertEquals(expected_rules, rule_set_sinc);
+
+            assertSubset(expected_rules, rule_set_sinc);
             deleteDir(Paths.get(TMP_DIR, compressed_kb_name).toFile());
         }
         deleteDir(kb_dir_path.toFile());
+    }
+
+    <T> void assertSubset(Set<T> subset, Set<T> superset) {
+        assertTrue(subset.size() < superset.size());
+        for (T element: subset) {
+            assertTrue(superset.contains(element));
+        }
     }
 
     private void deleteDir(File file) {

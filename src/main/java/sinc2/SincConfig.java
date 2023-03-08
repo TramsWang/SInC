@@ -37,11 +37,13 @@ public class SincConfig {
     public double minConstantCoverage;
     /** The threshold for maximum compression ratio of a single rule */
     public double stopCompressionRatio;
+    /** The ratio (>=1) that extends the number of rules that are actually specialized according to the estimations */
+    public double observationRatio;
 
     public SincConfig(
             String basePath, String kbName, String dumpPath, String dumpName, int threads, boolean validation,
             int beamwidth, EvalMetric evalMetric, double minFactCoverage, double minConstantCoverage,
-            double stopCompressionRatio
+            double stopCompressionRatio, double observationRatio
     ) {
         this.basePath = basePath;
         this.kbName = kbName;
@@ -54,5 +56,6 @@ public class SincConfig {
         this.minFactCoverage = minFactCoverage;
         this.minConstantCoverage = minConstantCoverage;
         this.stopCompressionRatio = Math.max(Eval.COMP_RATIO_USEFUL_THRESHOLD, stopCompressionRatio);  // make sure the stopping compression ratio threshold is useful
+        this.observationRatio = Math.max(1.0, observationRatio);
     }
 }
