@@ -245,7 +245,7 @@ public class EstRule extends CachedRule {
                 }
                 results.add(new SpecOprWithScore(
                         new SpecOprCase1(vacant.predIdx, vacant.argIdx, var_id),
-                        new Eval(null, est_pos_ent, est_all_ent, length + 1)
+                        new Eval(est_pos_ent, est_all_ent, length + 1)
                 ));
             }
 
@@ -282,7 +282,7 @@ public class EstRule extends CachedRule {
                     }
                     results.add(new SpecOprWithScore(
                             new SpecOprCase2(relation.id, relation.totalCols(), arg_idx, var_id),
-                            new Eval(null, est_pos_ent, est_all_ent, length + 1)
+                            new Eval(est_pos_ent, est_all_ent, length + 1)
                     ));
                 }
             }
@@ -379,7 +379,7 @@ public class EstRule extends CachedRule {
                 }
                 results.add(new SpecOprWithScore(
                         new SpecOprCase3(empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx, empty_arg_loc_2.predIdx, empty_arg_loc_2.argIdx),
-                        new Eval(null, est_pos_ent, est_all_ent, length + 1)
+                        new Eval(est_pos_ent, est_all_ent, length + 1)
                 ));
             }
 
@@ -393,7 +393,7 @@ public class EstRule extends CachedRule {
                         double est_all_ent = eval.getAllEtls() / kb.totalConstants() * relation.valuesInColumn(arg_idx).length;
                         results.add(new SpecOprWithScore(
                                 new SpecOprCase4(relation.id, relation.totalCols(), arg_idx, empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx),
-                                new Eval(null, est_pos_ent, est_all_ent, length + 1)
+                                new Eval(est_pos_ent, est_all_ent, length + 1)
                         ));
                     }
                 }
@@ -405,7 +405,7 @@ public class EstRule extends CachedRule {
                         double est_all_ent = eval.getAllEtls() / empty_arg1_all_column_values.size() * empty_arg1_all_column_values.itemCount(relation_column_values);
                         results.add(new SpecOprWithScore(
                                 new SpecOprCase4(relation.id, relation.totalCols(), arg_idx, empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx),
-                                new Eval(null, est_pos_ent, est_all_ent, length + 1)
+                                new Eval(est_pos_ent, est_all_ent, length + 1)
                         ));
                     }
                 }
@@ -420,7 +420,7 @@ public class EstRule extends CachedRule {
                     double est_pos_ent = eval.getPosEtls() / empty_arg1_pos_column_values.size() * empty_arg1_pos_column_values.itemCount(constant);
                     results.add(new SpecOprWithScore(
                             new SpecOprCase5(empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx, constant),
-                            new Eval(null, est_pos_ent, est_all_ent, length + 1)
+                            new Eval(est_pos_ent, est_all_ent, length + 1)
                     ));
                 }
             } else {
@@ -429,7 +429,7 @@ public class EstRule extends CachedRule {
                     double est_all_ent = eval.getAllEtls() / empty_arg1_all_column_values.size() * empty_arg1_all_column_values.itemCount(constant);
                     results.add(new SpecOprWithScore(
                             new SpecOprCase5(empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx, constant),
-                            new Eval(null, est_pos_ent, est_all_ent, length + 1)
+                            new Eval(est_pos_ent, est_all_ent, length + 1)
                     ));
                 }
             }

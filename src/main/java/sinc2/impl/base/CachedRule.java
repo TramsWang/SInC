@@ -7,6 +7,7 @@ import sinc2.common.Record;
 import sinc2.kb.IntTable;
 import sinc2.kb.SimpleKb;
 import sinc2.kb.SimpleRelation;
+import sinc2.kb.SplitRecords;
 import sinc2.rule.*;
 import sinc2.util.MultiSet;
 
@@ -44,8 +45,10 @@ public class CachedRule extends Rule {
 
     /** The original KB */
     protected final SimpleKb kb;
-    /** The cache for the positive entailments (E+-cache) */
+    /** The cache for the positive entailments (E+-cache) (not entailed) */
     protected List<List<CompliedBlock>> posCache;
+    /** This cache is used to monitor the already-entailed records (T-cache) */
+    protected List<List<CompliedBlock>> entCache;
     /** The cache for all the entailments (E-cache). the first element should be null to keep the same length as the
      *  E+-cache, as the head should be removed in E-cache */
     protected List<List<CompliedBlock>> allCache;
@@ -68,13 +71,37 @@ public class CachedRule extends Rule {
         super(headPredSymbol, arity, fingerprintCache, category2TabuSetMap);
         this.kb = kb;
 
-        /* Initialize the E+-cache */
+        /* Initialize the E+-cache & T-cache */
         SimpleRelation head_relation = kb.getRelation(headPredSymbol);
-        final CompliedBlock cb_head = new CompliedBlock(new int[arity], head_relation.getAllRows(), head_relation);
-        final List<CompliedBlock> pos_init_entry = new ArrayList<>();
-        pos_init_entry.add(cb_head);
-        posCache = new ArrayList<>();
-        posCache.add(pos_init_entry);
+        SplitRecords split_records = head_relation.splitByEntailment();
+        if (0 == split_records.entailedRecords.length) {
+            final CompliedBlock cb_head = new CompliedBlock(new int[arity], head_relation.getAllRows(), head_relation);
+            final List<CompliedBlock> pos_init_entry = new ArrayList<>();
+            pos_init_entry.add(cb_head);
+            posCache = new ArrayList<>();
+            posCache.add(pos_init_entry);
+
+            entCache = new ArrayList<>();
+        } else if (0 == split_records.nonEntailedRecords.length) {
+            posCache = new ArrayList<>();
+            entCache = new ArrayList<>();
+        } else {
+            final CompliedBlock cb_head = new CompliedBlock(
+                    new int[arity], split_records.nonEntailedRecords, new IntTable(split_records.nonEntailedRecords)
+            );
+            final List<CompliedBlock> pos_init_entry = new ArrayList<>();
+            pos_init_entry.add(cb_head);
+            posCache = new ArrayList<>();
+            posCache.add(pos_init_entry);
+
+            final CompliedBlock cb_head_ent = new CompliedBlock(
+                    new int[arity], split_records.entailedRecords, new IntTable(split_records.entailedRecords)
+            );
+            final List<CompliedBlock> ent_init_entry = new ArrayList<>();
+            ent_init_entry.add(cb_head_ent);
+            entCache = new ArrayList<>();
+            entCache.add(ent_init_entry);
+        }
 
         /* Initialize the E-cache */
         final List<CompliedBlock> all_init_entry = new ArrayList<>();
@@ -99,6 +126,7 @@ public class CachedRule extends Rule {
         super(structure, fingerprintCache, category2TabuSetMap);
         this.kb = kb;
         this.posCache = new ArrayList<>();
+        this.entCache = new ArrayList<>();
         this.allCache = new ArrayList<>();
         for (int i = 0; i < usedLimitedVars(); i++) {
             plvList.add(null);
@@ -174,18 +202,127 @@ public class CachedRule extends Rule {
 
         /* Construct the initial cache entry (where only constant restrictions are applied) */
         /* If any of the compliance sets is empty, the cache entry will be NULL */
-        List<CompliedBlock> initial_entry = new ArrayList<>();
-        for (int pred_idx = HEAD_PRED_IDX; pred_idx < const_restriction_lists.length; pred_idx++) {
+        List<CompliedBlock> initial_entry_pos = new ArrayList<>();
+        List<CompliedBlock> initial_entry_ent = new ArrayList<>();
+        {
+            /* Split head */
+            Predicate head_predicate = this.structure.get(HEAD_PRED_IDX);
+            SimpleRelation head_relation = kb.getRelation(head_predicate.predSymbol);
+            List<ConstRestriction> const_restrictions = const_restriction_lists[HEAD_PRED_IDX];
+            int already_entailed = head_relation.totalEntailedRecords();
+            if (0 == already_entailed) {
+                initial_entry_ent = null;
+                int[][] records_in_relation = head_relation.getAllRows();
+                if (0 == records_in_relation.length) {
+                    initial_entry_pos = null;
+                } else if (null == const_restrictions) {
+                    initial_entry_pos.add(new CompliedBlock(new int[head_predicate.arity()], records_in_relation, head_relation));
+                } else {
+                    List<int[]> records_complied_to_constants = new ArrayList<>();
+                    for (int[] record : records_in_relation) {
+                        boolean match_all = true;
+                        for (ConstRestriction restriction: const_restrictions) {
+                            if (restriction.constant != record[restriction.argIdx]) {
+                                match_all = false;
+                                break;
+                            }
+                        }
+                        if (match_all) {
+                            records_complied_to_constants.add(record);
+                        }
+                    }
+                    if (records_complied_to_constants.isEmpty()) {
+                        initial_entry_pos = null;
+                    } else {
+                        int[] par = new int[head_predicate.arity()];
+                        for (ConstRestriction restriction : const_restrictions) {
+                            par[restriction.argIdx] = restriction.constant;
+                        }
+                        IntTable cb_indices = new IntTable(records_complied_to_constants.toArray(new int[0][]));
+                        initial_entry_pos.add(new CompliedBlock(par, cb_indices.getAllRows(), cb_indices));
+                    }
+                }
+            } else {
+                SplitRecords split_records = head_relation.splitByEntailment();
+                if (0 == split_records.nonEntailedRecords.length) {
+                    initial_entry_pos = null;
+                    initial_entry_ent = null;
+                } else if (null == const_restrictions) {
+                    initial_entry_pos.add(new CompliedBlock(
+                            new int[head_predicate.arity()], split_records.nonEntailedRecords,
+                            new IntTable(split_records.nonEntailedRecords)
+                    ));
+                    initial_entry_ent.add(new CompliedBlock(
+                            new int[head_predicate.arity()], split_records.entailedRecords,
+                            new IntTable(split_records.entailedRecords)
+                    ));
+                } else {
+                    List<int[]> records_complied_to_constants_pos = new ArrayList<>();
+                    for (int[] record : split_records.nonEntailedRecords) {
+                        boolean match_all = true;
+                        for (ConstRestriction restriction: const_restrictions) {
+                            if (restriction.constant != record[restriction.argIdx]) {
+                                match_all = false;
+                                break;
+                            }
+                        }
+                        if (match_all) {
+                            records_complied_to_constants_pos.add(record);
+                        }
+                    }
+                    if (records_complied_to_constants_pos.isEmpty()) {
+                        initial_entry_pos = null;
+                        initial_entry_ent = null;
+                    } else {
+                        int[] par = new int[head_predicate.arity()];
+                        for (ConstRestriction restriction : const_restrictions) {
+                            par[restriction.argIdx] = restriction.constant;
+                        }
+                        IntTable cb_indices_pos = new IntTable(records_complied_to_constants_pos.toArray(new int[0][]));
+                        initial_entry_pos.add(new CompliedBlock(par, cb_indices_pos.getAllRows(), cb_indices_pos));
+
+                        /* T-Cache Head */
+                        List<int[]> records_complied_to_constants_ent = new ArrayList<>();
+                        for (int[] record : split_records.entailedRecords) {
+                            boolean match_all = true;
+                            for (ConstRestriction restriction: const_restrictions) {
+                                if (restriction.constant != record[restriction.argIdx]) {
+                                    match_all = false;
+                                    break;
+                                }
+                            }
+                            if (match_all) {
+                                records_complied_to_constants_ent.add(record);
+                            }
+                        }
+                        if (records_complied_to_constants_ent.isEmpty()) {
+                            initial_entry_ent = null;
+                        } else {
+                            IntTable cb_indices_ent = new IntTable(records_complied_to_constants_ent.toArray(new int[0][]));
+                            initial_entry_ent.add(new CompliedBlock(par.clone(), cb_indices_ent.getAllRows(), cb_indices_ent));
+                        }
+                    }
+                }
+            }
+            if (null == initial_entry_pos) {
+                return;
+            }
+        }
+        for (int pred_idx = FIRST_BODY_PRED_IDX; pred_idx < const_restriction_lists.length; pred_idx++) {
             Predicate predicate = this.structure.get(pred_idx);
             SimpleRelation relation = kb.getRelation(predicate.predSymbol);
             List<ConstRestriction> const_restrictions = const_restriction_lists[pred_idx];
             int[][] records_in_relation = relation.getAllRows();
             if (0 == records_in_relation.length) {
-                initial_entry = null;
+                initial_entry_pos = null;
+                initial_entry_ent = null;
                 break;
             }
             if (null == const_restrictions) {
-                initial_entry.add(new CompliedBlock(new int[predicate.arity()], records_in_relation, relation));
+                initial_entry_pos.add(new CompliedBlock(new int[predicate.arity()], records_in_relation, relation));
+                if (null != initial_entry_ent) {
+                    initial_entry_ent.add(new CompliedBlock(new int[predicate.arity()], records_in_relation, relation));
+                }
             } else {
                 List<int[]> records_complied_to_constants = new ArrayList<>();
                 for (int[] record : records_in_relation) {
@@ -201,7 +338,8 @@ public class CachedRule extends Rule {
                     }
                 }
                 if (records_complied_to_constants.isEmpty()) {
-                    initial_entry = null;
+                    initial_entry_pos = null;
+                    initial_entry_ent = null;
                     break;
                 }
 
@@ -210,16 +348,19 @@ public class CachedRule extends Rule {
                     par[restriction.argIdx] = restriction.constant;
                 }
                 IntTable cb_indices = new IntTable(records_complied_to_constants.toArray(new int[0][]));
-                initial_entry.add(new CompliedBlock(par, cb_indices.getAllRows(), cb_indices));
+                initial_entry_pos.add(new CompliedBlock(par, cb_indices.getAllRows(), cb_indices));
+                if (null != initial_entry_ent) {
+                    initial_entry_ent.add(new CompliedBlock(par.clone(), cb_indices.getAllRows(), cb_indices));
+                }
             }
         }
-        if (null == initial_entry) {
+        if (null == initial_entry_pos) {
             return;
         }
 
         /* Build the caches */
         /* Build "allCache" first */
-        List<CompliedBlock> init_entry_without_head = new ArrayList<>(initial_entry);
+        List<CompliedBlock> init_entry_without_head = new ArrayList<>(initial_entry_pos);
         init_entry_without_head.set(HEAD_PRED_IDX, null);
         allCache.add(init_entry_without_head);
         for (List<ArgLocation> arg_locations : lv_id_locs_without_head) {
@@ -230,10 +371,20 @@ public class CachedRule extends Rule {
 
         /* Build "posCache" */
         /* Todo: the "posCache" can be built based on the result of "allCache" but the implementation is too complicated. Optimize in a future enhancement. */
-        posCache.add(initial_entry);
+        posCache.add(initial_entry_pos);
         for (List<ArgLocation> arg_locations : lv_id_locs_with_head) {
             if (null != arg_locations) {
                 posCache = splitCacheEntriesByLvs(posCache, arg_locations);
+            }
+        }
+
+        /* Build "T-Cache" */
+        if (null != initial_entry_ent) {
+            entCache.add(initial_entry_ent);
+            for (List<ArgLocation> arg_locations : lv_id_locs_with_head) {
+                if (null != arg_locations) {
+                    entCache = splitCacheEntriesByLvs(entCache, arg_locations);
+                }
             }
         }
     }
@@ -338,6 +489,7 @@ public class CachedRule extends Rule {
 
         /* The caches can be simply copied, as the list should not be modified, but directly replaced (Copy-on-write) */
         this.posCache = another.posCache;
+        this.entCache = another.entCache;
         this.allCache = another.allCache;
         this.plvList.addAll(another.plvList);
     }
@@ -356,9 +508,7 @@ public class CachedRule extends Rule {
         final SimpleRelation target_relation = kb.getRelation(getHead().predSymbol);
         for (final List<CompliedBlock> cache_entry: posCache) {
             for (int[] record: cache_entry.get(HEAD_PRED_IDX).complSet) {
-                if (!target_relation.isEntailed(record)) {
-                    entailed_head.add(new Record(record));
-                }
+                entailed_head.add(new Record(record));
             }
         }
         return ((double) entailed_head.size()) / target_relation.totalRows();
@@ -472,26 +622,26 @@ public class CachedRule extends Rule {
         /* Count for the total and new positive entailments */
         final Set<Record> newly_proved = new HashSet<>();
         final Set<Record> already_proved = new HashSet<>();
-        final SimpleRelation target_relation = kb.getRelation(getHead().predSymbol);
         if (0 == head_uv_cnt) {
             /* No UV in the head, PAR is the record */
             for (final List<CompliedBlock> cache_entry : posCache) {
                 int[] record = cache_entry.get(HEAD_PRED_IDX).partAsgnRecord;
-                if (target_relation.isEntailed(record)) {
-                    already_proved.add(new Record(record));
-                } else {
-                    newly_proved.add(new Record(record));
-                }
+                newly_proved.add(new Record(record));
+            }
+            for (final List<CompliedBlock> cache_entry: entCache) {
+                int[] record = cache_entry.get(HEAD_PRED_IDX).partAsgnRecord;
+                already_proved.add(new Record(record));
             }
         } else {
             /* UVs in the head, find all records in the CSs */
             for (final List<CompliedBlock> cache_entry: posCache) {
                 for (int[] record: cache_entry.get(HEAD_PRED_IDX).complSet) {
-                    if (target_relation.isEntailed(record)) {
-                        already_proved.add(new Record(record));
-                    } else {
-                        newly_proved.add(new Record(record));
-                    }
+                    newly_proved.add(new Record(record));
+                }
+            }
+            for (final List<CompliedBlock> cache_entry: entCache) {
+                for (int[] record: cache_entry.get(HEAD_PRED_IDX).complSet) {
+                    already_proved.add(new Record(record));
                 }
             }
         }
@@ -560,6 +710,11 @@ public class CachedRule extends Rule {
                 cb.buildIndices();
             }
         }
+        for (List<CompliedBlock> entry: entCache) {
+            for (CompliedBlock cb: entry) {
+                cb.buildIndices();
+            }
+        }
         for (List<CompliedBlock> entry: allCache) {
             for (int pred_idx = FIRST_BODY_PRED_IDX; pred_idx < structure.size(); pred_idx++) {
                 entry.get(pred_idx).buildIndices();
@@ -574,32 +729,33 @@ public class CachedRule extends Rule {
      */
     @Override
     protected UpdateStatus cvt1Uv2ExtLvHandlerPreCvg(int predIdx, int argIdx, int varId) {
-        boolean found = false;
-        final int arg_var = Argument.variable(varId);
-        for (int pred_idx = HEAD_PRED_IDX; pred_idx < structure.size() && !found; pred_idx++) {
-            final Predicate predicate = structure.get(pred_idx);
-
+        for (ArgLocation arg_loc: limitedVarArgs.get(varId)) {
             /* Find an argument that shares the same variable with the target */
-            for (int arg_idx = 0; arg_idx < predicate.arity(); arg_idx++) {
-                if (arg_var == predicate.args[arg_idx] && (pred_idx != predIdx || arg_idx != argIdx)) { // Don't compare with the target argument
-                    found = true;
-
-                    /* Split */
-                    posCache = splitCacheEntries(posCache, predIdx, argIdx, pred_idx, arg_idx);
-                    break;
-                }
+            if (arg_loc.predIdx != predIdx || arg_loc.argIdx != argIdx) {   // Don't compare with the target argument
+                /* Split */
+                posCache = splitCacheEntries(posCache, predIdx, argIdx, arg_loc.predIdx, arg_loc.argIdx);
+                break;
             }
         }
         return UpdateStatus.NORMAL;
     }
 
     /**
-     * Update the E-cache for case 1 specialization.
+     * Update the T-cache and E-cache for case 1 specialization.
      *
      * Note: all indices should be up-to-date
      */
     @Override
     protected UpdateStatus cvt1Uv2ExtLvHandlerPostCvg(int predIdx, int argIdx, int varId) {
+        for (ArgLocation arg_loc: limitedVarArgs.get(varId)) {
+            /* Find an argument that shares the same variable with the target */
+            if (arg_loc.predIdx != predIdx || arg_loc.argIdx != argIdx) {
+                /* Split */
+                entCache = splitCacheEntries(entCache, predIdx, argIdx, arg_loc.predIdx, arg_loc.argIdx);
+                break;
+            }
+        }
+
         if (HEAD_PRED_IDX != predIdx) { // No need to update the E-cache if the update is in the head
             PlvLoc plv_loc = plvList.get(varId);
             if (null != plv_loc) {
@@ -608,25 +764,18 @@ public class CachedRule extends Rule {
                 allCache = splitCacheEntries(allCache, predIdx, argIdx, plv_loc.bodyPredIdx, plv_loc.bodyArgIdx);
             } else {
                 boolean found = false;
-                final int arg_var = Argument.variable(varId);
-
-                /* Find an argument in the body that shares the same variable with the target */
-                for (int pred_idx = FIRST_BODY_PRED_IDX; pred_idx < structure.size() && !found; pred_idx++) {
-                    final Predicate predicate = structure.get(pred_idx);
-
-                    for (int arg_idx = 0; arg_idx < predicate.arity(); arg_idx++) {
-                        if (arg_var == predicate.args[arg_idx] && (pred_idx != predIdx || arg_idx != argIdx)) { // Don't compare with the target argument
-                            found = true;
-
-                            /* Split */
-                            allCache = splitCacheEntries(allCache, predIdx, argIdx, pred_idx, arg_idx);
-                            break;
-                        }
+                for (ArgLocation arg_loc: limitedVarArgs.get(varId)) {
+                    /* Find an argument in the body that shares the same variable with the target */
+                    if (HEAD_PRED_IDX != arg_loc.predIdx && (arg_loc.predIdx != predIdx || arg_loc.argIdx != argIdx)) { // Don't compare with the target argument
+                        /* Split */
+                        allCache = splitCacheEntries(allCache, predIdx, argIdx, arg_loc.predIdx, arg_loc.argIdx);
+                        found = true;
+                        break;
                     }
                 }
-
                 if (!found) {
                     /* No matching LV in the body, record as a PLV */
+                    final int arg_var = Argument.variable(varId);
                     final Predicate head_pred = structure.get(HEAD_PRED_IDX);
                     for (int arg_idx = 0; arg_idx < head_pred.arity(); arg_idx++) {
                         if (arg_var == head_pred.args[arg_idx]) {
@@ -647,33 +796,35 @@ public class CachedRule extends Rule {
      */
     @Override
     protected UpdateStatus cvt1Uv2ExtLvHandlerPreCvg(Predicate newPredicate, int argIdx, int varId) {
-        boolean found = false;
-        final int arg_var = Argument.variable(varId);
-        for (int pred_idx = HEAD_PRED_IDX; pred_idx < structure.size() - 1 && !found; pred_idx++) { // Don't find in the appended predicate
-            final Predicate predicate = structure.get(pred_idx);
-
+        for (ArgLocation arg_loc: limitedVarArgs.get(varId)) {
             /* Find an argument that shares the same variable with the target */
-            for (int arg_idx = 0; arg_idx < predicate.arity(); arg_idx++) {
-                if (arg_var == predicate.args[arg_idx]) {
-                    found = true;
-
-                    /* Append + Split */
-                    List<List<CompliedBlock>> tmp_cache = appendCacheEntries(posCache, newPredicate.predSymbol);
-                    posCache = splitCacheEntries(tmp_cache, structure.size() - 1, argIdx, pred_idx, arg_idx);
-                    break;
-                }
+            if (arg_loc.predIdx != structure.size() - 1 || arg_loc.argIdx != argIdx) {  // Don't find in the appended predicate
+                /* Append + Split */
+                List<List<CompliedBlock>> tmp_cache = appendCacheEntries(posCache, newPredicate.predSymbol);
+                posCache = splitCacheEntries(tmp_cache, structure.size() - 1, argIdx, arg_loc.predIdx, arg_loc.argIdx);
+                break;
             }
         }
         return UpdateStatus.NORMAL;
     }
 
     /**
-     * Update the E-cache for case 2 specialization.
+     * Update the T-cache and the E-cache for case 2 specialization.
      *
      * Note: all indices should be up-to-date
      */
     @Override
     protected UpdateStatus cvt1Uv2ExtLvHandlerPostCvg(Predicate newPredicate, int argIdx, int varId) {
+        for (ArgLocation arg_loc: limitedVarArgs.get(varId)) {
+            /* Find an argument that shares the same variable with the target */
+            if (arg_loc.predIdx != structure.size() - 1 || arg_loc.argIdx != argIdx) {  // Don't find in the appended predicate
+                /* Append + Split */
+                List<List<CompliedBlock>> tmp_cache = appendCacheEntries(entCache, newPredicate.predSymbol);
+                entCache = splitCacheEntries(tmp_cache, structure.size() - 1, argIdx, arg_loc.predIdx, arg_loc.argIdx);
+                break;
+            }
+        }
+
         PlvLoc plv_loc = plvList.get(varId);
         if (null != plv_loc) {
             /* Match the found PLV, append then split */
@@ -684,26 +835,19 @@ public class CachedRule extends Rule {
             );
         } else {
             boolean found = false;
-            final int arg_var = Argument.variable(varId);
-
-            /* Find an argument in the body that shares the same variable with the target */
-            for (int pred_idx = FIRST_BODY_PRED_IDX; pred_idx < structure.size() - 1 && !found; pred_idx++) {   // Don't find in the appended predicate
-                final Predicate predicate = structure.get(pred_idx);
-
-                for (int arg_idx = 0; arg_idx < predicate.arity(); arg_idx++) {
-                    if (arg_var == predicate.args[arg_idx]) {
-                        found = true;
-
-                        /* Append + Split */
-                        List<List<CompliedBlock>> tmp_cache = appendCacheEntries(allCache, newPredicate.predSymbol);
-                        allCache = splitCacheEntries(tmp_cache, structure.size() - 1, argIdx, pred_idx, arg_idx);
-                        break;
-                    }
+            for (ArgLocation arg_loc: limitedVarArgs.get(varId)) {
+                /* Find an argument in the body that shares the same variable with the target */
+                if (HEAD_PRED_IDX != arg_loc.predIdx && (arg_loc.predIdx != structure.size() - 1 || arg_loc.argIdx != argIdx)) { // Don't compare with the target argument
+                    /* Append + Split */
+                    List<List<CompliedBlock>> tmp_cache = appendCacheEntries(allCache, newPredicate.predSymbol);
+                    allCache = splitCacheEntries(tmp_cache, structure.size() - 1, argIdx, arg_loc.predIdx, arg_loc.argIdx);
+                    found = true;
+                    break;
                 }
             }
-
             if (!found) {
                 /* No matching LV in the body, record as a PLV, and append */
+                final int arg_var = Argument.variable(varId);
                 final Predicate head_pred = structure.get(HEAD_PRED_IDX);
                 for (int arg_idx = 0; arg_idx < head_pred.arity(); arg_idx++) {
                     if (arg_var == head_pred.args[arg_idx]) {
@@ -736,6 +880,8 @@ public class CachedRule extends Rule {
      */
     @Override
     protected UpdateStatus cvt2Uvs2NewLvHandlerPostCvg(int predIdx1, int argIdx1, int predIdx2, int argIdx2) {
+        entCache = splitCacheEntries(entCache, predIdx1, argIdx1, predIdx2, argIdx2);
+
         if (HEAD_PRED_IDX != predIdx1 || HEAD_PRED_IDX != predIdx2) {   // At least one modified predicate is in the body. Otherwise, nothing should be done.
             if (HEAD_PRED_IDX == predIdx1 || HEAD_PRED_IDX == predIdx2) {   // One is the head and the other is not
                 /* The new variable is a PLV */
@@ -773,6 +919,9 @@ public class CachedRule extends Rule {
      */
     @Override
     protected UpdateStatus cvt2Uvs2NewLvHandlerPostCvg(Predicate newPredicate, int argIdx1, int predIdx2, int argIdx2) {
+        List<List<CompliedBlock>> tmp_cache = appendCacheEntries(entCache, newPredicate.predSymbol);
+        entCache = splitCacheEntries(tmp_cache, structure.size() - 1, argIdx1, predIdx2, argIdx2);
+
         if (HEAD_PRED_IDX == predIdx2) {   // One is the head and the other is not
             /* The new variable is a PLV, append */
             plvList.add(new PlvLoc(structure.size() - 1, argIdx1, argIdx2));
@@ -780,7 +929,7 @@ public class CachedRule extends Rule {
         } else {    // Both are in the body
             /* The new variable is not a PLV, append then split */
             plvList.add(null);
-            List<List<CompliedBlock>> tmp_cache = appendCacheEntries(allCache, newPredicate.predSymbol);
+            tmp_cache = appendCacheEntries(allCache, newPredicate.predSymbol);
             allCache = splitCacheEntries(tmp_cache, structure.size() - 1, argIdx1, predIdx2, argIdx2);
         }
         return UpdateStatus.NORMAL;
@@ -805,6 +954,8 @@ public class CachedRule extends Rule {
      */
     @Override
     protected UpdateStatus cvt1Uv2ConstHandlerPostCvg(int predIdx, int argIdx, int constant) {
+        entCache = assignCacheEntries(entCache, predIdx, argIdx, constant);
+
         if (HEAD_PRED_IDX != predIdx) { // No need to update the E-cache if the update is in the head
             /* Assign */
             allCache = assignCacheEntries(allCache, predIdx, argIdx, constant);
@@ -1190,6 +1341,7 @@ public class CachedRule extends Rule {
     @Override
     public void releaseMemory() {
         posCache = null;
+        entCache = null;
         allCache = null;
     }
 }

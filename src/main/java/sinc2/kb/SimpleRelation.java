@@ -273,4 +273,41 @@ public class SimpleRelation extends IntTable {
     public int[] getRowAt(int idx) {
         return sortedRowsByCols[0][idx];
     }
+
+    /**
+     * Split rows in the relation by whether they are flagged as entailed.
+     */
+    public SplitRecords splitByEntailment() {
+        int already_entailed_cnt = totalEntailedRecords();
+        if (0 == already_entailed_cnt) {
+            return new SplitRecords(new int[0][], getAllRows());
+        }
+        if (totalRows() == already_entailed_cnt) {
+            return new SplitRecords(getAllRows(), new int[0][]);
+        }
+        int[][] entailed_records = new int[already_entailed_cnt][];
+        int[][] non_entailed_records = new int[totalRows() - already_entailed_cnt][];
+        int idx = 0;
+        int idx_ent = 0;
+        int idx_non_ent = 0;
+        int[][] rows = sortedRowsByCols[0];
+        for (int flags : entailmentFlags) {
+            int limit = Math.min(idx + BITS_PER_INT, totalRows);
+            int mask = 1;
+            while (idx < limit) {
+                if (0 == (flags & mask)) {
+                    /* Not entailed */
+                    non_entailed_records[idx_non_ent] = rows[idx];
+                    idx_non_ent++;
+                } else {
+                    /* Entailed */
+                    entailed_records[idx_ent] = rows[idx];
+                    idx_ent++;
+                }
+                idx++;
+                mask = mask << 1;
+            }
+        }
+        return new SplitRecords(entailed_records, non_entailed_records);
+    }
 }

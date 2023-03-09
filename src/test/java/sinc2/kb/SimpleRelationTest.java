@@ -9,6 +9,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -225,4 +226,40 @@ class SimpleRelationTest {
                 new int[]{1}, new int[]{}, new int[]{3}
         }, promising_constants);
     }
+
+    @Test
+    void testSplitByEntailment() {
+        int num_rows = SimpleRelation.BITS_PER_INT * 2 + SimpleRelation.BITS_PER_INT / 3;
+        List<int[]> _expected_non_entailed_rows = new ArrayList<>();
+        List<int[]> _expected_entailed_rows = new ArrayList<>();
+        int[][] rows = new int[num_rows][];
+        for (int i = 0; i < num_rows; i++) {
+            int[] record = new int[]{i, i, i};
+            if (0 == i % 3) {
+                _expected_entailed_rows.add(record);
+            } else {
+                _expected_non_entailed_rows.add(record);
+            }
+            rows[i] = record;
+        }
+        SimpleRelation relation = new SimpleRelation("test", 0, rows);
+        for (int[] record: _expected_entailed_rows) {
+            relation.setAsEntailed(record);
+        }
+        SplitRecords actual_split_records = relation.splitByEntailment();
+        tableEqual(new IntTable(_expected_entailed_rows.toArray(new int[0][])), new IntTable(actual_split_records.entailedRecords));
+        tableEqual(new IntTable(_expected_non_entailed_rows.toArray(new int[0][])), new IntTable(actual_split_records.nonEntailedRecords));
+    }
+
+    protected void tableEqual(IntTable table1, IntTable table2) {
+        assertEquals(table1.totalRows, table2.totalRows);
+        assertEquals(table1.totalCols, table2.totalCols);
+        for (int[] row: table1) {
+            assertTrue(table2.hasRow(row));
+        }
+        for (int[] row: table2) {
+            assertTrue(table1.hasRow(row));
+        }
+    }
+
 }

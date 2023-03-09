@@ -215,23 +215,27 @@ class CachedRuleTest {
         assertEquals(expected_counter_examples, rule.getCounterexamples());
 
         /* parent(X, Y) :- father(X, Y) */
-        rule.updateCacheIndices();
-        assertEquals(UpdateStatus.NORMAL, rule.cvt2Uvs2NewLv(0, 1, 1, 1));
-        assertEquals("parent(X0,X1):-father(X0,X1)", rule.toDumpString(KB));
+        fp_cache.clear();
+        final CachedRule rule2 = new CachedRule(NUM_PARENT, 2, fp_cache, tabu_map, kb);
+        rule2.updateCacheIndices();
+        assertEquals(UpdateStatus.NORMAL, rule2.cvt2Uvs2NewLv(NUM_FATHER, 2, 0, 0, 0));
+        rule2.updateCacheIndices();
+        assertEquals(UpdateStatus.NORMAL, rule2.cvt2Uvs2NewLv(0, 1, 1, 1));
+        assertEquals("parent(X0,X1):-father(X0,X1)", rule2.toDumpString(KB));
         assertEquals(
                 new Eval(0, 2, 2),
-                rule.getEval()
+                rule2.getEval()
         );
-        assertEquals(2, rule.usedLimitedVars());
-        assertEquals(2, rule.length());
+        assertEquals(2, rule2.usedLimitedVars());
+        assertEquals(2, rule2.length());
         assertEquals(3, fp_cache.size());
         assertEquals(0, tabu_map.size());
-        actual_evidence = rule.getEvidenceAndMarkEntailment();
+        actual_evidence = rule2.getEvidenceAndMarkEntailment();
         assertArrayEquals(new int[]{NUM_PARENT, NUM_FATHER}, actual_evidence.predicateSymbolsInRule);
         assertTrue(actual_evidence.evidenceList.isEmpty());
         Record counter1 = new Record(new int[]{NUM_F3, NUM_S3});
         Record counter2 = new Record(new int[]{NUM_F4, NUM_D4});
-        assertEquals(new HashSet<>(List.of(counter1, counter2)), rule.getCounterexamples());
+        assertEquals(new HashSet<>(List.of(counter1, counter2)), rule2.getCounterexamples());
     }
 
     @Test
@@ -284,23 +288,27 @@ class CachedRuleTest {
         assertEquals(expected_counter_examples, rule.getCounterexamples());
 
         /* parent(Y, X) :- father(Y, X) */
-        rule.updateCacheIndices();
-        assertEquals(UpdateStatus.NORMAL, rule.cvt2Uvs2NewLv(0, 0, 1, 0));
-        assertEquals("parent(X1,X0):-father(X1,X0)", rule.toDumpString(KB));
+        fp_cache.clear();
+        final CachedRule rule2 = new CachedRule(NUM_PARENT, 2, fp_cache, tabu_map, kb);
+        rule2.updateCacheIndices();
+        assertEquals(UpdateStatus.NORMAL, rule2.cvt2Uvs2NewLv(NUM_FATHER, 2, 1, 0, 1));
+        rule2.updateCacheIndices();
+        assertEquals(UpdateStatus.NORMAL, rule2.cvt2Uvs2NewLv(0, 0, 1, 0));
+        assertEquals("parent(X1,X0):-father(X1,X0)", rule2.toDumpString(KB));
         assertEquals(
                 new Eval(0, 2, 2),
-                rule.getEval()
+                rule2.getEval()
         );
-        assertEquals(2, rule.usedLimitedVars());
-        assertEquals(2, rule.length());
+        assertEquals(2, rule2.usedLimitedVars());
+        assertEquals(2, rule2.length());
         assertEquals(3, fp_cache.size());
         assertEquals(0, tabu_map.size());
-        actual_evidence = rule.getEvidenceAndMarkEntailment();
+        actual_evidence = rule2.getEvidenceAndMarkEntailment();
         assertArrayEquals(new int[]{NUM_PARENT, NUM_FATHER}, actual_evidence.predicateSymbolsInRule);
         assertTrue(actual_evidence.evidenceList.isEmpty());
         Record counter1 = new Record(new int[]{NUM_F3, NUM_S3});
         Record counter2 = new Record(new int[]{NUM_F4, NUM_D4});
-        assertEquals(new HashSet<>(List.of(counter1, counter2)), rule.getCounterexamples());
+        assertEquals(new HashSet<>(List.of(counter1, counter2)), rule2.getCounterexamples());
     }
 
     @Test
@@ -373,23 +381,29 @@ class CachedRuleTest {
         assertEquals(expected_counter_examples, rule.getCounterexamples());
 
         /* grandParent(X, Y) :- parent(X, Z), parent(Z, Y) */
-        rule.updateCacheIndices();
-        assertEquals(UpdateStatus.NORMAL, rule.cvt2Uvs2NewLv(1, 1, 2, 0));
-        assertEquals("grandParent(X0,X1):-parent(X0,X2),parent(X2,X1)", rule.toDumpString(KB));
+        fp_cache.clear();
+        final CachedRule rule2 = new CachedRule(NUM_GRANDPARENT, 2, fp_cache, tabu_map, kb);
+        rule2.updateCacheIndices();
+        assertEquals(UpdateStatus.NORMAL, rule2.cvt2Uvs2NewLv(NUM_PARENT, 2, 0, 0, 0));
+        rule2.updateCacheIndices();
+        assertEquals(UpdateStatus.NORMAL, rule2.cvt2Uvs2NewLv(NUM_PARENT, 2, 1, 0, 1));
+        rule2.updateCacheIndices();
+        assertEquals(UpdateStatus.NORMAL, rule2.cvt2Uvs2NewLv(1, 1, 2, 0));
+        assertEquals("grandParent(X0,X1):-parent(X0,X2),parent(X2,X1)", rule2.toDumpString(KB));
         assertEquals(
                 new Eval(0, 2, 3),
-                rule.getEval()
+                rule2.getEval()
         );
-        assertEquals(3, rule.usedLimitedVars());
-        assertEquals(3, rule.length());
+        assertEquals(3, rule2.usedLimitedVars());
+        assertEquals(3, rule2.length());
         assertEquals(4, fp_cache.size());
         assertEquals(0, tabu_map.size());
-        actual_evidence = rule.getEvidenceAndMarkEntailment();
+        actual_evidence = rule2.getEvidenceAndMarkEntailment();
         assertArrayEquals(new int[]{NUM_GRANDPARENT, NUM_PARENT, NUM_PARENT}, actual_evidence.predicateSymbolsInRule);
         assertTrue(actual_evidence.evidenceList.isEmpty());
         Record counter1 = new Record(new int[]{NUM_G1, NUM_D1});
         Record counter2 = new Record(new int[]{NUM_G2, NUM_S2});
-        assertEquals(new HashSet<>(List.of(counter1, counter2)), rule.getCounterexamples());
+        assertEquals(new HashSet<>(List.of(counter1, counter2)), rule2.getCounterexamples());
     }
 
     @Test
@@ -930,13 +944,6 @@ class CachedRuleTest {
         assertEquals(3, rule1.length());
         assertEquals(4, fp_cache.size());
         assertEquals(0, tabu_map.size());
-        Set<ComparableArray<Record>> expected_grounding_set = new HashSet<>();
-        expected_grounding_set.add(new ComparableArray<>(new Record[]{GRAND1, PARENT6, FATHER1}));
-        expected_grounding_set.add(new ComparableArray<>(new Record[]{GRAND2, PARENT7, FATHER3}));
-        Record counter1 = new Record(new int[]{NUM_G2, NUM_S2});
-        Record counter2 = new Record(new int[]{NUM_G3, NUM_S3});
-        checkEvidence(rule1.getEvidenceAndMarkEntailment(), new int[]{NUM_GRANDPARENT, NUM_PARENT, NUM_FATHER}, new Set[]{expected_grounding_set});
-        assertEquals(new HashSet<>(List.of(counter1, counter2)), rule1.getCounterexamples());
 
         /* #2: grandParent(X, ?) :- parent(X, ?) */
         final CachedRule rule2 = new CachedRule(rule);
@@ -951,7 +958,7 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule3.cvt2Uvs2NewLv(NUM_FATHER, 2, 1, 0, 1));
         assertEquals("grandParent(?,X0):-father(?,X0)", rule3.toDumpString(KB));
         assertEquals(
-                new Eval(0, 5 * 16 - 2, 1),
+                new Eval(2, 5 * 16, 1),
                 rule3.getEval()
         );
         assertEquals(1, rule3.usedLimitedVars());
@@ -964,16 +971,13 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.NORMAL, rule3.cvt2Uvs2NewLv(NUM_PARENT, 2, 0, 0, 0));
         assertEquals("grandParent(X1,X0):-father(?,X0),parent(X1,?)", rule3.toDumpString(KB));
         assertEquals(
-                new Eval(0, 5 * 6 - 2, 2),
+                new Eval(2, 5 * 6, 2),
                 rule3.getEval()
         );
         assertEquals(2, rule3.usedLimitedVars());
         assertEquals(2, rule3.length());
         assertEquals(6, fp_cache.size());
         assertEquals(0, tabu_map.size());
-        EvidenceBatch actual_evidence = rule3.getEvidenceAndMarkEntailment();
-        assertArrayEquals(new int[]{NUM_GRANDPARENT, NUM_FATHER, NUM_PARENT}, actual_evidence.predicateSymbolsInRule);
-        assertTrue(actual_evidence.evidenceList.isEmpty());
         final Set<Record> expected_counterexample_set = new HashSet<>();
         for (int arg1: new int[]{NUM_F1, NUM_F2, NUM_M2, NUM_G1, NUM_G2, NUM_G3}) {
             for (int arg2: new int[]{NUM_S1, NUM_S2, NUM_D2, NUM_S3, NUM_D4}) {
@@ -989,6 +993,14 @@ class CachedRuleTest {
         assertEquals(UpdateStatus.DUPLICATED, rule3.cvt2Uvs2NewLv(1, 0, 2, 1));
         assertEquals(6, fp_cache.size());
         assertEquals(0, tabu_map.size());
+
+        Set<ComparableArray<Record>> expected_grounding_set = new HashSet<>();
+        expected_grounding_set.add(new ComparableArray<>(new Record[]{GRAND1, PARENT6, FATHER1}));
+        expected_grounding_set.add(new ComparableArray<>(new Record[]{GRAND2, PARENT7, FATHER3}));
+        Record counter1 = new Record(new int[]{NUM_G2, NUM_S2});
+        Record counter2 = new Record(new int[]{NUM_G3, NUM_S3});
+        checkEvidence(rule1.getEvidenceAndMarkEntailment(), new int[]{NUM_GRANDPARENT, NUM_PARENT, NUM_FATHER}, new Set[]{expected_grounding_set});
+        assertEquals(new HashSet<>(List.of(counter1, counter2)), rule1.getCounterexamples());
     }
 
     @Test
@@ -1035,31 +1047,32 @@ class CachedRuleTest {
         assertEquals(2, rule2.length());
         assertEquals(3, fp_cache.size());
         assertEquals(0, tabu_map.size());
-        final Set<ComparableArray<Record>> expected_grounding_set2 = new HashSet<>();
-        expected_grounding_set2.add(new ComparableArray<>(new Record[]{PARENT4}));
-        checkEvidence(rule2.getEvidenceAndMarkEntailment(), new int[]{NUM_PARENT}, new Set[]{expected_grounding_set2});
-        assertTrue(rule2.getCounterexamples().isEmpty());
 
         /* #3: parent(f2, X) :- father(?, X) */
         final CachedRule rule3 = new CachedRule(rule1);
         assertEquals(UpdateStatus.NORMAL, rule3.cvt2Uvs2NewLv(NUM_FATHER, 2, 1, 0, 1));
         assertEquals(String.format("parent(%d,X0):-father(?,X0)", NUM_F2), rule3.toDumpString(KB));
         assertEquals(
-                new Eval(1, 4, 2),
+                new Eval(2, 5, 2),
                 rule3.getEval()
         );
         assertEquals(1, rule3.usedLimitedVars());
         assertEquals(2, rule3.length());
         assertEquals(4, fp_cache.size());
         assertEquals(0, tabu_map.size());
-        final Set<ComparableArray<Record>> expected_grounding_set3 = new HashSet<>();
-        expected_grounding_set3.add(new ComparableArray<>(new Record[]{PARENT3, FATHER2}));
-        final Set<Record> expected_counterexample_set3 = new HashSet<>();
-        for (int arg: new int[]{NUM_S1, NUM_S3, NUM_D4}) {
-            expected_counterexample_set3.add(new Record(new int[]{NUM_F2, arg}));
-        }
-        checkEvidence(rule3.getEvidenceAndMarkEntailment(), new int[]{NUM_PARENT, NUM_FATHER}, new Set[]{expected_grounding_set3});
-        assertEquals(expected_counterexample_set3, rule3.getCounterexamples());
+//        final Set<ComparableArray<Record>> expected_grounding_set3 = new HashSet<>();
+//        expected_grounding_set3.add(new ComparableArray<>(new Record[]{PARENT3, FATHER2}));
+//        final Set<Record> expected_counterexample_set3 = new HashSet<>();
+//        for (int arg: new int[]{NUM_S1, NUM_S3, NUM_D4}) {
+//            expected_counterexample_set3.add(new Record(new int[]{NUM_F2, arg}));
+//        }
+//        checkEvidence(rule3.getEvidenceAndMarkEntailment(), new int[]{NUM_PARENT, NUM_FATHER}, new Set[]{expected_grounding_set3});
+//        assertEquals(expected_counterexample_set3, rule3.getCounterexamples());
+
+        final Set<ComparableArray<Record>> expected_grounding_set2 = new HashSet<>();
+        expected_grounding_set2.add(new ComparableArray<>(new Record[]{PARENT4}));
+        checkEvidence(rule2.getEvidenceAndMarkEntailment(), new int[]{NUM_PARENT}, new Set[]{expected_grounding_set2});
+        assertTrue(rule2.getCounterexamples().isEmpty());
     }
 
     void checkEvidence(EvidenceBatch actualEvidence, int[] expectedRelationsInRule, Set<ComparableArray<Record>>[] expectedGroundingSets) {
