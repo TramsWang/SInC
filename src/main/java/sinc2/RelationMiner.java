@@ -332,9 +332,10 @@ public abstract class RelationMiner {
      * Find the positive and negative entailments of the rule. Label the positive entailments and add the negative ones
      * to the counterexample set. Evidence for the positive entailments are also needed to update the dependency graph.
      *
+     * @return The number of newly entailed records
      * @throws KbException When KB operation fails
      */
-    protected void updateKbAndDependencyGraph(Rule rule) throws KbException {
+    protected int updateKbAndDependencyGraph(Rule rule) throws KbException {
         counterexamples.addAll(rule.getCounterexamples());
         EvidenceBatch evidence_batch = rule.getEvidenceAndMarkEntailment();
         for (int[][] grounding: evidence_batch.evidenceList) {
@@ -365,6 +366,7 @@ public abstract class RelationMiner {
                 return dependencies;
             });
         }
+        return evidence_batch.evidenceList.size();
     }
 
     /**
@@ -376,11 +378,10 @@ public abstract class RelationMiner {
         Rule rule;
         int covered_facts = 0;
         final int total_facts = kb.getRelation(targetRelation).totalRows();
-        while (!SInC.interrupted && (null != (rule = findRule()))) {
+        while (!SInC.interrupted && (covered_facts < total_facts) && (null != (rule = findRule()))) {
             hypothesis.add(rule);
-            updateKbAndDependencyGraph(rule);
+            covered_facts += updateKbAndDependencyGraph(rule);
             rule.releaseMemory();
-            covered_facts += rule.getEval().getPosEtls();
             logger.printf(
                     "Found (Coverage: %.2f%%, %d/%d): %s\n", covered_facts * 100.0 / total_facts, covered_facts, total_facts,
                     rule.toDumpString(kb)

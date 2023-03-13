@@ -175,7 +175,7 @@ class EstSincTest {
         expected_rules.add(r4.getFingerprint());
 
         for (EvalMetric eval_type: new EvalMetric[]{
-//                EvalMetric.CompressionCapacity,
+                EvalMetric.CompressionCapacity,
                 EvalMetric.CompressionRatio
         }) {
             final SincConfig config = new SincConfig(
@@ -199,7 +199,7 @@ class EstSincTest {
     }
 
     <T> void assertSubset(Set<T> subset, Set<T> superset) {
-        assertTrue(subset.size() < superset.size());
+        assertTrue(subset.size() <= superset.size());
         for (T element: subset) {
             assertTrue(superset.contains(element));
         }
