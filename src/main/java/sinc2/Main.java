@@ -3,6 +3,7 @@ package sinc2;
 import org.apache.commons.cli.*;
 import sinc2.common.SincException;
 import sinc2.impl.base.SincBasic;
+import sinc2.impl.est.EstSinc;
 import sinc2.rule.EvalMetric;
 
 public class Main {
@@ -13,6 +14,7 @@ public class Main {
     public static final double DEFAULT_FACT_COVERAGE = 0.05;
     public static final double DEFAULT_CONSTANT_COVERAGE = 0.25;
     public static final double DEFAULT_STOP_COMPRESSION_RATE = 0.9;
+    public static final double DEFAULT_OBSERVATION_RATIO = 2.0;
     public static final EvalMetric DEFAULT_EVAL_METRIC = EvalMetric.CompressionCapacity;
 
     private static final String SHORT_OPT_HELP = "h";
@@ -27,6 +29,7 @@ public class Main {
     private static final String SHORT_OPT_FACT_COVERAGE = "f";
     private static final String SHORT_OPT_CONSTANT_COVERAGE = "c";
     private static final String SHORT_OPT_STOP_COMPRESSION_RATE = "p";
+    private static final String SHORT_OPT_OBSERVATION_RATIO = "o";
     private static final String LONG_OPT_HELP = "help";
     private static final String LONG_OPT_INPUT_PATH = "input-path";
     private static final String LONG_OPT_INPUT_KB = "kb-name";
@@ -39,6 +42,7 @@ public class Main {
     private static final String LONG_OPT_FACT_COVERAGE = "fact-coverage";
     private static final String LONG_OPT_CONSTANT_COVERAGE = "const-coverage";
     private static final String LONG_OPT_STOP_COMPRESSION_RATE = "stop-comp-rate";
+    private static final String LONG_OPT_OBSERVATION_RATIO = "observation-ratio";
 
     private static final Option OPTION_HELP = Option.builder(SHORT_OPT_HELP).longOpt(LONG_OPT_HELP)
             .desc("Display this help").build();
@@ -59,11 +63,15 @@ public class Main {
     private static final Option OPTION_EVAL_METRIC = Option.builder(SHORT_OPT_EVAL_METRIC).longOpt(LONG_OPT_EVAL_METRIC)
             .argName("name").hasArg().type(String.class).build();
     private static final Option OPTION_FACT_COVERAGE = Option.builder(SHORT_OPT_FACT_COVERAGE).longOpt(LONG_OPT_FACT_COVERAGE)
-            .desc(String.format("Set fact coverage threshold (Default %f)", DEFAULT_FACT_COVERAGE)).argName("fc").hasArg().type(Double.class).build();
+            .desc(String.format("Set fact coverage threshold (Default %.2f)", DEFAULT_FACT_COVERAGE)).argName("fc").hasArg().type(Double.class).build();
     private static final Option OPTION_CONSTANT_COVERAGE = Option.builder(SHORT_OPT_CONSTANT_COVERAGE).longOpt(LONG_OPT_CONSTANT_COVERAGE)
-            .desc(String.format("Set constant coverage threshold (Default %f)", DEFAULT_CONSTANT_COVERAGE)).argName("cc").hasArg().type(Double.class).build();
+            .desc(String.format("Set constant coverage threshold (Default %.2f)", DEFAULT_CONSTANT_COVERAGE)).argName("cc").hasArg().type(Double.class).build();
     private static final Option OPTION_STOP_COMPRESSION_RATE = Option.builder(SHORT_OPT_STOP_COMPRESSION_RATE).longOpt(LONG_OPT_STOP_COMPRESSION_RATE)
-            .desc(String.format("Set stopping compression rate (Default %f)", DEFAULT_STOP_COMPRESSION_RATE)).argName("scr").hasArg().type(Double.class).build();
+            .desc(String.format("Set stopping compression rate (Default %.2f)", DEFAULT_STOP_COMPRESSION_RATE)).argName("scr").hasArg().type(Double.class).build();
+    private static final Option OPTION_OBSERVATION_RATIO = Option.builder(SHORT_OPT_OBSERVATION_RATIO).longOpt(LONG_OPT_OBSERVATION_RATIO)
+            .desc(String.format("Use rule mining estimation and set observation ratio (Default %.2f). " +
+                    "Estimation is adopted by default. If the value is set smaller than 1.0, estimation is turned off and " +
+                    "the basic model is applied.", DEFAULT_OBSERVATION_RATIO)).argName("or").hasArg().type(Double.class).build();
 
     static {
         /* List Available Eval Metrics */
@@ -177,13 +185,25 @@ public class Main {
                 System.out.println("Stopping compression rate set to: " + scr);
             }
         }
+        double or = DEFAULT_OBSERVATION_RATIO;
+        if (cmd.hasOption(OPTION_OBSERVATION_RATIO)) {
+            String value = cmd.getOptionValue(OPTION_OBSERVATION_RATIO);
+            if (null != value) {
+                or = Double.parseDouble(value);
+                System.out.println("Observation ratio set to: " + or);
+            }
+        }
 
         /* Create SInC Object */
         SincConfig config = new SincConfig(
                 input_path, input_kb_name, output_path, output_kb_name,
-                threads, validation, beam, metric, fc, cc, scr, 1.0
+                threads, validation, beam, metric, fc, cc, scr, or
         );
-        return new SincBasic(config);
+        if (1.0 > or) {
+            return new SincBasic(config);
+        } else {
+            return new EstSinc(config);
+        }
     }
 
     protected static Options buildOptions() {
@@ -206,6 +226,7 @@ public class Main {
         options.addOption(OPTION_FACT_COVERAGE);
         options.addOption(OPTION_CONSTANT_COVERAGE);
         options.addOption(OPTION_STOP_COMPRESSION_RATE);
+        options.addOption(OPTION_OBSERVATION_RATIO);
 
         return options;
     }
