@@ -572,47 +572,67 @@ public class CachedRule extends Rule {
             }
 
             /* Count the number of the combinations of GVs and PLVs */
-            final Map<Record, Set<Record>> body_gv_binding_2_plv_bindings = new HashMap<>();
-            for (final List<CompliedBlock> cache_entry: allCache) {
-                /* Find the GV combination */
-                final int[] gv_binding = new int[body_gv_locs.size()];
-                for (int i = 0; i < body_gv_locs.size(); i++) {
-                    final ArgLocation loc = body_gv_locs.get(i);
-                    gv_binding[i] = cache_entry.get(loc.predIdx).partAsgnRecord[loc.argIdx];
-                }
-
-                /* Find the combinations of PLV bindings */
-                /* Note: the PLVs in the same predicate should be bind at the same time according to the records in the
-                   compliance set, and find the cartesian products of the groups of PLVs bindings. */
-                int total_binding_length = 0;
-                final Set<Record>[] plv_bindings_within_pred_sets = new Set[preds_containing_plvs];
-                {
-                    int i = 0;
-                    for (int body_pred_idx = FIRST_BODY_PRED_IDX; body_pred_idx < structure.size(); body_pred_idx++) {
-                        final List<Integer> plv_arg_idxs = plv_arg_index_lists[body_pred_idx];
-                        if (null != plv_arg_idxs) {
-                            final Set<Record> plv_bindings = new HashSet<>();
-                            for (int[] cs_record : cache_entry.get(body_pred_idx).complSet) {
-                                final int[] plv_binding_within_pred = new int[plv_arg_idxs.size()];
-                                for (int j = 0; j < plv_binding_within_pred.length; j++) {
-                                    plv_binding_within_pred[j] = cs_record[plv_arg_idxs.get(j)];
-                                }
-                                plv_bindings.add(new Record(plv_binding_within_pred));
+            if (body_gv_locs.isEmpty() && allCache.size() == 1) {
+                /* This is a special case where it is no need to instantiate all combinations */
+                List<CompliedBlock> cache_entry = allCache.get(0);
+                body_gv_plv_bindings_cnt = 1;
+                for (int body_pred_idx = FIRST_BODY_PRED_IDX; body_pred_idx < structure.size(); body_pred_idx++) {
+                    final List<Integer> plv_arg_idxs = plv_arg_index_lists[body_pred_idx];
+                    if (null != plv_arg_idxs) {
+                        final Set<Record> plv_bindings = new HashSet<>();
+                        for (int[] cs_record : cache_entry.get(body_pred_idx).complSet) {
+                            final int[] plv_binding_within_pred = new int[plv_arg_idxs.size()];
+                            for (int j = 0; j < plv_binding_within_pred.length; j++) {
+                                plv_binding_within_pred[j] = cs_record[plv_arg_idxs.get(j)];
                             }
-                            plv_bindings_within_pred_sets[i] = plv_bindings;
-                            i++;
-                            total_binding_length += plv_arg_idxs.size();
+                            plv_bindings.add(new Record(plv_binding_within_pred));
                         }
+                        body_gv_plv_bindings_cnt *= plv_bindings.size();
                     }
                 }
-                final Set<Record> complete_plv_bindings =
-                        body_gv_binding_2_plv_bindings.computeIfAbsent(new Record(gv_binding), k -> new HashSet<>());
-                addCompleteBodyPlvBindings(
-                        complete_plv_bindings, plv_bindings_within_pred_sets, new int[total_binding_length], 0, 0
-                );
-            }
-            for (Set<Record> plv_bindings: body_gv_binding_2_plv_bindings.values()) {
-                body_gv_plv_bindings_cnt += plv_bindings.size();
+            } else {
+                final Map<Record, Set<Record>> body_gv_binding_2_plv_bindings = new HashMap<>();
+                for (final List<CompliedBlock> cache_entry : allCache) {
+                    /* Find the GV combination */
+                    final int[] gv_binding = new int[body_gv_locs.size()];
+                    for (int i = 0; i < body_gv_locs.size(); i++) {
+                        final ArgLocation loc = body_gv_locs.get(i);
+                        gv_binding[i] = cache_entry.get(loc.predIdx).partAsgnRecord[loc.argIdx];
+                    }
+
+                    /* Find the combinations of PLV bindings */
+                    /* Note: the PLVs in the same predicate should be bind at the same time according to the records in the
+                       compliance set, and find the cartesian products of the groups of PLVs bindings. */
+                    int total_binding_length = 0;
+                    final Set<Record>[] plv_bindings_within_pred_sets = new Set[preds_containing_plvs];
+                    {
+                        int i = 0;
+                        for (int body_pred_idx = FIRST_BODY_PRED_IDX; body_pred_idx < structure.size(); body_pred_idx++) {
+                            final List<Integer> plv_arg_idxs = plv_arg_index_lists[body_pred_idx];
+                            if (null != plv_arg_idxs) {
+                                final Set<Record> plv_bindings = new HashSet<>();
+                                for (int[] cs_record : cache_entry.get(body_pred_idx).complSet) {
+                                    final int[] plv_binding_within_pred = new int[plv_arg_idxs.size()];
+                                    for (int j = 0; j < plv_binding_within_pred.length; j++) {
+                                        plv_binding_within_pred[j] = cs_record[plv_arg_idxs.get(j)];
+                                    }
+                                    plv_bindings.add(new Record(plv_binding_within_pred));
+                                }
+                                plv_bindings_within_pred_sets[i] = plv_bindings;
+                                i++;
+                                total_binding_length += plv_arg_idxs.size();
+                            }
+                        }
+                    }
+                    final Set<Record> complete_plv_bindings =
+                            body_gv_binding_2_plv_bindings.computeIfAbsent(new Record(gv_binding), k -> new HashSet<>());
+                    addCompleteBodyPlvBindings(
+                            complete_plv_bindings, plv_bindings_within_pred_sets, new int[total_binding_length], 0, 0
+                    );
+                }
+                for (Set<Record> plv_bindings : body_gv_binding_2_plv_bindings.values()) {
+                    body_gv_plv_bindings_cnt += plv_bindings.size();
+                }
             }
         }
         final double all_entails = body_gv_plv_bindings_cnt * Math.pow(
@@ -895,6 +915,9 @@ public class CachedRule extends Rule {
                 plvList.add(null);
                 allCache = splitCacheEntries(allCache, predIdx1, argIdx1, predIdx2, argIdx2);
             }
+        } else {
+            /* Both are in the head. Extend the PLV list */
+            plvList.add(null);
         }
         return UpdateStatus.NORMAL;
     }

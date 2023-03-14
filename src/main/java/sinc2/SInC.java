@@ -212,12 +212,13 @@ public abstract class SInC {
         logger.printf("KB Name:\t%s\n", config.kbName);
         logger.printf("Dump Path:\t%s\n", config.dumpPath);
         logger.printf("Dump Name:\t%s\n", config.dumpName);
-        logger.printf("Beamwidth:\t%s\n", config.beamwidth);
-        logger.printf("Threads:\t%s\n", config.threads);
+        logger.printf("Beamwidth:\t%d\n", config.beamwidth);
+        logger.printf("Threads:\t%d\n", config.threads);
         logger.printf("Eval Metric:\t%s\n", config.evalMetric);
         logger.printf("Min Fact Coverage:\t%s\n", config.minFactCoverage);
         logger.printf("Min Constant Coverage:\t%s\n", config.minConstantCoverage);
         logger.printf("Stop Compression Ratio:\t%s\n", config.stopCompressionRatio);
+        logger.printf("Observation Ratio:\t%s\n", config.observationRatio);
         logger.printf("Validation:\t%s\n", config.validation);
         logger.println();
     }
