@@ -39,4 +39,9 @@ public class SpecOprCase2 extends SpecOpr {
     public int hashCode() {
         return Objects.hash(super.hashCode(), functor, arity, argIdx, varId);
     }
+
+    @Override
+    public String toString() {
+        return String.format("Spec#2(p%d[%d],X%d)", functor, argIdx, varId);
+    }
 }

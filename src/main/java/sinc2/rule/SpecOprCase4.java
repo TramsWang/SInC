@@ -41,4 +41,9 @@ public class SpecOprCase4 extends SpecOpr {
     public int hashCode() {
         return Objects.hash(super.hashCode(), functor, arity, argIdx1, predIdx2, argIdx2);
     }
+
+    @Override
+    public String toString() {
+        return String.format("Spec#4(p%d[%d],%d[%d])", functor, argIdx1, predIdx2, argIdx2);
+    }
 }
