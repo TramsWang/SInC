@@ -71,7 +71,7 @@ public class Eval {
         double tmp_ratio = posEtls / (allEtls + ruleLength);
         this.compRatio = Double.isNaN(tmp_ratio) ? 0 : tmp_ratio;
         this.compCapacity = posEtls - negEtls - ruleLength;
-        this.infoGain = (0 == posEtls || 0 == compRatio) ? 0 : posEtls * Math.log(compRatio);
+        this.infoGain = (0 == posEtls || 0 == compRatio) ? Double.NEGATIVE_INFINITY : posEtls * Math.log(1+compRatio);
     }
 
     /**

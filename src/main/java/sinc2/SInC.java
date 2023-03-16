@@ -331,8 +331,8 @@ public abstract class SInC {
         monitor.validationTime = time_validated - time_kb_dumped;
 
         /* Todo: Upload to neo4j in debug mode */
-        if (DebugLevel.UPLOAD <= DebugLevel.LEVEL) {
-            logDebug(DebugLevel.UPLOAD, "Upload to Neo4j");
+        if (DebugLevel.DEBUG <= DebugLevel.LEVEL) {
+            logDebug(DebugLevel.DEBUG, "Upload to Neo4j");
         }
         long time_neo4j = System.currentTimeMillis();
         monitor.neo4jTime = time_neo4j - time_validated;

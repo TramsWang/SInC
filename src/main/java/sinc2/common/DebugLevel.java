@@ -11,8 +11,8 @@ public final class DebugLevel {
     public static final int NONE = 0;
     /** Show verbose output */
     public static final int VERBOSE = 1;
-    /** Upload dependency graph to Neo4j */
-    public static final int UPLOAD = 2;
+    /** Show debug output */
+    public static final int DEBUG = 2;
     /** Change this static variable to alter the compilation level */
     public static final int LEVEL = NONE;
 }

@@ -9,6 +9,7 @@ import sinc2.kb.SimpleKb;
 import sinc2.kb.SimpleRelation;
 import sinc2.kb.SplitRecords;
 import sinc2.rule.*;
+import sinc2.util.ArrayOperation;
 import sinc2.util.MultiSet;
 
 import java.util.*;
@@ -544,41 +545,66 @@ public class CachedRule extends Rule {
         }
 
         /* Count the number of all entailments */
-        int body_gv_plv_bindings_cnt = 0;
-        if (noPlvInRule()) {
-            /* Count all combinations of body GVs */
-            final Set<Record> body_gv_bindings = new HashSet<>();
-            for (final List<CompliedBlock> cache_entry: allCache) {
-                final int[] binding = new int[body_gv_locs.size()];
-                for (int i = 0; i < body_gv_locs.size(); i++) {
-                    final ArgLocation loc = body_gv_locs.get(i);
-                    binding[i] = cache_entry.get(loc.predIdx).partAsgnRecord[loc.argIdx];
+        /* List argument indices of PLVs in each predicate */
+        int body_gv_plv_bindings_cnt = 1;
+        final List<Integer>[] plv_arg_index_lists = new List[structure.size()]; // Predicate index is the index of the array
+        for (final PlvLoc plv_loc: plvList) {
+            if (null != plv_loc) {
+                if (null == plv_arg_index_lists[plv_loc.bodyPredIdx]) {
+                    plv_arg_index_lists[plv_loc.bodyPredIdx] = new ArrayList<>();
                 }
-                body_gv_bindings.add(new Record(binding));
+                plv_arg_index_lists[plv_loc.bodyPredIdx].add(plv_loc.bodyArgIdx);
             }
-            body_gv_plv_bindings_cnt = body_gv_bindings.size();
-        } else {
-            /* List argument indices of PLVs in each predicate */
-            final List<Integer>[] plv_arg_index_lists = new List[structure.size()]; // Predicate index is the index of the array
-            int preds_containing_plvs = 0;
-            for (final PlvLoc plv_loc: plvList) {
-                if (null != plv_loc) {
-                    if (null == plv_arg_index_lists[plv_loc.bodyPredIdx]) {
-                        plv_arg_index_lists[plv_loc.bodyPredIdx] = new ArrayList<>();
-                        preds_containing_plvs++;
+        }
+
+        /* Count the number of the combinations of GVs and PLVs */
+        int[][] body_pred_idxs_partitions = bodyPredPartition(structure.size(), limitedVarArgs);
+        for (int[] body_pred_idxs_partition: body_pred_idxs_partitions) {
+            /* Find GVs in this partition */
+            List<ArgLocation> body_gv_locs_in_partition = new ArrayList<>();
+            List<Integer> body_idxs_with_plvs = new ArrayList<>();
+            for (int pred_idx: body_pred_idxs_partition) {
+                for (ArgLocation body_gv_loc: body_gv_locs) {
+                    if (body_gv_loc.predIdx == pred_idx) {
+                        body_gv_locs_in_partition.add(body_gv_loc);
                     }
-                    plv_arg_index_lists[plv_loc.bodyPredIdx].add(plv_loc.bodyArgIdx);
+                }
+                if (null != plv_arg_index_lists[pred_idx]) {
+                    body_idxs_with_plvs.add(pred_idx);
                 }
             }
 
-            /* Count the number of the combinations of GVs and PLVs */
-            if (body_gv_locs.isEmpty() && allCache.size() == 1) {
-                /* This is a special case where it is no need to instantiate all combinations */
-                List<CompliedBlock> cache_entry = allCache.get(0);
-                body_gv_plv_bindings_cnt = 1;
-                for (int body_pred_idx = FIRST_BODY_PRED_IDX; body_pred_idx < structure.size(); body_pred_idx++) {
-                    final List<Integer> plv_arg_idxs = plv_arg_index_lists[body_pred_idx];
-                    if (null != plv_arg_idxs) {
+            if (body_idxs_with_plvs.isEmpty()) {
+                /* Count all combinations of body GVs */
+                final Set<Record> body_gv_bindings = new HashSet<>();
+                for (final List<CompliedBlock> cache_entry: allCache) {
+                    final int[] binding = new int[body_gv_locs_in_partition.size()];
+                    for (int i = 0; i < body_gv_locs_in_partition.size(); i++) {
+                        final ArgLocation loc = body_gv_locs_in_partition.get(i);
+                        binding[i] = cache_entry.get(loc.predIdx).partAsgnRecord[loc.argIdx];
+                    }
+                    body_gv_bindings.add(new Record(binding));
+                }
+                body_gv_plv_bindings_cnt *= body_gv_bindings.size();
+            } else {
+                /* Find PLV combinations in this partition */
+                final Map<Record, Set<Record>> body_gv_binding_2_plv_bindings = new HashMap<>();
+                for (final List<CompliedBlock> cache_entry : allCache) {
+                    /* Find the GV combination */
+                    final int[] gv_binding = new int[body_gv_locs_in_partition.size()];
+                    for (int i = 0; i < body_gv_locs_in_partition.size(); i++) {
+                        final ArgLocation loc = body_gv_locs_in_partition.get(i);
+                        gv_binding[i] = cache_entry.get(loc.predIdx).partAsgnRecord[loc.argIdx];
+                    }
+
+                    /* Find the combinations of PLV bindings */
+                    /* Note: the PLVs in the same predicate should be bind at the same time according to the records in the
+                       compliance set, and find the cartesian products of the groups of PLVs bindings. */
+                    int total_binding_length = 0;
+                    final Set<Record>[] plv_bindings_within_pred_sets = new Set[body_idxs_with_plvs.size()];
+                    for (int i = 0; i < body_idxs_with_plvs.size(); i++) {
+                        int body_pred_idx = body_idxs_with_plvs.get(i);
+                        final List<Integer> plv_arg_idxs = plv_arg_index_lists[body_pred_idx];
                         final Set<Record> plv_bindings = new HashSet<>();
                         for (int[] cs_record : cache_entry.get(body_pred_idx).complSet) {
                             final int[] plv_binding_within_pred = new int[plv_arg_idxs.size()];
@@ -587,52 +613,21 @@ public class CachedRule extends Rule {
                             }
                             plv_bindings.add(new Record(plv_binding_within_pred));
                         }
-                        body_gv_plv_bindings_cnt *= plv_bindings.size();
+                        plv_bindings_within_pred_sets[i] = plv_bindings;
+                        total_binding_length += plv_arg_idxs.size();
                     }
-                }
-            } else {
-                final Map<Record, Set<Record>> body_gv_binding_2_plv_bindings = new HashMap<>();
-                for (final List<CompliedBlock> cache_entry : allCache) {
-                    /* Find the GV combination */
-                    final int[] gv_binding = new int[body_gv_locs.size()];
-                    for (int i = 0; i < body_gv_locs.size(); i++) {
-                        final ArgLocation loc = body_gv_locs.get(i);
-                        gv_binding[i] = cache_entry.get(loc.predIdx).partAsgnRecord[loc.argIdx];
-                    }
-
-                    /* Find the combinations of PLV bindings */
-                    /* Note: the PLVs in the same predicate should be bind at the same time according to the records in the
-                       compliance set, and find the cartesian products of the groups of PLVs bindings. */
-                    int total_binding_length = 0;
-                    final Set<Record>[] plv_bindings_within_pred_sets = new Set[preds_containing_plvs];
-                    {
-                        int i = 0;
-                        for (int body_pred_idx = FIRST_BODY_PRED_IDX; body_pred_idx < structure.size(); body_pred_idx++) {
-                            final List<Integer> plv_arg_idxs = plv_arg_index_lists[body_pred_idx];
-                            if (null != plv_arg_idxs) {
-                                final Set<Record> plv_bindings = new HashSet<>();
-                                for (int[] cs_record : cache_entry.get(body_pred_idx).complSet) {
-                                    final int[] plv_binding_within_pred = new int[plv_arg_idxs.size()];
-                                    for (int j = 0; j < plv_binding_within_pred.length; j++) {
-                                        plv_binding_within_pred[j] = cs_record[plv_arg_idxs.get(j)];
-                                    }
-                                    plv_bindings.add(new Record(plv_binding_within_pred));
-                                }
-                                plv_bindings_within_pred_sets[i] = plv_bindings;
-                                i++;
-                                total_binding_length += plv_arg_idxs.size();
-                            }
-                        }
-                    }
-                    final Set<Record> complete_plv_bindings =
-                            body_gv_binding_2_plv_bindings.computeIfAbsent(new Record(gv_binding), k -> new HashSet<>());
+                    final Set<Record> complete_plv_bindings = body_gv_binding_2_plv_bindings.computeIfAbsent(
+                            new Record(gv_binding), k -> new HashSet<>()
+                    );
                     addCompleteBodyPlvBindings(
                             complete_plv_bindings, plv_bindings_within_pred_sets, new int[total_binding_length], 0, 0
                     );
                 }
-                for (Set<Record> plv_bindings : body_gv_binding_2_plv_bindings.values()) {
-                    body_gv_plv_bindings_cnt += plv_bindings.size();
+                int plv_bindings_in_partition = 0;
+                for (Set<Record> plv_bindings: body_gv_binding_2_plv_bindings.values()) {
+                    plv_bindings_in_partition += plv_bindings.size();
                 }
+                body_gv_plv_bindings_cnt *= plv_bindings_in_partition;
             }
         }
         final double all_entails = body_gv_plv_bindings_cnt * Math.pow(
@@ -672,15 +667,55 @@ public class CachedRule extends Rule {
     }
 
     /**
-     * Check if there is no PLV in the body.
+     * Partition body predicate indices according to LV links. Each partition as an integer array.
      */
-    protected boolean noPlvInRule() {
-        for (PlvLoc plv_loc: plvList) {
-            if (null != plv_loc) {
-                return false;
+    static protected int[][] bodyPredPartition(int predicates, List<List<ArgLocation>> limitedVarArgs) {
+        int[] pred_labels = new int[predicates];
+        for (int pred_idx = FIRST_BODY_PRED_IDX; pred_idx < pred_labels.length; pred_idx++) {
+            pred_labels[pred_idx] = pred_idx;
+        }
+        for (List<ArgLocation> var_locs: limitedVarArgs) {
+            for (int idx1 = 0; idx1 < var_locs.size(); idx1++) {
+                ArgLocation var_loc1 = var_locs.get(idx1);
+                if (HEAD_PRED_IDX != var_loc1.predIdx) {
+                    int label1 = pred_labels[var_loc1.predIdx];
+                    for (int idx2 = idx1 + 1; idx2 < var_locs.size(); idx2++) {
+                        ArgLocation var_loc2 = var_locs.get(idx2);
+                        if (HEAD_PRED_IDX != var_loc2.predIdx) {
+                            int label2 = pred_labels[var_loc2.predIdx];
+                            if (label1 != label2) {
+                                for (int pred_idx = FIRST_BODY_PRED_IDX; pred_idx < pred_labels.length; pred_idx++) {
+                                    if (label2 == pred_labels[pred_idx]) {
+                                        pred_labels[pred_idx] = label1;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
             }
         }
-        return true;
+        List<Integer>[] partition_list = new List[pred_labels.length];
+        int partition_cnt = 0;
+        for (int pred_idx = FIRST_BODY_PRED_IDX; pred_idx < pred_labels.length; pred_idx++) {
+            int label = pred_labels[pred_idx];
+            List<Integer> pred_idxs = partition_list[label];
+            if (null == pred_idxs) {
+                pred_idxs = new ArrayList<>();
+                partition_list[label] = pred_idxs;
+                partition_cnt++;
+            }
+            pred_idxs.add(pred_idx);
+        }
+        int[][] partitions = new int[partition_cnt][];
+        for (List<Integer> pred_idxs: partition_list) {
+            if (null != pred_idxs) {
+                partition_cnt--;
+                partitions[partition_cnt] = ArrayOperation.toArray(pred_idxs);
+            }
+        }
+        return partitions;
     }
 
     /**
@@ -1154,7 +1189,7 @@ public class CachedRule extends Rule {
      * @return The set of counterexamples
      */
     @Override
-    public Set<Record> getCounterexamples() {
+    public Set<Record> getCounterexamples() {   // Todo: This should be modified according to 'eval()'
         /* Find head-only variables and the locations in the head */
         final Map<Integer, List<Integer>> head_only_var_arg_2_loc_map = new HashMap<>();  // GVs will be removed later
         int uv_id = usedLimitedVars();

@@ -133,7 +133,15 @@ public class Fingerprint {
      * @return Ture if the rule of this fingerprint is the generalization of the other.
      */
     public boolean generalizationOf(Fingerprint another) {
-        if (!generalizationOf(classedStructure.get(0), another.classedStructure.get(0))) {
+        PredicateWithClass head = classedStructure.get(0);
+        PredicateWithClass another_head = another.classedStructure.get(0);
+        if (!generalizationOf(head, another_head)) {
+            return false;
+        }
+        if (2 == head.classArgs.length && (
+                (head.classArgs[0] == head.classArgs[1] && another_head.classArgs[0] != another_head.classArgs[1]) ||
+                        (head.classArgs[0] != head.classArgs[1] && another_head.classArgs[0] == another_head.classArgs[1])
+        )) {
             return false;
         }
         for (int pred_idx = Rule.FIRST_BODY_PRED_IDX; pred_idx < classedStructure.size(); pred_idx++) {

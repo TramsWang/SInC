@@ -2,6 +2,7 @@ package sinc2.impl.base;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import sinc2.common.ArgLocation;
 import sinc2.common.Argument;
 import sinc2.common.Predicate;
 import sinc2.common.Record;
@@ -1461,5 +1462,71 @@ class CachedRuleTest {
         expected_counter_example_set.remove(new Record(h4));
         assertEquals(expected_counter_example_set, rule.getCounterexamples());
         assertTrue(rel_h.isEntailed(h4));
+    }
+
+    @Test
+    void testBodyPredPartition() {
+        /* p(X, Y) :- q(X, Z), r(Z, Y) */
+        int[][] expected_partition = new int[][] {
+                new int[]{1, 2}
+        };
+        int[][] actual_partition = CachedRule.bodyPredPartition(3, List.of(
+                List.of(new ArgLocation(0, 0), new ArgLocation(1, 0)),
+                List.of(new ArgLocation(0, 1), new ArgLocation(2, 1)),
+                List.of(new ArgLocation(1, 1), new ArgLocation(2, 0))
+        ));
+        checkPartition(expected_partition, actual_partition);
+
+        /* p(X, Y) :- q(X, X), r(Y, Y) */
+        expected_partition = new int[][] {
+                new int[]{1},
+                new int[]{2}
+        };
+        actual_partition = CachedRule.bodyPredPartition(3, List.of(
+                List.of(new ArgLocation(0, 0), new ArgLocation(1, 0), new ArgLocation(1, 1)),
+                List.of(new ArgLocation(0, 1), new ArgLocation(2, 0), new ArgLocation(2, 1))
+        ));
+        checkPartition(expected_partition, actual_partition);
+
+        /* p(X, Y) :- q(X, Z), r(Y, ?), s(Z, ?) */
+        expected_partition = new int[][] {
+                new int[]{1, 3},
+                new int[]{2}
+        };
+        actual_partition = CachedRule.bodyPredPartition(4, List.of(
+                List.of(new ArgLocation(0, 0), new ArgLocation(1, 0)),
+                List.of(new ArgLocation(0, 1), new ArgLocation(2, 0)),
+                List.of(new ArgLocation(1, 1), new ArgLocation(3, 0))
+        ));
+        checkPartition(expected_partition, actual_partition);
+
+        /* p(X, Y, Z, W, S) :- q(X, Z), r(Z, Y), s(W, R), t(R), t(S) */
+        expected_partition = new int[][] {
+                new int[]{1, 2},
+                new int[]{3, 4},
+                new int[]{5}
+        };
+        actual_partition = CachedRule.bodyPredPartition(6, List.of(
+                List.of(new ArgLocation(0, 0), new ArgLocation(1, 0)),
+                List.of(new ArgLocation(0, 1), new ArgLocation(2, 1)),
+                List.of(new ArgLocation(0, 2), new ArgLocation(1, 1), new ArgLocation(2, 0)),
+                List.of(new ArgLocation(0, 3), new ArgLocation(3, 0)),
+                List.of(new ArgLocation(3, 1), new ArgLocation(4, 0)),
+                List.of(new ArgLocation(0, 4), new ArgLocation(5, 0))
+        ));
+        checkPartition(expected_partition, actual_partition);
+    }
+
+    void checkPartition(int[][] expectedPartition, int[][] actualPartition) {
+        assertEquals(expectedPartition.length, actualPartition.length);
+        Set<Record> expected_partition_set = new HashSet<>();
+        for (int[] partition: expectedPartition) {
+            expected_partition_set.add(new Record(partition));
+        }
+        Set<Record> actual_partition_set = new HashSet<>();
+        for (int[] partition: actualPartition) {
+            actual_partition_set.add(new Record(partition));
+        }
+        assertEquals(expected_partition_set, actual_partition_set);
     }
 }

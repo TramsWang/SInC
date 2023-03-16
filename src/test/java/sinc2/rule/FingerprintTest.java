@@ -4,7 +4,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import sinc2.common.*;
 import sinc2.util.MultiSet;
-import sinc2.util.kb.NumeratedKb;
 import sinc2.util.kb.NumerationMap;
 
 import java.io.BufferedReader;
@@ -414,6 +413,14 @@ class FingerprintTest {
                 new String[]{
                         "p(X0,X1):-q(X0,X1)",
                         "p(X0,X1):-q(X0,?),q(?,X1)"
+                },
+                new String[] {
+                        "p(X0,?):-p(X0,X0)",
+                        "p(X0,X1):-p(X1,X0)"
+                },
+                new String[] {
+                        "p(X0,X0):-",
+                        "p(X0,X1):-p(X1,X0)"
                 }
         };
         List<Predicate>[][] rule_pairs = new List[][]{
@@ -427,7 +434,26 @@ class FingerprintTest {
                                 new Predicate(NUM_Q, new int[]{Argument.variable(0), Argument.EMPTY_VALUE}),
                                 new Predicate(NUM_Q, new int[]{Argument.EMPTY_VALUE, Argument.variable(1)})
                         ))
-                }
+                },
+                new List[]{
+                        new ArrayList<>(List.of(
+                                new Predicate(NUM_P, new int[]{Argument.variable(0), Argument.EMPTY_VALUE}),
+                                new Predicate(NUM_P, new int[]{Argument.variable(0), Argument.variable(0)})
+                        )),
+                        new ArrayList<>(List.of(
+                                new Predicate(NUM_P, new int[]{Argument.variable(0), Argument.variable(1)}),
+                                new Predicate(NUM_P, new int[]{Argument.variable(1), Argument.variable(0)})
+                        ))
+                },
+                new List[]{
+                        new ArrayList<>(List.of(
+                                new Predicate(NUM_P, new int[]{Argument.variable(0), Argument.variable(0)})
+                        )),
+                        new ArrayList<>(List.of(
+                                new Predicate(NUM_P, new int[]{Argument.variable(0), Argument.variable(1)}),
+                                new Predicate(NUM_P, new int[]{Argument.variable(1), Argument.variable(0)})
+                        ))
+                },
         };
         int failed = 0;
         for (int i = 0; i < rule_pairs.length; i++) {

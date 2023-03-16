@@ -99,6 +99,9 @@ public abstract class RelationMiner {
                     }
 
                     /* Find the specializations and generalizations of rule 'r' */
+                    if (3 == targetRelation) {
+                        System.out.println("HERE");
+                    }
                     int specializations_cnt = findSpecializations(r, top_candidates);
                     int generalizations_cnt = findGeneralizations(r, top_candidates);
                     if (0 == specializations_cnt && 0 == generalizations_cnt) {
@@ -287,6 +290,10 @@ public abstract class RelationMiner {
         boolean updated_is_better = false;
         switch (updateStatus) {
             case NORMAL:
+                if (DebugLevel.DEBUG <= DebugLevel.LEVEL) {
+                    logger.printf("Spec. %s\n", updatedRule.toString(kb));
+                    logger.flush();
+                }
                 if (updatedRule.getEval().value(evalMetric) > originalRule.getEval().value(evalMetric)) {
                     updated_is_better = true;
                     int replace_idx = -1;
@@ -310,7 +317,12 @@ public abstract class RelationMiner {
             case INVALID:
             case DUPLICATED:
             case INSUFFICIENT_COVERAGE:
+                break;
             case TABU_PRUNED:
+                if (DebugLevel.DEBUG <= DebugLevel.LEVEL) {
+                    logger.printf("TABU: %s\n", updatedRule.toString(kb));
+                    logger.flush();
+                }
                 break;
             default:
                 throw new Error("Unknown Update Status of Rule: " + updateStatus.name());
@@ -386,6 +398,7 @@ public abstract class RelationMiner {
                     "Found (Coverage: %.2f%%, %d/%d): %s\n", covered_facts * 100.0 / total_facts, covered_facts, total_facts,
                     rule.toDumpString(kb)
             );
+            logger.flush();
         }
         logger.println("Done");
     }
