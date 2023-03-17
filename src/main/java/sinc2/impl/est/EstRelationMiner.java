@@ -138,6 +138,10 @@ public class EstRelationMiner extends RelationMinerBasic {
                     }
                 }
             }
+            if (-1 == best_rule_idx) {
+                /* No more option to compare */
+                break;
+            }
             SpecOprWithScore best_spec = estimatedSpecLists[best_rule_idx].get(idxs[best_rule_idx]);
             idxs[best_rule_idx]++;
             Rule copy = beams[best_rule_idx].clone();

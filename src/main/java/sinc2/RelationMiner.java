@@ -99,9 +99,6 @@ public abstract class RelationMiner {
                     }
 
                     /* Find the specializations and generalizations of rule 'r' */
-                    if (3 == targetRelation) {
-                        System.out.println("HERE");
-                    }
                     int specializations_cnt = findSpecializations(r, top_candidates);
                     int generalizations_cnt = findGeneralizations(r, top_candidates);
                     if (0 == specializations_cnt && 0 == generalizations_cnt) {
