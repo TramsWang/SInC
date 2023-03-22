@@ -37,6 +37,8 @@ public abstract class RelationMiner {
     protected final Set<Record> counterexamples = new HashSet<>();
     /** The tabu set */
     protected final Map<MultiSet<Integer>, Set<Fingerprint>> tabuSet = new HashMap<>();
+    /** This member keeps track of the number of evaluated SQL queries */
+    public int evaluatedSqls = 0;
 
     /** Logger */
     protected final PrintWriter logger;
@@ -310,6 +312,7 @@ public abstract class RelationMiner {
                         candidates[replace_idx] = updatedRule;
                     }
                 }
+                evaluatedSqls += 2;
                 break;
             case INVALID:
             case DUPLICATED:
@@ -320,6 +323,7 @@ public abstract class RelationMiner {
                     logger.printf("TABU: %s\n", updatedRule.toString(kb));
                     logger.flush();
                 }
+                evaluatedSqls++;
                 break;
             default:
                 throw new Error("Unknown Update Status of Rule: " + updateStatus.name());

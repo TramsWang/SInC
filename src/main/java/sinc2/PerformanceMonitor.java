@@ -29,6 +29,8 @@ public class PerformanceMonitor {
     public int sccNumber = 0;
     public int sccVertices = 0;
     public int fvsVertices = 0;
+    /** This member keeps track of the number of evaluated SQL queries */
+    public int evaluatedSqls = 0;
 
 
     public void show(PrintWriter writer) {
@@ -45,11 +47,11 @@ public class PerformanceMonitor {
 
         writer.println("--- Statistics ---");
         writer.printf(
-                "# %10s %10s %10s %10s %10s %10s %10s %10s %10s %10s %10s %10s\n",
-                "|P|", "|Σ|", "|B|", "|H|", "||H||", "|N|", "|A|", "|ΔΣ|", "#SCC", "|SCC|", "|FVS|", "Comp(%)"
+                "# %10s %10s %10s %10s %10s %10s %10s %10s %10s %10s %10s %10s %10s %10s\n",
+                "|P|", "|Σ|", "|B|", "|H|", "||H||", "|N|", "|A|", "|ΔΣ|", "#SCC", "|SCC|", "|FVS|", "Comp(%)", "#SQL", "#SQL/|H|"
         );
         writer.printf(
-                "  %10d %10d %10d %10d %10d %10d %10d %10d %10d %10d %10d %10.2f\n\n",
+                "  %10d %10d %10d %10d %10d %10d %10d %10d %10d %10d %10d %10.2f %10d %10.2f\n\n",
                 kbFunctors,
                 kbConstants,
                 kbSize,
@@ -61,7 +63,9 @@ public class PerformanceMonitor {
                 sccNumber,
                 sccVertices,
                 fvsVertices,
-                (necessaryFacts + counterexamples + hypothesisSize) * 100.0 / kbSize
+                (necessaryFacts + counterexamples + hypothesisSize) * 100.0 / kbSize,
+                evaluatedSqls,
+                evaluatedSqls * 1.0 / hypothesisRuleNumber
         );
     }
 }

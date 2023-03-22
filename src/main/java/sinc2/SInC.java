@@ -261,10 +261,7 @@ public abstract class SInC {
                         "Relation mining done (%d/%d): %s",
                         i+1, target_relations.length, kb.getRelation(relation_num).name
                 ));
-                for (Rule r: relation_miner.getHypothesis()) {
-                    monitor.hypothesisSize += r.length();
-                }
-                monitor.hypothesisRuleNumber += relation_miner.getHypothesis().size();
+                finalizeRelationMiner(relation_miner);
             }
         } catch (KbException e) {
             e.printStackTrace(logger);
@@ -339,6 +336,14 @@ public abstract class SInC {
 
         monitor.totalTime = time_neo4j - time_start;
         showMonitor();
+    }
+
+    protected void finalizeRelationMiner(RelationMiner miner) {
+        for (Rule r: miner.getHypothesis()) {
+            monitor.hypothesisSize += r.length();
+        }
+        monitor.hypothesisRuleNumber += miner.getHypothesis().size();
+        monitor.evaluatedSqls += miner.evaluatedSqls;
     }
 
     protected void logInfo(String msg) {
