@@ -33,6 +33,7 @@ public class EstimationRanking {
         kb.updatePromisingConstants();
         int[][][][] rankings_when_mining_relations = new int[kb.totalRelations()][][][];    // int[relation idx][rule length][beams][rank]
         for (SimpleRelation relation: kb.getRelations()) {
+            System.out.println(relation.id);
             rankings_when_mining_relations[relation.id] = getRankingsInRelation(kb, relation);
         }
         Gson gson = new Gson();
@@ -104,11 +105,13 @@ public class EstimationRanking {
         for (SpecOprWithScore est_spec_opr: estimatedSpecs) {
             EstRule new_rule = rule.clone();
             UpdateStatus update_status = est_spec_opr.opr.specialize(new_rule);
-            if (UpdateStatus.NORMAL == update_status) {
-                ranked_specs.add(new EstRanking(est_spec_opr.estEval, ranked_specs.size(), new_rule));
-            }
+            ranked_specs.add(new EstRanking(
+                    est_spec_opr.estEval, ranked_specs.size(), (UpdateStatus.NORMAL == update_status) ? new_rule : null
+            ));
         }
-        ranked_specs.sort(Comparator.comparingDouble((EstRanking e) -> e.specRule.getEval().value(EVAL_METRIC)).reversed());
+        ranked_specs.sort(Comparator.comparingDouble(
+                (EstRanking e) -> (null == e.specRule) ? Double.NEGATIVE_INFINITY : e.specRule.getEval().value(EVAL_METRIC)
+        ).reversed());
         return ranked_specs;
     }
     void findEstimatedSpecializations(
@@ -124,7 +127,8 @@ public class EstimationRanking {
                 List<EstRanking> est_spec_list = specLists[rule_idx];
                 int idx = idxs[rule_idx];
                 if (idx < est_spec_list.size()) {
-                    double score = est_spec_list.get(idx).specRule.getEval().value(EVAL_METRIC);
+                    EstRule rule = est_spec_list.get(idx).specRule;
+                    double score = (null == rule) ? Double.NEGATIVE_INFINITY : rule.getEval().value(EVAL_METRIC);
                     if (best_score < score) {
                         best_score = score;
                         best_rule_idx = rule_idx;
