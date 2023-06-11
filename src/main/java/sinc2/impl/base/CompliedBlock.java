@@ -9,7 +9,7 @@ import sinc2.kb.IntTable;
  * @since 2.0
  */
 public class CompliedBlock {
-    /** Partially Assigned Record (PAR) */
+    /** Partially Assigned Record (PAR) */  //Todo: This information is redundant
     public final int[] partAsgnRecord;
     /** Compliance Set (CS) */
     public final int[][] complSet;

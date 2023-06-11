@@ -121,6 +121,36 @@ class IntTableTest {
     }
 
     @Test
+    void testSplitSlices() {
+        int[][] rows = new int[][] {
+                new int[] {1, 5, 3},
+                new int[] {2, 4, 3},
+                new int[] {1, 2, 9},
+                new int[] {5, 3, 3},
+                new int[] {1, 5, 2},
+        };
+        IntTable table = new IntTable(rows);
+        int[][][] slices0 = table.splitSlices(0);
+        assertEquals(3, slices0.length);
+        rowsInTable(new int[][]{new int[]{1, 5, 3}, new int[]{1, 5, 2}, new int[]{1, 2, 9},}, new IntTable(slices0[0]));
+        rowsInTable(new int[][]{new int[]{2, 4, 3},}, new IntTable(slices0[1]));
+        rowsInTable(new int[][]{new int[]{5, 3, 3},}, new IntTable(slices0[2]));
+
+        int[][][] slices1 = table.splitSlices(1);
+        assertEquals(4, slices1.length);
+        rowsInTable(new int[][]{new int[]{1, 2, 9},}, new IntTable(slices1[0]));
+        rowsInTable(new int[][]{new int[]{5, 3, 3},}, new IntTable(slices1[1]));
+        rowsInTable(new int[][]{new int[]{2, 4, 3},}, new IntTable(slices1[2]));
+        rowsInTable(new int[][]{new int[]{1, 5, 3}, new int[]{1, 5, 2}}, new IntTable(slices1[3]));
+
+        int[][][] slices2 = table.splitSlices(2);
+        assertEquals(3, slices2.length);
+        rowsInTable(new int[][]{new int[]{1, 5, 2},}, new IntTable(slices2[0]));
+        rowsInTable(new int[][]{new int[]{1, 5, 3}, new int[]{2, 4, 3}, new int[]{5, 3, 3},}, new IntTable(slices2[1]));
+        rowsInTable(new int[][]{new int[]{1, 2, 9},}, new IntTable(slices2[2]));
+    }
+
+    @Test
     void testMatch() {
         int[][] rows1 = new int[][] {
                 new int[] {1, 5, 3},

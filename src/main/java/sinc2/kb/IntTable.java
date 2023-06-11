@@ -154,6 +154,23 @@ public class IntTable implements Iterable<int[]> {
         return new IntTable(slice);
     }
 
+    /**
+     * Split the table according to values in a column. The values at the column are the same in each slice.
+     */
+    public int[][][] splitSlices(int col) {
+        int[][] sorted_rows = sortedRowsByCols[col];
+        int[] start_offsets = startOffsetsByCols[col];
+        int[][][] slices = new int[start_offsets.length - 1][][];
+        for (int i = 0; i < slices.length; i++) {
+            int start_offset = start_offsets[i];
+            int length = start_offsets[i+1] - start_offset;
+            int[][] slice = new int[length][];
+            System.arraycopy(sorted_rows, start_offset, slice, 0, length);
+            slices[i] = slice;
+        }
+        return slices;
+    }
+
     static public class MatchedSubTables {
         public final List<int[][]> slices1;
         public final List<int[][]> slices2;

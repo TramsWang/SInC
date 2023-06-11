@@ -42,7 +42,6 @@ public class SimpleRelation extends IntTable {
      */
     static public int[][] loadFile(File file, int arity, int totalRecords) throws IOException {
         IntReader reader = new IntReader(file);
-        byte[] buffer = new byte[Integer.BYTES];
         int[][] records = new int[totalRecords][];
         for (int i = 0; i < totalRecords; i++) {
             int[] record = new int[arity];
