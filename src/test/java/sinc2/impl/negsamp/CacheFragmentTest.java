@@ -38,7 +38,7 @@ class CacheFragmentTest {
     @Test
     void case1aTest1() {
         /* p(?, ?, ?) */
-        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P));
+        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
 
         /* p(X, ?, ?) */
         fragment.updateCase1a(0, 0, 0);
@@ -80,7 +80,7 @@ class CacheFragmentTest {
     @Test
     void case1aTest2() {
         /* p(?, ?, ?) */
-        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P));
+        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
 
         /* p(X, ?, ?) */
         fragment.updateCase1a(0, 0, 0);
@@ -124,7 +124,7 @@ class CacheFragmentTest {
     @Test
     void case1bTest1() {
         /* p(?, ?, ?) */
-        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P));
+        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
 
         /* p(X, ?, ?) */
         fragment.updateCase1a(0, 0, 0);
@@ -132,7 +132,7 @@ class CacheFragmentTest {
         /* Copy and: p(X, ?, ?), q(?, X, ?) */
         fragment.buildIndices();
         CacheFragment fragment2 = new CacheFragment(fragment);
-        fragment2.updateCase1b(KB.getRelation(NUM_Q), 1, 0);
+        fragment2.updateCase1b(KB.getRelation(NUM_Q), NUM_Q, 1, 0);
         List<List<CB>> expected_entries = List.of(
                 List.of(
                         new CB(new int[][]{
@@ -187,8 +187,8 @@ class CacheFragmentTest {
     void case1cTest1() {
         /* F1: p(?, ?, ?) */
         /* F2: p(?, ?, ?) */
-        CacheFragment fragment1 = new CacheFragment(KB.getRelation(NUM_P));
-        CacheFragment fragment2 = new CacheFragment(KB.getRelation(NUM_P));
+        CacheFragment fragment1 = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
+        CacheFragment fragment2 = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
 
         /* F1: p(X, ?, ?) */
         fragment1.updateCase1a(0, 0, 0);
@@ -269,8 +269,8 @@ class CacheFragmentTest {
     void case1cTest2() {
         /* F1: p(?, ?, ?) */
         /* F2: p(?, ?, ?) */
-        CacheFragment fragment1 = new CacheFragment(KB.getRelation(NUM_P));
-        CacheFragment fragment2 = new CacheFragment(KB.getRelation(NUM_P));
+        CacheFragment fragment1 = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
+        CacheFragment fragment2 = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
 
         /* F1: p(X, X, ?) */
         fragment1.updateCase1a(0, 0, 0);
@@ -314,7 +314,7 @@ class CacheFragmentTest {
     @Test
     void case2aTest1() {
         /* p(?, ?, ?) */
-        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P));
+        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
 
         /* p(Y, Y, ?) */
         fragment.updateCase2a(0, 0, 0, 1, 1);
@@ -362,7 +362,7 @@ class CacheFragmentTest {
     @Test
     void case2aTest2() {
         /* p(?, ?, ?) */
-        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P));
+        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
 
         /* p(?, X, X) */
         fragment.updateCase2a(0, 1, 0, 2, 0);
@@ -403,10 +403,10 @@ class CacheFragmentTest {
     @Test
     void case2bTest1() {
         /* p(?, ?, ?) */
-        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P));
+        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
 
         /* p(X, ?, ?), q(X, ?, ?) */
-        fragment.updateCase2b(KB.getRelation(NUM_Q), 0, 0, 0, 0);
+        fragment.updateCase2b(KB.getRelation(NUM_Q), NUM_Q, 0, 0, 0, 0);
         List<List<CB>> expected_entries = List.of(
                 List.of(
                         new CB(new int[][]{
@@ -468,14 +468,14 @@ class CacheFragmentTest {
     @Test
     void case2bTest2() {
         /* p(?, ?, ?) */
-        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P));
+        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
 
         /* p(X, ?, ?) */
         fragment.updateCase1a(0, 0, 0);
 
         /* p(X, Y, ?), q(?, ?, Y) */
         fragment.buildIndices();
-        fragment.updateCase2b(KB.getRelation(NUM_Q), 2, 0, 1, 1);
+        fragment.updateCase2b(KB.getRelation(NUM_Q), NUM_Q, 2, 0, 1, 1);
         List<List<CB>> expected_entries = List.of(
                 List.of(
                         new CB(new int[][]{
@@ -511,7 +511,7 @@ class CacheFragmentTest {
 
         /* p(X, Y, ?), q(?, Z, Y), q(?, Z, ?) */
         fragment.buildIndices();
-        fragment.updateCase2b(KB.getRelation(NUM_Q), 1, 1, 1, 2);
+        fragment.updateCase2b(KB.getRelation(NUM_Q), NUM_Q, 1, 1, 1, 2);
         expected_entries = List.of(
                 List.of(
                         new CB(new int[][]{
@@ -569,8 +569,8 @@ class CacheFragmentTest {
     void case2cTest1() {
         /* F1: p(?, ?, ?) */
         /* F2: q(?, ?, ?) */
-        CacheFragment fragment1 = new CacheFragment(KB.getRelation(NUM_P));
-        CacheFragment fragment2 = new CacheFragment(KB.getRelation(NUM_Q));
+        CacheFragment fragment1 = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
+        CacheFragment fragment2 = new CacheFragment(KB.getRelation(NUM_Q), NUM_Q);
 
         /* F1 + F2: p(X, ?, ?), q(X, ?, ?) */
         fragment1.updateCase2c(0, 0, fragment2, 0, 0, 0);
@@ -611,8 +611,8 @@ class CacheFragmentTest {
     void case2cTest2() {
         /* F1: p(?, ?, ?) */
         /* F2: q(?, ?, ?) */
-        CacheFragment fragment1 = new CacheFragment(KB.getRelation(NUM_P));
-        CacheFragment fragment2 = new CacheFragment(KB.getRelation(NUM_Q));
+        CacheFragment fragment1 = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
+        CacheFragment fragment2 = new CacheFragment(KB.getRelation(NUM_Q), NUM_Q);
 
         /* F1: p(X, X, ?) */
         fragment1.updateCase2a(0, 0, 0, 1, 0);
@@ -664,7 +664,7 @@ class CacheFragmentTest {
     @Test
     void case3Test1() {
         /* p(?, ?, ?) */
-        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P));
+        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
 
         /* p(1, ?, ?) */
         fragment.updateCase3(0, 0, 1);
@@ -686,10 +686,10 @@ class CacheFragmentTest {
     @Test
     void case3Test2() {
         /* p(?, ?, ?) */
-        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P));
+        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
 
         /* p(X, ?, ?), q(X, ?, ?) */
-        fragment.updateCase2b(KB.getRelation(NUM_Q), 0, 0, 0, 0);
+        fragment.updateCase2b(KB.getRelation(NUM_Q), NUM_Q, 0, 0, 0, 0);
 
         /* p(X, ?, ?), q(X, ?, 8) */
         fragment.buildIndices();
@@ -777,5 +777,133 @@ class CacheFragmentTest {
             builder.append(',').append(rule.get(i).toString(KB));
         }
         return builder.toString();
+    }
+
+    @Test
+    void testCountTableSize1() {
+        /* p(?, ?, ?) */
+        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
+        assertEquals(8, fragment.countTableSize(0));
+
+        /* p(1, ?, ?) */
+        fragment.updateCase3(0, 0, 1);
+        assertEquals(4, fragment.countTableSize(0));
+    }
+
+    @Test
+    void testCountTableSize2() {
+        /* p(?, ?, ?) */
+        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
+
+        /* p(X, ?, ?) */
+        fragment.updateCase1a(0, 0, 0);
+
+        /* p(X, Y, ?), q(?, ?, Y) */
+        fragment.buildIndices();
+        fragment.updateCase2b(KB.getRelation(NUM_Q), NUM_Q, 2, 0, 1, 1);
+
+        /* p(X, Y, ?), q(?, Z, Y), q(?, Z, ?) */
+        fragment.buildIndices();
+        fragment.updateCase2b(KB.getRelation(NUM_Q), NUM_Q, 1, 1, 1, 2);
+        assertEquals(6, fragment.countTableSize(2));
+//        expected_entries = List.of(
+//                List.of(
+//                        new CB(new int[][]{
+//                                new int[]{1, 1, 1},
+//                                new int[]{1, 1, 2},
+//                                new int[]{2, 1, 3},
+//                        }), new CB(new int[][]{
+//                                new int[]{2, 4, 1}
+//                        }), new CB(new int[][]{
+//                                new int[]{2, 4, 1}
+//                        })
+//                ), List.of(
+//                        new CB(new int[][]{
+//                                new int[]{1, 2, 3}
+//                        }), new CB(new int[][]{
+//                                new int[]{1, 1, 2},
+//                        }), new CB(new int[][]{
+//                                new int[]{1, 1, 2},
+//                                new int[]{3, 1, 4},
+//                                new int[]{5, 1, 4}
+//                        })
+//                ),List.of(
+//                        new CB(new int[][]{
+//                                new int[]{1, 2, 3}
+//                        }), new CB(new int[][]{
+//                                new int[]{6, 7, 2}
+//                        }), new CB(new int[][]{
+//                                new int[]{2, 7, 8},
+//                                new int[]{6, 7, 2}
+//                        })
+//                ), List.of(
+//                        new CB(new int[][]{
+//                                new int[]{4, 4, 6},
+//                                new int[]{2, 4, 4}
+//                        }), new CB(new int[][]{
+//                                new int[]{5, 1, 4},
+//                                new int[]{3, 1, 4}
+//                        }), new CB(new int[][]{
+//                                new int[]{1, 1, 2},
+//                                new int[]{3, 1, 4},
+//                                new int[]{5, 1, 4}
+//                        })
+//                )
+//        );
+    }
+
+    @Test
+    void testCountCombinations1() {
+        /* p(X, ?, ?) [X] */
+        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
+        fragment.updateCase1a(0, 0, 0);
+        assertEquals("p(X0,?,?)", rule2String(fragment.partAssignedRule));
+        assertEquals(4, fragment.countCombinations(new int[]{0}));
+    }
+
+    @Test
+    void testCountCombinations2() {
+        /* p(X, Y, ?) [X,Y] */
+        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
+        fragment.updateCase1a(0, 0, 0);
+        fragment.buildIndices();
+        fragment.updateCase1a(0, 1, 1);
+        assertEquals("p(X0,X1,?)", rule2String(fragment.partAssignedRule));
+        assertEquals(7, fragment.countCombinations(new int[]{0, 1}));
+    }
+
+    @Test
+    void testCountCombinations3() {
+        /* p(Y, Y, ?) [Y] */
+        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
+        fragment.updateCase2a(0, 0, 0, 1, 1);
+        assertEquals("p(X1,X1,?)", rule2String(fragment.partAssignedRule));
+        assertEquals(3, fragment.countCombinations(new int[]{1}));
+    }
+
+    @Test
+    void testCountCombinations4() {
+        /* p(X, Y, ?), q(?, Z, Y), q(?, Z, ?) [Y, Z] */
+        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
+        fragment.updateCase1a(0, 0, 0);
+        fragment.buildIndices();
+        fragment.updateCase2b(KB.getRelation(NUM_Q), NUM_Q, 2, 0, 1, 1);
+        fragment.buildIndices();
+        fragment.updateCase2b(KB.getRelation(NUM_Q), NUM_Q, 1, 1, 1, 2);
+        assertEquals("p(X0,X1,?),q(?,X2,X1),q(?,X2,?)", rule2String(fragment.partAssignedRule));
+        assertEquals(4, fragment.countCombinations(new int[]{1, 2}));
+    }
+
+    @Test
+    void testCountCombinations5() {
+        /* p(X, Y, ?), q(?, Z, Y), q(?, Z, ?) [X, Z] */
+        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
+        fragment.updateCase1a(0, 0, 0);
+        fragment.buildIndices();
+        fragment.updateCase2b(KB.getRelation(NUM_Q), NUM_Q, 2, 0, 1, 1);
+        fragment.buildIndices();
+        fragment.updateCase2b(KB.getRelation(NUM_Q), NUM_Q, 1, 1, 1, 2);
+        assertEquals("p(X0,X1,?),q(?,X2,X1),q(?,X2,?)", rule2String(fragment.partAssignedRule));
+        assertEquals(6, fragment.countCombinations(new int[]{0, 2}));
     }
 }

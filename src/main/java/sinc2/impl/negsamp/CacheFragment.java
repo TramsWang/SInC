@@ -4,7 +4,6 @@ import sinc2.common.Argument;
 import sinc2.common.Predicate;
 import sinc2.common.Record;
 import sinc2.kb.IntTable;
-import sinc2.kb.SimpleRelation;
 
 import java.util.*;
 
@@ -64,15 +63,25 @@ public class CacheFragment {
     /** A list of LV info. Each index is the ID of an LV */
     protected List<VarInfo> varInfoList;
 
-    public CacheFragment(SimpleRelation firstRelation) {
+    public CacheFragment(IntTable firstRelation, int relationSymbol) {
         partAssignedRule = new ArrayList<>();
         entries = new ArrayList<>();
         varInfoList = new ArrayList<>();
 
-        partAssignedRule.add(new Predicate(firstRelation.id, firstRelation.totalCols()));
+        partAssignedRule.add(new Predicate(relationSymbol, firstRelation.totalCols()));
         List<CB> first_entry = new ArrayList<>();
         first_entry.add(new CB(firstRelation.getAllRows(), firstRelation));
         entries.add(first_entry);
+    }
+
+    /**
+     * This constructor is used to construct an empty fragment
+     */
+    public CacheFragment(int relationSymbol, int arity) {
+        partAssignedRule = new ArrayList<>();
+        entries = new ArrayList<>();
+        varInfoList = new ArrayList<>();
+        partAssignedRule.add(new Predicate(relationSymbol, arity));
     }
 
     public CacheFragment(CacheFragment another) {
@@ -80,7 +89,7 @@ public class CacheFragment {
         for (Predicate predicate: another.partAssignedRule) {
             this.partAssignedRule.add(new Predicate(predicate));
         }
-        this.entries = another.entries;
+        this.entries = another.entries; // The caches can be simply copied, as the list should not be modified, but directly replaced (Copy-on-write)
         this.varInfoList = new ArrayList<>(another.varInfoList.size());
         for (VarInfo var_info: another.varInfoList) {
             this.varInfoList.add((null == var_info) ? null : new VarInfo(var_info));
@@ -125,7 +134,7 @@ public class CacheFragment {
      * Append a new relation and split cache entries according to two columns in the fragment. One column is in one of
      * the original relations, and the other is in the appended relation.
      */
-    protected void splitCacheEntries(int tabIdx1, int colIdx1, SimpleRelation newRelation, int colIdx2) {
+    protected void splitCacheEntries(int tabIdx1, int colIdx1, IntTable newRelation, int colIdx2) {
         List<List<CB>> new_entries = new ArrayList<>();
         for (List<CB> cache_entry : entries) {
             CB cb1 = cache_entry.get(tabIdx1);
@@ -185,7 +194,7 @@ public class CacheFragment {
      * Append a new relation and match a column to another that has already been assigned an LV. The matching column is
      * in the appended relation.
      */
-    protected void matchCacheEntries(int matchedTabIdx, int matchedColIdx, SimpleRelation newRelation, int matchingColIdx) {
+    protected void matchCacheEntries(int matchedTabIdx, int matchedColIdx, IntTable newRelation, int matchingColIdx) {
         List<List<CB>> new_entries = new ArrayList<>();
         for (List<CB> cache_entry : entries) {
             CB matched_cb = cache_entry.get(matchedTabIdx);
@@ -263,8 +272,8 @@ public class CacheFragment {
      *
      * NOTE: In this case, there must be an argument, in the PAR of this fragment, that has already been assigned to the LV.
      */
-    public void updateCase1b(SimpleRelation newRelation, int colIdx, int vid) {
-        Predicate new_pred = new Predicate(newRelation.id, newRelation.totalCols());
+    public void updateCase1b(IntTable newRelation, int relationSymbol, int colIdx, int vid) {
+        Predicate new_pred = new Predicate(relationSymbol, newRelation.totalCols());
         new_pred.args[colIdx] = Argument.variable(vid);
         partAssignedRule.add(new_pred);
         VarInfo var_info = varInfoList.get(vid);    // Assertion: this shall NOT be NULL
@@ -398,12 +407,12 @@ public class CacheFragment {
     /**
      * Update case 2b.
      */
-    public void updateCase2b(SimpleRelation newRelation, int colIdx1, int tabIdx2, int colIdx2, int newVid) {
+    public void updateCase2b(IntTable newRelation, int relationSymbol, int colIdx1, int tabIdx2, int colIdx2, int newVid) {
         /* Modify PAR */
         addVarInfo(newVid, new VarInfo(tabIdx2, colIdx2, false));
         int var_arg = Argument.variable(newVid);
         partAssignedRule.get(tabIdx2).args[colIdx2] = var_arg;
-        Predicate new_pred = new Predicate(newRelation.id, newRelation.totalCols());
+        Predicate new_pred = new Predicate(relationSymbol, newRelation.totalCols());
         new_pred.args[colIdx1] = var_arg;
         partAssignedRule.add(new_pred);
 
@@ -596,11 +605,9 @@ public class CacheFragment {
      * Count the number of unique records in a separate table.
      */
     public int countTableSize(int tabIdx) {
-        Set<Record> records = new HashSet<>();
+        Set<int[]> records = new HashSet<>();
         for (List<CB> entry: entries) {
-            for (int[] record: entry.get(tabIdx).complianceSet) {
-                records.add(new Record(record));
-            }
+            records.addAll(Arrays.asList(entry.get(tabIdx).complianceSet));
         }
         return records.size();
     }
