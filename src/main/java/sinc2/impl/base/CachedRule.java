@@ -929,7 +929,7 @@ public class CachedRule extends Rule {
     }
 
     /**
-     * Update the E-cache for case 3 specialization.
+     * Update the T-cache and the E-cache for case 3 specialization.
      *
      * Note: all indices should be up-to-date
      */
@@ -971,7 +971,7 @@ public class CachedRule extends Rule {
     }
 
     /**
-     * Update the E-cache for case 4 specialization.
+     * Update the T-cache and the E-cache for case 4 specialization.
      *
      * Note: all indices should be up-to-date
      */
@@ -1006,7 +1006,7 @@ public class CachedRule extends Rule {
     }
 
     /**
-     * Update the E-cache for case 5 specialization.
+     * Update the T-cache and the E-cache for case 5 specialization.
      *
      * Note: all indices should be up-to-date
      */

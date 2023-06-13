@@ -3,6 +3,7 @@ package sinc2.impl.negsamp;
 import sinc2.common.Argument;
 import sinc2.common.Predicate;
 import sinc2.common.Record;
+import sinc2.impl.base.CachedRule;
 import sinc2.kb.IntTable;
 
 import java.util.*;
@@ -491,7 +492,7 @@ public class CacheFragment {
      * @param bindingSetIdx the index of the binding set in current recursion
      * @param templateStartIdx the starting index of the template for the PLV bindings
      */
-    protected void addCompleteBodyPlvBindings(
+    protected void addCompletePlvBindings(
             Set<Record> completeBindings, Set<Record>[] plvBindingSets, int[] template, int bindingSetIdx, int templateStartIdx
     ) {
         final Set<Record> plv_bindings = plvBindingSets[bindingSetIdx];
@@ -510,7 +511,7 @@ public class CacheFragment {
             /* Complete part of the template and move to next recursion */
             while (true) {
                 System.arraycopy(plv_binding.args, 0, template, templateStartIdx, binding_length);
-                addCompleteBodyPlvBindings(
+                addCompletePlvBindings(
                         completeBindings, plvBindingSets, template, bindingSetIdx+1, templateStartIdx+binding_length
                 );
                 if (!itr.hasNext()) break;
@@ -524,7 +525,7 @@ public class CacheFragment {
      *
      * NOTE: the listed variables must NOT contain duplications and LVs that are not presented in this fragment.
      */
-    public int countCombinations(int[] vids) {
+    public int countCombinations(List<Integer> vids) {
         List<VarInfo> lvs = new ArrayList<>();
         List<Integer>[] plv_col_index_lists = new List[partAssignedRule.size()];    // Table index is the index of the array
         List<Integer> tab_idxs_with_plvs = new ArrayList<>();
@@ -589,7 +590,7 @@ public class CacheFragment {
                     complete_plv_bindings.addAll(plv_bindings_within_tab_sets[0]);
                 } else {
                     /* Cartesian product required */
-                    addCompleteBodyPlvBindings(
+                    addCompletePlvBindings(
                             complete_plv_bindings, plv_bindings_within_tab_sets, new int[total_plvs], 0, 0
                     );
                 }
@@ -602,6 +603,114 @@ public class CacheFragment {
     }
 
     /**
+     * Recursively add PLV bindings to a given template
+     *
+     * @param templateSet          The set of finished templates
+     * @param plvBindingSets       The bindings of PLVs grouped by predicate
+     * @param plv2TemplateIdxLists The linked arguments in the head for each PLV
+     * @param template             An argument list template
+     * @param setIdx               The index of the PLV group
+     */
+    protected void addPlvBindings2Templates(
+            final Set<Record> templateSet, final Set<Record>[] plvBindingSets, final List<Integer>[] plv2TemplateIdxLists,
+            final int[] template, final int setIdx
+    ) {
+        final Set<Record> plv_bindings = plvBindingSets[setIdx];
+        final List<Integer> plv_2_template_idxs = plv2TemplateIdxLists[setIdx];
+        if (setIdx == plvBindingSets.length - 1) {
+            /* Finish the last group of PLVs, add to the template set */
+            for (Record plv_binding: plv_bindings) {
+                for (int i = 0; i < plv_binding.args.length; i++) {
+                    template[plv_2_template_idxs.get(i)] = plv_binding.args[i];
+                }
+                templateSet.add(new Record(template.clone()));
+            }
+        } else {
+            /* Add current binding to the template and move to the next recursion */
+            for (Record plv_binding: plv_bindings) {
+                for (int i = 0; i < plv_binding.args.length; i++) {
+                    template[plv_2_template_idxs.get(i)] = plv_binding.args[i];
+                }
+                addPlvBindings2Templates(templateSet, plvBindingSets, plv2TemplateIdxLists, template, setIdx + 1);
+            }
+        }
+    }
+
+    /**
+     * This method returns the set of combinations of all listed variables.
+     *
+     * NOTE: the listed variables must NOT contain duplications and LVs that are not presented in this fragment.
+     */
+    public Set<Record> enumerateCombinations(List<Integer> vids) {
+        /* Split LVs and PLVs and find the locations of the vars */
+        /* Also, group PLVs within tabs */
+        List<VarInfo> lvs = new ArrayList<>();
+        List<Integer> lv_template_idxs = new ArrayList<>();
+        List<Integer>[] plv_col_idx_lists = new List[partAssignedRule.size()];    // Table index is the index of the array
+        List<Integer>[] plv_2_template_idx_lists = new List[partAssignedRule.size()];
+        List<Integer> tab_idxs_with_plvs = new ArrayList<>();
+        for (int template_idx = 0; template_idx < vids.size(); template_idx++) {
+            VarInfo var_info = varInfoList.get(vids.get(template_idx));    // This shall NOT be NULL
+            if (var_info.isPlv) {
+                if (null == plv_col_idx_lists[var_info.tabIdx]) {
+                    plv_col_idx_lists[var_info.tabIdx] = new ArrayList<>();
+                    plv_2_template_idx_lists[var_info.tabIdx] = new ArrayList<>();
+                    tab_idxs_with_plvs.add(var_info.tabIdx);
+                }
+                plv_col_idx_lists[var_info.tabIdx].add(var_info.colIdx);
+                plv_2_template_idx_lists[var_info.tabIdx].add(template_idx);
+            } else {
+                lv_template_idxs.add(template_idx);
+                lvs.add(var_info);
+            }
+        }
+
+        final Set<Record> bindings = new HashSet<>();
+        if (tab_idxs_with_plvs.isEmpty()) {
+            /* No PLV. Just enumerate all combinations of LVs */
+            for (List<CB> cache_entry: entries) {
+                int[] binding = new int[vids.size()];
+                for (int template_idx = 0; template_idx < binding.length; template_idx++) {
+                    VarInfo lv_info = lvs.get(template_idx);
+                    binding[template_idx] = cache_entry.get(lv_info.tabIdx).complianceSet[0][lv_info.colIdx];
+                }
+                bindings.add(new Record(binding));
+            }
+        } else  {
+            for (List<CB> cache_entry: entries) {
+                /* Find LV binding first */
+                final int[] binding_with_only_lvs = new int[vids.size()];
+                for (int i = 0; i < lvs.size(); i++) {
+                    VarInfo lv_info = lvs.get(i);
+                    binding_with_only_lvs[lv_template_idxs.get(i)] = cache_entry.get(lv_info.tabIdx).complianceSet[0][lv_info.colIdx];
+                }
+
+                /* Cartesian product all the PLVs */
+                Set<Record>[] plv_bindings_within_tab_sets = new Set[tab_idxs_with_plvs.size()];
+                List<Integer>[] plv_2_template_idx_within_tab_lists = new List[tab_idxs_with_plvs.size()];
+                for (int i = 0; i < plv_bindings_within_tab_sets.length; i++) {
+                    final int tab_idx = tab_idxs_with_plvs.get(i);
+                    final List<Integer> plv_col_idxs = plv_col_idx_lists[tab_idx];
+                    final Set<Record> plv_bindings = new HashSet<>();
+                    plv_bindings_within_tab_sets[i] = plv_bindings;
+                    plv_2_template_idx_within_tab_lists[i] = plv_2_template_idx_lists[tab_idx];
+                    for (int[] cs_record : cache_entry.get(tab_idx).complianceSet) {
+                        final int[] plv_binding_within_tab = new int[plv_col_idxs.size()];
+                        for (int j = 0; j < plv_binding_within_tab.length; j++) {
+                            plv_binding_within_tab[j] = cs_record[plv_col_idxs.get(j)];
+                        }
+                        plv_bindings.add(new Record(plv_binding_within_tab));
+                    }
+                }
+                addPlvBindings2Templates(
+                        bindings, plv_bindings_within_tab_sets, plv_2_template_idx_within_tab_lists, binding_with_only_lvs, 0
+                );
+            }
+        }
+        return bindings;
+    }
+
+    /**
      * Count the number of unique records in a separate table.
      */
     public int countTableSize(int tabIdx) {
@@ -610,5 +719,13 @@ public class CacheFragment {
             records.addAll(Arrays.asList(entry.get(tabIdx).complianceSet));
         }
         return records.size();
+    }
+
+    public boolean isEmpty() {
+        return entries.isEmpty();
+    }
+
+    public void clear() {
+        entries = new ArrayList<>();
     }
 }

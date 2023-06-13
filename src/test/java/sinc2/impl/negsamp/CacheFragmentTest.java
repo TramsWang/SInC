@@ -2,10 +2,12 @@ package sinc2.impl.negsamp;
 
 import org.junit.jupiter.api.Test;
 import sinc2.common.Predicate;
+import sinc2.common.Record;
 import sinc2.kb.IntTable;
 import sinc2.kb.SimpleKb;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -858,7 +860,7 @@ class CacheFragmentTest {
         CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
         fragment.updateCase1a(0, 0, 0);
         assertEquals("p(X0,?,?)", rule2String(fragment.partAssignedRule));
-        assertEquals(4, fragment.countCombinations(new int[]{0}));
+        assertEquals(4, fragment.countCombinations(List.of(0)));
     }
 
     @Test
@@ -869,7 +871,7 @@ class CacheFragmentTest {
         fragment.buildIndices();
         fragment.updateCase1a(0, 1, 1);
         assertEquals("p(X0,X1,?)", rule2String(fragment.partAssignedRule));
-        assertEquals(7, fragment.countCombinations(new int[]{0, 1}));
+        assertEquals(7, fragment.countCombinations(List.of(0, 1)));
     }
 
     @Test
@@ -878,7 +880,7 @@ class CacheFragmentTest {
         CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
         fragment.updateCase2a(0, 0, 0, 1, 1);
         assertEquals("p(X1,X1,?)", rule2String(fragment.partAssignedRule));
-        assertEquals(3, fragment.countCombinations(new int[]{1}));
+        assertEquals(3, fragment.countCombinations(List.of(1)));
     }
 
     @Test
@@ -891,7 +893,7 @@ class CacheFragmentTest {
         fragment.buildIndices();
         fragment.updateCase2b(KB.getRelation(NUM_Q), NUM_Q, 1, 1, 1, 2);
         assertEquals("p(X0,X1,?),q(?,X2,X1),q(?,X2,?)", rule2String(fragment.partAssignedRule));
-        assertEquals(4, fragment.countCombinations(new int[]{1, 2}));
+        assertEquals(4, fragment.countCombinations(List.of(1, 2)));
     }
 
     @Test
@@ -904,6 +906,133 @@ class CacheFragmentTest {
         fragment.buildIndices();
         fragment.updateCase2b(KB.getRelation(NUM_Q), NUM_Q, 1, 1, 1, 2);
         assertEquals("p(X0,X1,?),q(?,X2,X1),q(?,X2,?)", rule2String(fragment.partAssignedRule));
-        assertEquals(6, fragment.countCombinations(new int[]{0, 2}));
+        assertEquals(6, fragment.countCombinations(List.of(0, 2)));
+    }
+
+    @Test
+    void testEnumerateCombinations1() {
+        /* p(X, ?, ?) [X] */
+        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
+        fragment.updateCase1a(0, 0, 0);
+        assertEquals("p(X0,?,?)", rule2String(fragment.partAssignedRule));
+        assertEquals(new HashSet<>(List.of(
+                new Record(new int[]{1}),
+                new Record(new int[]{2}),
+                new Record(new int[]{4}),
+                new Record(new int[]{5})
+        )), fragment.enumerateCombinations(List.of(0)));
+    }
+
+    @Test
+    void testEnumerateCombinations2() {
+        /* p(Y, Y, ?) [Y] */
+        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
+        fragment.updateCase2a(0, 0, 0, 1, 1);
+        assertEquals("p(X1,X1,?)", rule2String(fragment.partAssignedRule));
+        assertEquals(new HashSet<>(List.of(
+                new Record(new int[]{1}),
+                new Record(new int[]{4}),
+                new Record(new int[]{5})
+        )), fragment.enumerateCombinations(List.of(1)));
+    }
+
+    @Test
+    void testEnumerateCombinations3() {
+        /* p(Y, X, ?) [X, Y] */
+        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
+        fragment.updateCase1a(0, 0, 1);
+        fragment.buildIndices();
+        fragment.updateCase1a(0, 1, 0);
+        assertEquals("p(X1,X0,?)", rule2String(fragment.partAssignedRule));
+        assertEquals(new HashSet<>(List.of(
+                new Record(new int[]{1, 1}),
+                new Record(new int[]{2, 1}),
+                new Record(new int[]{1, 2}),
+                new Record(new int[]{4, 4}),
+                new Record(new int[]{5, 5}),
+                new Record(new int[]{3, 1}),
+                new Record(new int[]{4, 2})
+        )), fragment.enumerateCombinations(List.of(0, 1)));
+    }
+
+    @Test
+    void testEnumerateCombinations4() {
+        /* p(Y, Y, W) [Y, W] */
+        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
+        fragment.updateCase2a(0, 0, 0, 1, 1);
+        fragment.buildIndices();
+        fragment.updateCase1a(0, 2, 3);
+        assertEquals("p(X1,X1,X3)", rule2String(fragment.partAssignedRule));
+        assertEquals(new HashSet<>(List.of(
+                new Record(new int[]{1, 1}),
+                new Record(new int[]{1, 2}),
+                new Record(new int[]{4, 6}),
+                new Record(new int[]{5, 1})
+        )), fragment.enumerateCombinations(List.of(1, 3)));
+    }
+
+    @Test
+    void testEnumerateCombinations5() {
+        /* p(X, Y, ?), q(?, Z, Y), q(?, Z, ?) [X, Z] */
+        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
+        fragment.updateCase1a(0, 0, 0);
+        fragment.buildIndices();
+        fragment.updateCase2b(KB.getRelation(NUM_Q), NUM_Q, 2, 0, 1, 1);
+        fragment.buildIndices();
+        fragment.updateCase2b(KB.getRelation(NUM_Q), NUM_Q, 1, 1, 1, 2);
+        assertEquals("p(X0,X1,?),q(?,X2,X1),q(?,X2,?)", rule2String(fragment.partAssignedRule));
+        assertEquals(new HashSet<>(List.of(
+                new Record(new int[]{1, 4}),
+                new Record(new int[]{2, 4}),
+                new Record(new int[]{1, 1}),
+                new Record(new int[]{1, 7}),
+                new Record(new int[]{4, 1}),
+                new Record(new int[]{2, 1})
+        )), fragment.enumerateCombinations(List.of(0, 2)));
+    }
+
+    @Test
+    void testEnumerateCombinations6() {
+        /* p(X, Y, ?), q(?, Z, Y), q(?, Z, ?) [Z, X] */
+        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
+        fragment.updateCase1a(0, 0, 0);
+        fragment.buildIndices();
+        fragment.updateCase2b(KB.getRelation(NUM_Q), NUM_Q, 2, 0, 1, 1);
+        fragment.buildIndices();
+        fragment.updateCase2b(KB.getRelation(NUM_Q), NUM_Q, 1, 1, 1, 2);
+        assertEquals("p(X0,X1,?),q(?,X2,X1),q(?,X2,?)", rule2String(fragment.partAssignedRule));
+        assertEquals(new HashSet<>(List.of(
+                new Record(new int[]{4, 1}),
+                new Record(new int[]{4, 2}),
+                new Record(new int[]{1, 1}),
+                new Record(new int[]{7, 1}),
+                new Record(new int[]{1, 4}),
+                new Record(new int[]{1, 2})
+        )), fragment.enumerateCombinations(List.of(2, 0)));
+    }
+
+    @Test
+    void testEnumerateCombinations7() {
+        /* p(X, Y, ?), q(?, Z, Y), q(?, Z, W) [X, W] */
+        CacheFragment fragment = new CacheFragment(KB.getRelation(NUM_P), NUM_P);
+        fragment.updateCase1a(0, 0, 0);
+        fragment.buildIndices();
+        fragment.updateCase2b(KB.getRelation(NUM_Q), NUM_Q, 2, 0, 1, 1);
+        fragment.buildIndices();
+        fragment.updateCase2b(KB.getRelation(NUM_Q), NUM_Q, 1, 1, 1, 2);
+        fragment.buildIndices();
+        fragment.updateCase1a(2, 2, 3);
+        assertEquals("p(X0,X1,?),q(?,X2,X1),q(?,X2,X3)", rule2String(fragment.partAssignedRule));
+        assertEquals(new HashSet<>(List.of(
+                new Record(new int[]{1, 1}),
+                new Record(new int[]{2, 1}),
+                new Record(new int[]{1, 2}),
+                new Record(new int[]{1, 4}),
+                new Record(new int[]{1, 8}),
+                new Record(new int[]{4, 2}),
+                new Record(new int[]{4, 4}),
+                new Record(new int[]{2, 2}),
+                new Record(new int[]{2, 4})
+        )), fragment.enumerateCombinations(List.of(0, 3)));
     }
 }
