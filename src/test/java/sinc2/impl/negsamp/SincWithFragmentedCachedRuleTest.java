@@ -1,4 +1,4 @@
-package sinc2.impl.base;
+package sinc2.impl.negsamp;
 
 import org.junit.jupiter.api.Test;
 import sinc2.SincConfig;
@@ -21,10 +21,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
-class SincBasicTest {
+class SincWithFragmentedCachedRuleTest {
 
     static final String TMP_DIR = "/dev/shm/";
 
@@ -81,7 +80,7 @@ class SincBasicTest {
                     eval_type, 0.05, 0.25, 1, 1.0
             );
             Set<Fingerprint> rule_set_sinc = new HashSet<>();
-            SincBasic sinc = new SincBasic(config);
+            SincWithFragmentedCachedRule sinc = new SincWithFragmentedCachedRule(config);
             sinc.run();
             SimpleCompressedKb compressed_kb = sinc.getCompressedKb();
             for (Rule r: compressed_kb.getHypothesis()) {
@@ -89,6 +88,10 @@ class SincBasicTest {
             }
 
 //            assertTrue(sinc.recover());  // Todo: uncomment here
+            System.out.println("Actual Rules:");
+            for (Rule rule: compressed_kb.getHypothesis()) {
+                System.out.println(rule.toString(kb));
+            }
             assertEquals(expected_rules, rule_set_sinc);
             deleteDir(Paths.get(TMP_DIR, compressed_kb_name).toFile());
         }
@@ -184,7 +187,7 @@ class SincBasicTest {
                     eval_type, 0.05, 0.25, 1, 1.0
             );
             Set<Fingerprint> rule_set_sinc = new HashSet<>();
-            SincBasic sinc = new SincBasic(config);
+            SincWithFragmentedCachedRule sinc = new SincWithFragmentedCachedRule(config);
             sinc.run();
             SimpleCompressedKb compressed_kb = sinc.getCompressedKb();
             for (Rule r: compressed_kb.getHypothesis()) {
