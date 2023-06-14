@@ -3,7 +3,6 @@ package sinc2.impl.negsamp;
 import sinc2.common.Argument;
 import sinc2.common.Predicate;
 import sinc2.common.Record;
-import sinc2.impl.base.CachedRule;
 import sinc2.kb.IntTable;
 
 import java.util.*;
@@ -726,6 +725,8 @@ public class CacheFragment {
     }
 
     public void clear() {
-        entries = new ArrayList<>();
+        if (!entries.isEmpty()) {
+            entries = new ArrayList<>();
+        }
     }
 }
