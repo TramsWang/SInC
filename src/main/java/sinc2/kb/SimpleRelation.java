@@ -184,9 +184,9 @@ public class SimpleRelation extends IntTable {
      * Find the promising constants according to current records.
      */
     public int[][] getPromisingConstants() {
-        int[][] promising_constants_by_cols = new int[totalCols][];
+        int[][] promising_constants_by_cols = new int[totalCols()][];
         final int threshold = (int) Math.ceil(totalRows * MIN_CONSTANT_COVERAGE);
-        for (int col = 0; col < totalCols; col++) {
+        for (int col = 0; col < totalCols(); col++) {
             List<Integer> promising_constants = new ArrayList<>();
             int[] values = valuesByCols[col];
             int[] start_offsets = startOffsetsByCols[col];

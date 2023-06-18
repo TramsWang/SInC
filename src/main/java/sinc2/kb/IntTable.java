@@ -31,6 +31,8 @@ import java.util.*;
  * of this data structure is the query time. The existence query time is about O(log n) if the values in the rows are
  * randomly distributed in at least one column. Therefore, we require that there are NO duplicated rows in the table.
  *
+ * Todo: I think most of the algorithms here can benefit from "divide and conquer" routine. It may worth a try in the future
+ *
  * @since 2.1
  */
 public class IntTable implements Iterable<int[]> {
@@ -620,5 +622,30 @@ public class IntTable implements Iterable<int[]> {
             }
         }
         return new SimInfo(((double) matched_in_i) / tabi.totalRows, ((double) matched_in_j) / tabj.totalRows);
+    }
+
+    public int[] insertIndices(IntTable another) {
+        if (0 == totalRows || 0 == another.totalRows || totalCols != another.totalCols) {
+            return null;
+        }
+        int[][] sorted_rows = sortedRowsByCols[0];
+        int[][] sorted_rows2 = another.sortedRowsByCols[0];
+        int[] insert_indices = new int[sorted_rows2.length];
+        int previous_inserting_index = 0;
+        for (int i = 0; i < insert_indices.length; i++) {
+            int[] inserting_row = sorted_rows2[i];
+            previous_inserting_index = -Arrays.binarySearch(
+                    sorted_rows, previous_inserting_index, totalRows, inserting_row, rowComparator
+            ) - 1;  // The "inserting_row" is certainly not in the current table
+            insert_indices[i] = previous_inserting_index;
+            if (previous_inserting_index >= totalRows) {
+                /* The remaining rows are all at the same inserting index */
+                for (int j = i + 1; j < insert_indices.length; j++) {
+                    insert_indices[j] = previous_inserting_index;
+                }
+                break;
+            }
+        }
+        return insert_indices;
     }
 }

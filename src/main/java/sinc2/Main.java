@@ -4,6 +4,7 @@ import org.apache.commons.cli.*;
 import sinc2.common.SincException;
 import sinc2.impl.base.SincBasic;
 import sinc2.impl.est.EstSinc;
+import sinc2.impl.negsamp.SincWithFragmentedCachedRule;
 import sinc2.rule.EvalMetric;
 
 public class Main {
@@ -200,7 +201,7 @@ public class Main {
                 threads, validation, beam, metric, fc, cc, scr, or
         );
         if (1.0 > or) {
-            return new SincBasic(config);
+            return new SincWithFragmentedCachedRule(config);
         } else {
             return new EstSinc(config);
         }
