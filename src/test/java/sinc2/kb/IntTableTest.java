@@ -333,6 +333,34 @@ class IntTableTest {
                     fail();
             }
         }
+
+        rows = new int[][] {
+                new int[] {1, 1, 1},
+                new int[] {1, 5, 1},
+                new int[] {2, 4, 3},
+                new int[] {1, 2, 1},
+                new int[] {3, 3, 3},
+                new int[] {3, 3, 4},
+                new int[] {1, 5, 2},
+        };
+        table = new IntTable(rows);
+        expected_slice1 = new IntTable(new int[][]{new int[]{1, 1, 1}});
+        expected_slice3 = new IntTable(new int[][]{new int[]{3, 3, 3}});
+        actual_slices = table.matchSlices(new int[]{0, 1, 2});
+        assertEquals(2, actual_slices.size());
+        for (int i = 0; i < 2; i++) {
+            IntTable actual_slice = new IntTable(actual_slices.get(i));
+            switch (actual_slice.getAllRows()[0][0]) {
+                case 1:
+                    tableEqual(expected_slice1, actual_slice);
+                    break;
+                case 3:
+                    tableEqual(expected_slice3, actual_slice);
+                    break;
+                default:
+                    fail();
+            }
+        }
     }
 
     @Test
@@ -487,6 +515,30 @@ class IntTableTest {
         sim_info = IntTable.columnSimilarity(tab1, 2, tab2, 2);
         assertEquals(0.8, sim_info.simIJ);
         assertEquals(5.0/6, sim_info.simJI);
+    }
+
+    @Test
+    void testInsertIndices() {
+        int[][] rows1 = new int[][] {
+                new int[] {1, 2, 9},
+                new int[] {1, 5, 2},
+                new int[] {1, 5, 3},
+                new int[] {2, 4, 3},
+                new int[] {5, 3, 3},
+        };
+        int[][] rows2 = new int[][] {
+                new int[] {1, 1, 1},
+                new int[] {1, 1, 2},
+                new int[] {2, 2, 2},
+                new int[] {3, 3, 3},
+                new int[] {5, 3, 5},
+                new int[] {5, 5, 5},
+        };
+        IntTable tab1 = new IntTable(rows1);
+        IntTable tab2 = new IntTable(rows2);
+
+        assertArrayEquals(new int[]{0, 0, 3, 4, 5, 5}, tab1.insertIndices(tab2));
+        assertArrayEquals(new int[]{2, 2, 2, 3, 4}, tab2.insertIndices(tab1));
     }
 
     protected void assertEqualToAtLeastOne(Object[] actual, Object[]... expected) {

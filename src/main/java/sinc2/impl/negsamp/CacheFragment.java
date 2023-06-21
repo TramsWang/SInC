@@ -1,9 +1,11 @@
 package sinc2.impl.negsamp;
 
+import sinc2.common.ArgLocation;
 import sinc2.common.Argument;
 import sinc2.common.Predicate;
 import sinc2.common.Record;
 import sinc2.kb.IntTable;
+import sinc2.util.ArrayOperation;
 
 import java.util.*;
 
@@ -20,7 +22,7 @@ import java.util.*;
  *   2c: Merge two fragments by converting two UVs to a new LV (one UV in one fragment, the other UV in the other fragment)
  *   3: Convert a UV to a constant
  */
-public class CacheFragment {
+public class CacheFragment implements Iterable<List<CB>> {
 
     /**
      * Used for quickly locating an LV (PLV)
@@ -82,6 +84,212 @@ public class CacheFragment {
         entries = new ArrayList<>();
         varInfoList = new ArrayList<>();
         partAssignedRule.add(new Predicate(relationSymbol, arity));
+    }
+
+    /**
+     * This constructor is used for constructing a cache fragment given a certain fragment of a rule and a list of tables
+     * corresponding to the rule fragment.
+     *
+     * @param structure A fragment of a rule
+     * @param tables    A list of tables
+     */
+    public CacheFragment(List<Predicate> structure, IntTable[] tables) {
+        class ConstRestriction {        // This class is used for representing constant restrictions in the rule
+            public final int argIdx;    // The argument index of the constant in a predicate
+            public final int constant;  // The constant
+
+            public ConstRestriction(int argIdx, int constant) {
+                this.argIdx = argIdx;
+                this.constant = constant;
+            }
+        }
+
+        /* Construct structure */
+        entries = new ArrayList<>();
+        partAssignedRule = new ArrayList<>(structure.size());
+        int max_vid = -1;
+        List<ConstRestriction>[] const_restrictions_in_tabs = new List[structure.size()];   // Table index as the array index
+        for (Predicate predicate : structure) {
+            partAssignedRule.add(new Predicate(predicate));
+            for (int argument : predicate.args) {
+                if (Argument.isVariable(argument)) {
+                    max_vid = Math.max(max_vid, Argument.decode(argument));
+                }
+            }
+        }
+        varInfoList = new ArrayList<>(max_vid + 1);
+        List<ArgLocation>[] var_id_locs = new List[max_vid + 1];    // Var ID as the index of the array
+        for (int vid = 0; vid <= max_vid; vid++) {
+            varInfoList.add(null);
+        }
+
+        /* Find variable locations and constant restrictions */
+        for (int pred_idx = 0; pred_idx < partAssignedRule.size(); pred_idx++) {
+            Predicate predicate = partAssignedRule.get(pred_idx);
+            for (int arg_idx = 0; arg_idx < predicate.arity(); arg_idx++) {
+                int argument = predicate.args[arg_idx];
+                if (Argument.isVariable(argument)) {
+                    int vid = Argument.decode(argument);
+                    if (null == var_id_locs[vid]) {
+                        var_id_locs[vid] = new ArrayList<>();
+                    }
+                    var_id_locs[vid].add(new ArgLocation(pred_idx, arg_idx));
+                } else if (Argument.isConstant(argument)) {
+                    if (null == const_restrictions_in_tabs[pred_idx]) {
+                        const_restrictions_in_tabs[pred_idx] = new ArrayList<>();
+                    }
+                    const_restrictions_in_tabs[pred_idx].add(new ConstRestriction(arg_idx, Argument.decode(argument)));
+                }   // no need to record empty argument
+            }
+        }
+        for (int vid = 0; vid < var_id_locs.length; vid++) {
+            List<ArgLocation> var_locs = var_id_locs[vid];
+            if (null != var_locs && !var_locs.isEmpty()) {
+                /* Record an LV or PLV */
+                ArgLocation var_loc = var_locs.get(0);
+                varInfoList.set(vid, new VarInfo(var_loc.predIdx, var_loc.argIdx, var_locs.size() == 1));
+            }
+        }
+
+        /* Filter records in tables by constant restrictions */
+        IntTable[] filtered_tables = new IntTable[tables.length];
+        boolean is_empty = false;
+        for (int tab_idx = 0; tab_idx < filtered_tables.length; tab_idx++) {
+            IntTable original_table = tables[tab_idx];
+            if (0 == original_table.totalRows()) {
+                is_empty = true;
+                break;
+            }
+            List<ConstRestriction> const_restrictions = const_restrictions_in_tabs[tab_idx];
+            if (null == const_restrictions) {
+                filtered_tables[tab_idx] = original_table;
+            } else {
+                /* Filter by constant restrictions */
+                List<int[]> records_complied_to_constants = new ArrayList<>(original_table.totalRows());
+                for (int[] record : original_table.getAllRows()) {
+                    boolean match_all = true;
+                    for (ConstRestriction restriction: const_restrictions) {
+                        if (restriction.constant != record[restriction.argIdx]) {
+                            match_all = false;
+                            break;
+                        }
+                    }
+                    if (match_all) {
+                        records_complied_to_constants.add(record);
+                    }
+                }
+
+                if (records_complied_to_constants.size() == original_table.totalRows()) {
+                    filtered_tables[tab_idx] = original_table;
+                } else if (records_complied_to_constants.isEmpty()) {
+                    is_empty = true;
+                    break;
+                } else {
+                    filtered_tables[tab_idx] = new IntTable(records_complied_to_constants.toArray(new int[0][]));
+                }
+            }
+        }
+
+        /* Construct cache entries */
+        if (is_empty) {
+            return;
+        }
+        List<CB> first_entry = new ArrayList<>();
+        for (IntTable table: filtered_tables) {
+            first_entry.add(new CB(table.getAllRows(), table));
+        }
+        entries.add(first_entry);
+        for (List<ArgLocation> var_locs: var_id_locs) {
+            if (null != var_locs && var_locs.size() >= 2) {
+                splitCacheEntriesByLvs(var_locs);
+            }
+        }
+    }
+
+    /**
+     * This method split cache entries by a given LV. The LV may occur more than twice in the fragment structure.
+     *
+     * @param lvLocations Locations of the LV in the structure
+     */
+    protected void splitCacheEntriesByLvs(List<ArgLocation> lvLocations) {
+        /* Group arguments indices in predicates */
+        List<Integer>[] lv_locs_in_tabs = new List[partAssignedRule.size()];  // Table index as the array index
+        int preds_with_lvs = 0;
+        for (ArgLocation lv_loc: lvLocations) {
+            if (null == lv_locs_in_tabs[lv_loc.predIdx]) {
+                lv_locs_in_tabs[lv_loc.predIdx] = new ArrayList<>();
+                preds_with_lvs++;
+            }
+            lv_locs_in_tabs[lv_loc.predIdx].add(lv_loc.argIdx);
+        }
+
+        /* Filter tables with more than 1 LVs */
+        int[] tab_idxs_with_lvs = new int[preds_with_lvs];
+        int[] var_arg_idx_in_preds = new int[preds_with_lvs];
+        int pred_idx_with_lv = 0;
+        for (int tab_idx = 0; tab_idx < partAssignedRule.size(); tab_idx++) {
+            List<Integer> lv_arg_idxs = lv_locs_in_tabs[tab_idx];
+            if (null != lv_arg_idxs) {
+                tab_idxs_with_lvs[pred_idx_with_lv] = tab_idx;
+                var_arg_idx_in_preds[pred_idx_with_lv] = lv_arg_idxs.get(0);
+                pred_idx_with_lv++;
+                if (1 < lv_arg_idxs.size()) {
+                    /* Filter the CBs in entries */
+                    Iterator<List<CB>> entry_itr = entries.listIterator();
+                    while (entry_itr.hasNext()) {
+                        List<CB> entry = entry_itr.next();
+                        CB cb = entry.get(tab_idx);
+                        List<int[]> new_comp_set = new ArrayList<>();
+                        for (int[] record : cb.complianceSet) {
+                            boolean all_matched = true;
+                            Iterator<Integer> arg_idx_itr = lv_arg_idxs.iterator();
+                            final int val = record[arg_idx_itr.next()];
+                            while (arg_idx_itr.hasNext()) {
+                                if (val != record[arg_idx_itr.next()]) {
+                                    all_matched = false;
+                                    break;
+                                }
+                            }
+                            if (all_matched) {
+                                new_comp_set.add(record);
+                            }
+                        }
+                        if (cb.complianceSet.length != new_comp_set.size()) {
+                            if (new_comp_set.isEmpty()) {
+                                entry_itr.remove();
+                            } else {
+                                /* Change CB */
+                                int[][] new_comp_set_rows = new_comp_set.toArray(new int[0][]);
+                                entry.set(tab_idx, new CB(new_comp_set_rows, new IntTable(new_comp_set_rows)));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        /* Update cache by splitting entries */
+        List<List<CB>> new_entries = new ArrayList<>();
+        IntTable[] tables = new IntTable[preds_with_lvs];
+        for (List<CB> cache_entry: entries) {
+            /* Match values */
+            for (int i = 0; i < tab_idxs_with_lvs.length; i++) {
+                tables[i] = cache_entry.get(tab_idxs_with_lvs[i]).indices;
+            }
+            List<int[][]>[] slices = IntTable.matchSlices(tables, var_arg_idx_in_preds);
+            int slices_cnt = slices[0].size();
+            for (int slice_idx = 0; slice_idx < slices_cnt; slice_idx++) {
+                List<CB> new_entry = new ArrayList<>(cache_entry);
+                for (int i = 0; i < tab_idxs_with_lvs.length; i++) {
+                    int[][] slice = slices[i].get(slice_idx);
+                    if (slice.length != tables[i].totalRows()) {
+                        new_entry.set(tab_idxs_with_lvs[i], new CB(slice, new IntTable(slice)));
+                    }
+                }
+                new_entries.add(new_entry);
+            }
+        }
+        entries = new_entries;
     }
 
     public CacheFragment(CacheFragment another) {
@@ -728,5 +936,22 @@ public class CacheFragment {
         if (!entries.isEmpty()) {
             entries = new ArrayList<>();
         }
+    }
+
+    @Override
+    public Iterator<List<CB>> iterator() {
+        return entries.iterator();
+    }
+
+    public int totalEntries() {
+        return entries.size();
+    }
+
+    public List<CB> getEntry(int idx) {
+        return entries.get(idx);
+    }
+
+    public int totalTables() {
+        return partAssignedRule.size();
     }
 }

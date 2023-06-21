@@ -1,6 +1,7 @@
 package sinc2.impl.negsamp;
 
 import org.junit.jupiter.api.Test;
+import sinc2.common.Argument;
 import sinc2.common.Predicate;
 import sinc2.common.Record;
 import sinc2.kb.IntTable;
@@ -1034,5 +1035,153 @@ class CacheFragmentTest {
                 new Record(new int[]{2, 2}),
                 new Record(new int[]{2, 4})
         )), fragment.enumerateCombinations(List.of(0, 3)));
+    }
+
+    @Test
+    void testStructureConstructor1() {
+        /* p(X, Y, ?), q(?, Z, Y), q(?, Z, ?) */
+        CacheFragment fragment = new CacheFragment(List.of(
+                new Predicate(NUM_P, new int[]{Argument.variable(0), Argument.variable(1), Argument.EMPTY_VALUE}),
+                new Predicate(NUM_Q, new int[]{Argument.EMPTY_VALUE, Argument.variable(2), Argument.variable(1)}),
+                new Predicate(NUM_Q, new int[]{Argument.EMPTY_VALUE, Argument.variable(2), Argument.EMPTY_VALUE})
+        ), new IntTable[]{KB.getRelation(NUM_P), KB.getRelation(NUM_Q), KB.getRelation(NUM_Q)});
+        List<List<CB>> expected_entries = List.of(
+                List.of(
+                        new CB(new int[][]{
+                                new int[]{1, 1, 1},
+                                new int[]{1, 1, 2},
+                                new int[]{2, 1, 3},
+                        }), new CB(new int[][]{
+                                new int[]{2, 4, 1}
+                        }), new CB(new int[][]{
+                                new int[]{2, 4, 1}
+                        })
+                ), List.of(
+                        new CB(new int[][]{
+                                new int[]{1, 2, 3}
+                        }), new CB(new int[][]{
+                                new int[]{1, 1, 2},
+                        }), new CB(new int[][]{
+                                new int[]{1, 1, 2},
+                                new int[]{3, 1, 4},
+                                new int[]{5, 1, 4}
+                        })
+                ),List.of(
+                        new CB(new int[][]{
+                                new int[]{1, 2, 3}
+                        }), new CB(new int[][]{
+                                new int[]{6, 7, 2}
+                        }), new CB(new int[][]{
+                                new int[]{2, 7, 8},
+                                new int[]{6, 7, 2}
+                        })
+                ), List.of(
+                        new CB(new int[][]{
+                                new int[]{4, 4, 6},
+                                new int[]{2, 4, 4}
+                        }), new CB(new int[][]{
+                                new int[]{5, 1, 4},
+                                new int[]{3, 1, 4}
+                        }), new CB(new int[][]{
+                                new int[]{1, 1, 2},
+                                new int[]{3, 1, 4},
+                                new int[]{5, 1, 4}
+                        })
+                )
+        );
+        checkEntries(expected_entries, fragment);
+        assertEquals("p(X0,X1,?),q(?,X2,X1),q(?,X2,?)", rule2String(fragment.partAssignedRule));
+        assertEquals(new ArrayList<>(List.of(
+                new CacheFragment.VarInfo(0, 0, true),
+                new CacheFragment.VarInfo(0, 1, false),
+                new CacheFragment.VarInfo(1, 1, false)
+        )), fragment.varInfoList);
+    }
+
+    @Test
+    void testStructureConstructor2() {
+        /* p(X, Y, 3), q(?, W, Y), q(?, W, ?) */
+        CacheFragment fragment = new CacheFragment(List.of(
+                new Predicate(NUM_P, new int[]{Argument.variable(0), Argument.variable(1), Argument.constant(3)}),
+                new Predicate(NUM_Q, new int[]{Argument.EMPTY_VALUE, Argument.variable(3), Argument.variable(1)}),
+                new Predicate(NUM_Q, new int[]{Argument.EMPTY_VALUE, Argument.variable(3), Argument.EMPTY_VALUE})
+        ), new IntTable[]{KB.getRelation(NUM_P), KB.getRelation(NUM_Q), KB.getRelation(NUM_Q)});
+        List<List<CB>> expected_entries = List.of(
+                List.of(
+                        new CB(new int[][]{
+                                new int[]{2, 1, 3},
+                        }), new CB(new int[][]{
+                                new int[]{2, 4, 1}
+                        }), new CB(new int[][]{
+                                new int[]{2, 4, 1}
+                        })
+                ), List.of(
+                        new CB(new int[][]{
+                                new int[]{1, 2, 3}
+                        }), new CB(new int[][]{
+                                new int[]{1, 1, 2},
+                        }), new CB(new int[][]{
+                                new int[]{1, 1, 2},
+                                new int[]{3, 1, 4},
+                                new int[]{5, 1, 4}
+                        })
+                ), List.of(
+                        new CB(new int[][]{
+                                new int[]{1, 2, 3}
+                        }), new CB(new int[][]{
+                                new int[]{6, 7, 2}
+                        }), new CB(new int[][]{
+                                new int[]{2, 7, 8},
+                                new int[]{6, 7, 2}
+                        })
+                )
+        );
+        checkEntries(expected_entries, fragment);
+        assertEquals("p(X0,X1,3),q(?,X3,X1),q(?,X3,?)", rule2String(fragment.partAssignedRule));
+        List<CacheFragment.VarInfo> expected_var_info = new ArrayList<>();
+        expected_var_info.add(new CacheFragment.VarInfo(0, 0, true));
+        expected_var_info.add(new CacheFragment.VarInfo(0, 1, false));
+        expected_var_info.add(null);
+        expected_var_info.add(new CacheFragment.VarInfo(1, 1, false));
+        assertEquals(expected_var_info, fragment.varInfoList);
+    }
+
+    @Test
+    void testStructureConstructor3() {
+        /* p(X, X, Y), q(?, ?, Y), q(?, Y, ?) */
+        CacheFragment fragment = new CacheFragment(List.of(
+                new Predicate(NUM_P, new int[]{Argument.variable(0), Argument.variable(0), Argument.variable(1)}),
+                new Predicate(NUM_Q, new int[]{Argument.EMPTY_VALUE, Argument.EMPTY_VALUE, Argument.variable(1)}),
+                new Predicate(NUM_Q, new int[]{Argument.EMPTY_VALUE, Argument.variable(1), Argument.EMPTY_VALUE})
+        ), new IntTable[]{KB.getRelation(NUM_P), KB.getRelation(NUM_Q), KB.getRelation(NUM_Q)});
+        List<List<CB>> expected_entries = List.of(
+                List.of(
+                        new CB(new int[][]{
+                                new int[]{1, 1, 1},
+                        }), new CB(new int[][]{
+                                new int[]{2, 4, 1}
+                        }), new CB(new int[][]{
+                                new int[]{1, 1, 2},
+                                new int[]{3, 1, 4},
+                                new int[]{5, 1, 4},
+                        })
+                ), List.of(
+                        new CB(new int[][]{
+                                new int[]{5, 5, 1}
+                        }), new CB(new int[][]{
+                                new int[]{2, 4, 1}
+                        }), new CB(new int[][]{
+                                new int[]{1, 1, 2},
+                                new int[]{3, 1, 4},
+                                new int[]{5, 1, 4},
+                        })
+                )
+        );
+        checkEntries(expected_entries, fragment);
+        assertEquals("p(X0,X0,X1),q(?,?,X1),q(?,X1,?)", rule2String(fragment.partAssignedRule));
+        assertEquals(new ArrayList<>(List.of(
+                new CacheFragment.VarInfo(0, 0, false),
+                new CacheFragment.VarInfo(0, 2, false)
+        )), fragment.varInfoList);
     }
 }

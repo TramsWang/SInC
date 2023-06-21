@@ -325,6 +325,39 @@ public class IntTable implements Iterable<int[]> {
     }
 
     /**
+     * Split the current table into slices, and in each slice, the arguments of the given columns are the same.
+     */
+    public List<int[][]> matchSlices(int[] cols) {
+        List<int[][]> slices = new ArrayList<>();
+        final int first_col = cols[0];
+        int[][] sorted_rows = sortedRowsByCols[first_col];
+        int[] values = valuesByCols[first_col];
+        int[] start_offsets = startOffsetsByCols[first_col];
+        for (int i = 0; i < values.length; i++) {
+            List<int[]> slice = new ArrayList<>();
+            final int val = values[i];
+            int end_offset = start_offsets[i+1];
+            for (int offset = start_offsets[i]; offset < end_offset; offset++) {
+                int[] row = sorted_rows[offset];
+                boolean all_match = true;
+                for (int j = 1; j < cols.length; j++) {
+                    if (val != row[cols[j]]) {
+                        all_match = false;
+                        break;
+                    }
+                }
+                if (all_match) {
+                    slice.add(row);
+                }
+            }
+            if (!slice.isEmpty()) {
+                slices.add(slice.toArray(new int[0][]));
+            }
+        }
+        return slices;
+    }
+
+    /**
      * Find the intersection of this table and another list of rows. The two should have the same number of columns, and
      * the list of rows should NOT contain repeated elements.
      * Note that this method WILL sort the 1D arrays in "rows" to some order.
@@ -624,6 +657,13 @@ public class IntTable implements Iterable<int[]> {
         return new SimInfo(((double) matched_in_i) / tabi.totalRows, ((double) matched_in_j) / tabj.totalRows);
     }
 
+    /**
+     * This method returns a list of indices. The i-th element of this list is the index, in this table, that the i-th
+     * row in another table should be inserted to. If this or the other table is empty, or the two tables do not match
+     * in arity, NULL is returned.
+     *
+     * NOTE: The given table should NOT have elements in common with this table
+     */
     public int[] insertIndices(IntTable another) {
         if (0 == totalRows || 0 == another.totalRows || totalCols != another.totalCols) {
             return null;
