@@ -39,11 +39,20 @@ public class SincConfig {
     public double stopCompressionRatio;
     /** The ratio (>=1) that extends the number of rules that are actually specialized according to the estimations */
     public double observationRatio;
+    /** The base path to the negative sample KB on file system. If non-NULL, negative sampling will be employed in SInC.
+     *  If "negKbName" is NULL, adversarial negative sampling will be used and this argument is ineffective. Otherwise,
+     *  negative samples are from the loaded negative sample KB. */
+    public String negKbBasePath;
+    /** The name of the negative sample KB. */
+    public String negKbName;
+    /** Whether negative samples are weighted differently */
+    public boolean weightedNegSamples;
 
     public SincConfig(
             String basePath, String kbName, String dumpPath, String dumpName, int threads, boolean validation,
             int beamwidth, EvalMetric evalMetric, double minFactCoverage, double minConstantCoverage,
-            double stopCompressionRatio, double observationRatio
+            double stopCompressionRatio, double observationRatio,
+            String negKbBasePath, String negKbName, boolean weightedNegSamples
     ) {
         this.basePath = basePath;
         this.kbName = kbName;
@@ -57,5 +66,8 @@ public class SincConfig {
         this.minConstantCoverage = minConstantCoverage;
         this.stopCompressionRatio = Math.max(Eval.COMP_RATIO_USEFUL_THRESHOLD, stopCompressionRatio);  // make sure the stopping compression ratio threshold is useful
         this.observationRatio = Math.max(1.0, observationRatio);
+        this.negKbBasePath = negKbBasePath;
+        this.negKbName = negKbName;
+        this.weightedNegSamples = weightedNegSamples;
     }
 }

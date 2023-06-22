@@ -139,4 +139,16 @@ public class NegSampleKb {
             weight_writer.close();
         }
     }
+
+    public String getName() {
+        return name;
+    }
+
+    public IntTable getNegSamples(int relIdx) {
+        return negSampleTabs[relIdx];
+    }
+
+    public Map<Record, Float> getSampleWeight(int relIdx) {
+        return negSampleWeightMaps[relIdx];
+    }
 }

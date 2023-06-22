@@ -77,7 +77,8 @@ class EstSincTest {
             System.out.println("CompKB: " + compressed_kb_name);
             final SincConfig config = new SincConfig(
                     TMP_DIR, kb_name, TMP_DIR, compressed_kb_name, 1, true, 5,
-                    eval_type, 0.05, 0.25, 1, 2.0
+                    eval_type, 0.05, 0.25, 1, 2.0,
+                    null, null, false
             );
             Set<Fingerprint> rule_set_sinc = new HashSet<>();
             EstSinc sinc = new EstSinc(config);
@@ -180,7 +181,8 @@ class EstSincTest {
         }) {
             final SincConfig config = new SincConfig(
                     TMP_DIR, kb_name, TMP_DIR, compressed_kb_name, 1, true, 5,
-                    eval_type, 0.05, 0.25, 1, 2.0
+                    eval_type, 0.05, 0.25, 1, 2.0,
+                    null, null, false
             );
             Set<Fingerprint> rule_set_sinc = new HashSet<>();
             EstSinc sinc = new EstSinc(config);

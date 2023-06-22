@@ -2,9 +2,9 @@ package sinc2;
 
 import org.apache.commons.cli.*;
 import sinc2.common.SincException;
-import sinc2.impl.base.SincBasic;
 import sinc2.impl.est.EstSinc;
 import sinc2.impl.negsamp.SincWithFragmentedCachedRule;
+import sinc2.impl.negsamp.SincWithNegSampling;
 import sinc2.rule.EvalMetric;
 
 public class Main {
@@ -17,12 +17,14 @@ public class Main {
     public static final double DEFAULT_STOP_COMPRESSION_RATE = 0.9;
     public static final double DEFAULT_OBSERVATION_RATIO = 2.0;
     public static final EvalMetric DEFAULT_EVAL_METRIC = EvalMetric.CompressionCapacity;
+    public static final int HELP_WIDTH = 125;
 
     private static final String SHORT_OPT_HELP = "h";
-    private static final String SHORT_OPT_INPUT_PATH = "I";
-    private static final String SHORT_OPT_INPUT_KB = "K";
-    private static final String SHORT_OPT_OUTPUT_PATH = "O";
-    private static final String SHORT_OPT_OUTPUT_KB = "C";
+    private static final String SHORT_OPT_INPUT = "I";
+    private static final String SHORT_OPT_OUTPUT = "O";
+    private static final String SHORT_OPT_NEG_INPUT = "N";
+    private static final String SHORT_OPT_NEG_ADVERSARIAL = "A";
+    private static final String SHORT_OPT_NEG_WEIGHT = "w";
     private static final String SHORT_OPT_THREAD = "t";
     private static final String SHORT_OPT_VALIDATE = "v";
     private static final String SHORT_OPT_BEAM_WIDTH = "b";
@@ -32,10 +34,11 @@ public class Main {
     private static final String SHORT_OPT_STOP_COMPRESSION_RATE = "p";
     private static final String SHORT_OPT_OBSERVATION_RATIO = "o";
     private static final String LONG_OPT_HELP = "help";
-    private static final String LONG_OPT_INPUT_PATH = "input-path";
-    private static final String LONG_OPT_INPUT_KB = "kb-name";
-    private static final String LONG_OPT_OUTPUT_PATH = "output-path";
-    private static final String LONG_OPT_OUTPUT_KB = "comp-kb-name";
+    private static final String LONG_OPT_INPUT = "input";
+    private static final String LONG_OPT_OUTPUT = "output";
+    private static final String LONG_OPT_NEG_INPUT = "neg-samples";
+    private static final String LONG_OPT_NEG_ADVERSARIAL = "neg-adv";
+    private static final String LONG_OPT_NEG_WEIGHT = "neg-weight";
     private static final String LONG_OPT_THREAD = "thread";
     private static final String LONG_OPT_VALIDATE = "validate";
     private static final String LONG_OPT_BEAM_WIDTH = "beam-width";
@@ -47,14 +50,19 @@ public class Main {
 
     private static final Option OPTION_HELP = Option.builder(SHORT_OPT_HELP).longOpt(LONG_OPT_HELP)
             .desc("Display this help").build();
-    private static final Option OPTION_INPUT_PATH = Option.builder(SHORT_OPT_INPUT_PATH).longOpt(LONG_OPT_INPUT_PATH)
-            .argName("path").hasArg().type(String.class).desc("The path to the input KB").build();
-    private static final Option OPTION_INPUT_KB = Option.builder(SHORT_OPT_INPUT_KB).longOpt(LONG_OPT_INPUT_KB)
-            .argName("name").hasArg().type(String.class).desc("The name of the input KB").build();
-    private static final Option OPTION_OUTPUT_PATH = Option.builder(SHORT_OPT_OUTPUT_PATH).longOpt(LONG_OPT_OUTPUT_PATH)
-            .argName("path").hasArg().type(String.class).desc("The path to where the output/compressed KB is stored").build();
-    private static final Option OPTION_OUTPUT_KB = Option.builder(SHORT_OPT_OUTPUT_KB).longOpt(LONG_OPT_OUTPUT_KB)
-            .argName("name").hasArg().type(String.class).desc("The name of the output/compressed KB").build();
+    private static final Option OPTION_INPUT_PATH = Option.builder(SHORT_OPT_INPUT).longOpt(LONG_OPT_INPUT)
+            .numberOfArgs(2).argName("path> <name").type(String.class)
+            .desc("The path to the input KB and the name of the KB").build();
+    private static final Option OPTION_OUTPUT_PATH = Option.builder(SHORT_OPT_OUTPUT).longOpt(LONG_OPT_OUTPUT)
+            .numberOfArgs(2).argName("path> <name").type(String.class)
+            .desc("The path to where the output/compressed KB is stored and the name of the output KB").build();
+    private static final Option OPTION_NEG_INPUT = Option.builder(SHORT_OPT_NEG_INPUT).longOpt(LONG_OPT_NEG_INPUT)
+            .numberOfArgs(2).argName("path> <name")
+            .desc("The path to the negative KB and the name of the KB. If specified, negative sampling is turned on.").build();
+    private static final Option OPTION_NEG_ADVERSARIAL = Option.builder(SHORT_OPT_NEG_ADVERSARIAL).longOpt(LONG_OPT_NEG_ADVERSARIAL)
+            .desc("Using adversarial negative sampling.").build();
+    private static final Option OPTION_NEG_WEIGHT = Option.builder(SHORT_OPT_NEG_WEIGHT).longOpt(LONG_OPT_NEG_WEIGHT)
+            .desc("Whether negative samples have different weight. This is only affective when negative sampling is turned on.").build();
     private static final Option OPTION_THREAD = Option.builder(SHORT_OPT_THREAD).longOpt(LONG_OPT_THREAD)
             .argName("#threads").hasArg().type(Integer.class).desc("The number of threads").build();
     private static final Option OPTION_VALIDATE = Option.builder(SHORT_OPT_VALIDATE).longOpt(LONG_OPT_VALIDATE)
@@ -102,6 +110,7 @@ public class Main {
         /* Help */
         if (cmd.hasOption(OPTION_HELP)) {
             HelpFormatter formatter = new HelpFormatter();
+            formatter.setWidth(HELP_WIDTH);
             formatter.printHelp("java -jar sinc.jar", options, true);
             return null;
         }
@@ -112,26 +121,36 @@ public class Main {
         String input_kb_name = null;
         String output_kb_name = null;
         if (cmd.hasOption(OPTION_INPUT_PATH)) {
-            input_path = cmd.getOptionValue(OPTION_INPUT_PATH);
-            System.out.println("Input path set to: " + input_path);
-        }
-        if (cmd.hasOption(OPTION_INPUT_KB)) {
-            input_kb_name = cmd.getOptionValue(OPTION_INPUT_KB);
-            System.out.println("Input KB set to: " + input_kb_name);
+            String[] values = cmd.getOptionValues(OPTION_INPUT_PATH);
+            input_path = values[0];
+            input_kb_name = values[1];
+            System.out.printf("Input path set to: %s/%s\n", input_path, input_kb_name);
         }
         if (cmd.hasOption(OPTION_OUTPUT_PATH)) {
-            output_path = cmd.getOptionValue(OPTION_OUTPUT_PATH);
-            System.out.println("Output path set to: " + output_path);
-        }
-        if (cmd.hasOption(OPTION_OUTPUT_KB)) {
-            output_kb_name = cmd.getOptionValue(OPTION_OUTPUT_KB);
-            System.out.println("Input path set to: " + output_kb_name);
+            String[] values = cmd.getOptionValues(OPTION_OUTPUT_PATH);
+            output_path = values[0];
+            output_kb_name = values[1];
+            System.out.printf("Output path set to: %s/%s\n", output_path, output_kb_name);
         }
         if (null == input_kb_name) {
             System.err.println("Missing input KB name");
             return null;
         }
         output_kb_name = (null == output_kb_name) ? input_kb_name + "_comp" : output_kb_name;
+
+        /* Assign negative sampling parameters */
+        String neg_base_path = null;
+        String neg_kb_name = null;
+        boolean neg_weight = cmd.hasOption(OPTION_NEG_WEIGHT);
+        if (cmd.hasOption(OPTION_NEG_INPUT)) {
+            String[] values = cmd.getOptionValues(OPTION_NEG_INPUT);
+            neg_base_path = values[0];
+            neg_kb_name = values[1];
+            System.out.printf("Negative sampling on: %s/%s (weight=%b)\n", neg_base_path, neg_kb_name, neg_weight);
+        } else if (cmd.hasOption(OPTION_NEG_ADVERSARIAL)) {
+            neg_base_path = "";
+            System.out.printf("Negative sampling on: Adversarial (weight=%b)\n", neg_weight);
+        }
 
         /* Assign Run-time parameters */
         int threads = DEFAULT_THREADS;
@@ -198,9 +217,17 @@ public class Main {
         /* Create SInC Object */
         SincConfig config = new SincConfig(
                 input_path, input_kb_name, output_path, output_kb_name,
-                threads, validation, beam, metric, fc, cc, scr, or
+                threads, validation, beam, metric, fc, cc, scr, or,
+                neg_base_path, neg_kb_name, neg_weight
         );
         if (1.0 > or) {
+            if (null != neg_base_path) {
+                if (null != neg_kb_name) {
+                    return new SincWithNegSampling(config);
+                } else {
+                    throw new Error("Adversarial negative sampling has not yet been implemented");  // Todo: Implement here
+                }
+            }
             return new SincWithFragmentedCachedRule(config);
         } else {
             return new EstSinc(config);
@@ -215,9 +242,15 @@ public class Main {
 
         /* Input/output options */
         options.addOption(OPTION_INPUT_PATH);
-        options.addOption(OPTION_INPUT_KB);
+//        options.addOption(OPTION_INPUT_KB);
         options.addOption(OPTION_OUTPUT_PATH);
-        options.addOption(OPTION_OUTPUT_KB);
+//        options.addOption(OPTION_OUTPUT_KB);
+
+        /* Negative sampling options */
+        OptionGroup neg_sampling_group = new OptionGroup();
+        neg_sampling_group.addOption(OPTION_NEG_INPUT).addOption(OPTION_NEG_ADVERSARIAL);
+        options.addOptionGroup(neg_sampling_group);
+        options.addOption(OPTION_NEG_WEIGHT);
 
         /* Run-time parameter options */
         options.addOption(OPTION_THREAD);

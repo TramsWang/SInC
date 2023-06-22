@@ -130,10 +130,13 @@ public abstract class SInC {
     }
 
     /**
-     * Load a KB (in the format of Numerated KB) and return the KB
+     * Load a KB (in the format of Numerated KB)
      */
-    protected SimpleKb loadKb() throws KbException, IOException {
-        return new SimpleKb(config.kbName, config.basePath);
+    protected void loadKb() throws KbException, IOException {
+        if (null == kb) {
+            kb = new SimpleKb(config.kbName, config.basePath);
+        }
+        kb.updatePromisingConstants();
     }
 
     /**
@@ -232,10 +235,7 @@ public abstract class SInC {
         /* Load KB */
         long time_start = System.currentTimeMillis();
         try {
-            if (null == kb) {
-                kb = loadKb();
-            }
-            kb.updatePromisingConstants();
+            loadKb();
         } catch (KbException | IOException e) {
             e.printStackTrace(logger);
             logError("KB load failed, abort.");
