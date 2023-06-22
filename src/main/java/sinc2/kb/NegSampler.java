@@ -7,6 +7,8 @@ import sinc2.impl.negsamp.CacheFragment;
 import sinc2.rule.Rule;
 import sinc2.util.ArrayOperation;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -316,5 +318,87 @@ public class NegSampler {
             }
         }
         return is_max ? record.clone() : next_record;
+    }
+
+    /**
+     * Use this method to generate negative samples in each dataset. There are two arguments in the array:
+     *   1. The path to the KBs
+     *   2. The path where the negative KB will be dumped
+     */
+    public static void main(String[] args) throws IOException {
+        String base_path = args[0];
+        String neg_base_path = args[1];
+        float[] budget_factors = new float[] {0.5f, 1, 1.5f, 2, 2.5f, 3};
+        File base_path_file = new File(base_path);
+        for (File kb_dir_file: base_path_file.listFiles()) {
+            if (kb_dir_file.isDirectory()) {
+                String kb_name = kb_dir_file.getName();
+                System.out.println("Sampling from: " + kb_name);
+                SimpleKb kb = new SimpleKb(kb_name, base_path);
+
+                for (float budget_factor: budget_factors) {
+                    System.out.printf("Uniform (%.2f) ...\n", budget_factor);
+                    NegSampleKb uniform_neg_kb = uniformGenerator(kb, budget_factor);
+                    uniform_neg_kb.dump(neg_base_path);
+
+                    System.out.printf("Pos Relative (%.2f) ...\n", budget_factor);
+                    NegSampleKb pos_rel_neg_kb = posRelativeGenerator(kb, budget_factor);
+                    pos_rel_neg_kb.dump(neg_base_path);
+                }
+                System.out.println("Neg Interval ...");
+                NegSampleKb neg_intv_neg_kb = negIntervalGenerator(kb);
+                neg_intv_neg_kb.dump(neg_base_path);
+            }
+        }
+    }
+
+    protected static NegSampleKb uniformGenerator(SimpleKb kb, float budget_factor) {
+        SimpleRelation[] relations = kb.getRelations();
+        int total_constants = kb.totalConstants();
+        IntTable[] neg_tables = new IntTable[relations.length];
+        Map<Record, Float>[] weight_maps = new Map[relations.length];
+        for (int rel_idx = 0; rel_idx < relations.length; rel_idx++) {
+            SimpleRelation relation = relations[rel_idx];
+            int budget = (int) Math.round(Math.min(
+                    relation.totalRows() * budget_factor,
+                    Math.pow(total_constants, relation.totalCols()) - relation.totalRows()
+            ));
+            IntTable neg_table = NegSampler.uniformSampling(relation, total_constants, budget);
+            neg_tables[rel_idx] = neg_table;
+            weight_maps[rel_idx] = NegSampler.calcNegSampleWeight(relation, neg_table, total_constants);
+        }
+        return new NegSampleKb(String.format("%s_neg_uni_%.1f", kb.getName(), budget_factor), neg_tables, weight_maps);
+    }
+
+    protected static NegSampleKb posRelativeGenerator(SimpleKb kb, float budget_factor) {
+        SimpleRelation[] relations = kb.getRelations();
+        int total_constants = kb.totalConstants();
+        IntTable[] neg_tables = new IntTable[relations.length];
+        Map<Record, Float>[] weight_maps = new Map[relations.length];
+        for (int rel_idx = 0; rel_idx < relations.length; rel_idx++) {
+            SimpleRelation relation = relations[rel_idx];
+            int budget = (int) Math.round(Math.min(
+                    relation.totalRows() * budget_factor,
+                    Math.pow(total_constants, relation.totalCols()) - relation.totalRows()
+            ));
+            IntTable neg_table = NegSampler.posRelativeSampling(relation, total_constants, budget);
+            neg_tables[rel_idx] = neg_table;
+            weight_maps[rel_idx] = NegSampler.calcNegSampleWeight(relation, neg_table, total_constants);
+        }
+        return new NegSampleKb(String.format("%s_neg_pos_rel_%.1f", kb.getName(), budget_factor), neg_tables, weight_maps);
+    }
+
+    protected static NegSampleKb negIntervalGenerator(SimpleKb kb) {
+        SimpleRelation[] relations = kb.getRelations();
+        int total_constants = kb.totalConstants();
+        IntTable[] neg_tables = new IntTable[relations.length];
+        Map<Record, Float>[] weight_maps = new Map[relations.length];
+        for (int rel_idx = 0; rel_idx < relations.length; rel_idx++) {
+            SimpleRelation relation = relations[rel_idx];
+            IntTable neg_table = NegSampler.negIntervalSampling(relation, total_constants);
+            neg_tables[rel_idx] = neg_table;
+            weight_maps[rel_idx] = NegSampler.calcNegSampleWeight(relation, neg_table, total_constants);
+        }
+        return new NegSampleKb(String.format("%s_neg_neg_intv", kb.getName()), neg_tables, weight_maps);
     }
 }
