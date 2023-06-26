@@ -49,8 +49,10 @@ public abstract class Rule {
     /** The evaluation of the rule */
     protected Eval eval;
     
-    /* Performance monitoring members */
+    /* Performance monitoring members (measured in nanoseconds) */
+    protected long fingerprintCreationTime = 0;
     protected long pruningTime = 0;
+    protected long evalTime = 0;
 
     /**
      * Parse a plain-text string into a rule structure. The allowed input can be defined by the following context-free
@@ -442,7 +444,7 @@ public abstract class Rule {
         eval = null;
 
         structure.add(new Predicate(headPredSymbol, arity));
-        fingerprint = new Fingerprint(structure);
+        updateFingerprint();
         this.fingerprintCache.add(fingerprint);
     }
 
@@ -523,6 +525,12 @@ public abstract class Rule {
      * @return A copy of the rule instance
      */
     public abstract Rule clone();
+
+    protected void updateFingerprint() {
+        long time_start = System.nanoTime();
+        fingerprint = new Fingerprint(structure);
+        fingerprintCreationTime += System.nanoTime() - time_start;
+    }
 
     /**
      * Check if the rule structure is invalid. The structure is invalid if:
@@ -710,6 +718,12 @@ public abstract class Rule {
         tabu_set.add(fingerprint);
     }
 
+    protected void updateEval() {
+        long time_start = System.nanoTime();
+        eval = calculateEval();
+        evalTime += System.nanoTime() - time_start;
+    }
+
     /**
      * Specialization Case 1: Convert a UV to an existing LV.
      *
@@ -741,7 +755,7 @@ public abstract class Rule {
             }
             status = cvt1Uv2ExtLvHandlerPostCvg(predIdx, argIdx, varId);
             if (UpdateStatus.NORMAL == status) {
-                this.eval = calculateEval();
+                updateEval();
             }
         }
         return status;
@@ -755,7 +769,7 @@ public abstract class Rule {
         target_predicate.args[argIdx] = Argument.variable(varId);
         limitedVarArgs.get(varId).add(new ArgLocation(predIdx, argIdx));
         length++;
-        fingerprint = new Fingerprint(structure);
+        updateFingerprint();
     }
 
     /**
@@ -802,7 +816,7 @@ public abstract class Rule {
             }
             status = cvt1Uv2ExtLvHandlerPostCvg(structure.get(structure.size()-1), argIdx, varId);
             if (UpdateStatus.NORMAL == status) {
-                this.eval = calculateEval();
+                updateEval();
             }
         }
         return status;
@@ -817,7 +831,7 @@ public abstract class Rule {
         target_predicate.args[argIdx] = Argument.variable(varId);
         limitedVarArgs.get(varId).add(new ArgLocation(structure.size() - 1, argIdx));
         length++;
-        fingerprint = new Fingerprint(structure);
+        updateFingerprint();
     }
 
     /**
@@ -874,7 +888,7 @@ public abstract class Rule {
             }
             status = cvt2Uvs2NewLvHandlerPostCvg(predIdx1, argIdx1, predIdx2, argIdx2);
             if (UpdateStatus.NORMAL == status) {
-                this.eval = calculateEval();
+                updateEval();
             }
         }
         return status;
@@ -894,7 +908,7 @@ public abstract class Rule {
         var_args.add(new ArgLocation(predIdx2, argIdx2));
         limitedVarArgs.add(var_args);
         length++;
-        fingerprint = new Fingerprint(structure);
+        updateFingerprint();
     }
 
     /**
@@ -949,7 +963,7 @@ public abstract class Rule {
             }
             status = cvt2Uvs2NewLvHandlerPostCvg(structure.get(structure.size()-1), argIdx1, predIdx2, argIdx2);
             if (UpdateStatus.NORMAL == status) {
-                this.eval = calculateEval();
+                updateEval();
             }
         }
         return status;
@@ -972,7 +986,7 @@ public abstract class Rule {
         var_args.add(new ArgLocation(predIdx2, argIdx2));
         limitedVarArgs.add(var_args);
         length++;
-        fingerprint = new Fingerprint(structure);
+        updateFingerprint();
     }
 
     /**
@@ -1026,7 +1040,7 @@ public abstract class Rule {
             }
             status = cvt1Uv2ConstHandlerPostCvg(predIdx, argIdx, constant);
             if (UpdateStatus.NORMAL == status) {
-                this.eval = calculateEval();
+                updateEval();
             }
         }
         return status;
@@ -1039,7 +1053,7 @@ public abstract class Rule {
         final Predicate predicate = structure.get(predIdx);
         predicate.args[argIdx] = Argument.constant(constant);
         length++;
-        fingerprint = new Fingerprint(structure);
+        updateFingerprint();
     }
 
     /**
@@ -1084,7 +1098,7 @@ public abstract class Rule {
             }
             status = rmAssignedArgHandlerPostCvg(predIdx, argIdx);
             if (UpdateStatus.NORMAL == status) {
-                this.eval = calculateEval();
+                updateEval();
             }
         }
         return status;
@@ -1142,7 +1156,7 @@ public abstract class Rule {
                 itr.remove();
             }
         }
-        fingerprint = new Fingerprint(structure);
+        updateFingerprint();
     }
 
     /**
@@ -1314,8 +1328,16 @@ public abstract class Rule {
         return builder.toString();
     }
 
+    public long getFingerprintCreationTime() {
+        return fingerprintCreationTime;
+    }
+
     public long getPruningTime() {
         return pruningTime;
+    }
+
+    public long getEvalTime() {
+        return evalTime;
     }
 
     @Override

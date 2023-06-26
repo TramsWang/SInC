@@ -54,16 +54,13 @@ public class FragmentedCachedRule extends Rule {
     protected List<TabInfo> predIdx2AllCacheTableInfo;
 
     /* Monitoring info. The time (in nanoseconds) refers to the corresponding time consumption in the last update of the rule */
+    protected long copyTime = 0;
     protected long posCacheUpdateTime = 0;
     protected long entCacheUpdateTime = 0;
     protected long allCacheUpdateTime = 0;
     protected long posCacheIndexingTime = 0;
     protected long entCacheIndexingTime = 0;
     protected long allCacheIndexingTime = 0;
-    protected long evalTime = 0;
-    protected long kbUpdateTime = 0;
-    protected long counterexampleTime = 0;
-    protected long copyTime = 0;
 
     /**
      * Initialize the most general rule.
@@ -168,7 +165,6 @@ public class FragmentedCachedRule extends Rule {
     @Override
     protected Eval calculateEval() {
         /* Find all variables in the head */
-        long time_start = System.nanoTime();
         final Set<Integer> head_only_lvs = new HashSet<>();  // For the head only LVs
         int head_uv_cnt = 0;
         final Predicate head_pred = getHead();
@@ -205,8 +201,6 @@ public class FragmentedCachedRule extends Rule {
         }
         int new_pos_ent = posCache.countTableSize(HEAD_PRED_IDX);
         int already_ent = entCache.countTableSize(HEAD_PRED_IDX);
-        long time_done = System.nanoTime();
-        evalTime = time_done - time_start;
 
         /* Update evaluation score */
         /* Those already proved should be excluded from the entire entailment set. Otherwise, they are counted as negative ones */
@@ -577,7 +571,6 @@ public class FragmentedCachedRule extends Rule {
      */
     @Override
     public EvidenceBatch getEvidenceAndMarkEntailment() {
-        long time_start = System.nanoTime();
         final int[] pred_symbols_in_rule = new int[structure.size()];
         for (int i = 0; i < pred_symbols_in_rule.length; i++) {
             pred_symbols_in_rule[i] = structure.get(i).predSymbol;
@@ -610,8 +603,6 @@ public class FragmentedCachedRule extends Rule {
                 }
             }
         }
-        long time_done = System.nanoTime();
-        kbUpdateTime = time_done - time_start;
 
         return evidence_batch;
     }
@@ -621,8 +612,6 @@ public class FragmentedCachedRule extends Rule {
      */
     @Override
     public Set<Record> getCounterexamples() {
-        long time_start = System.nanoTime();
-
         /* Find all variables in the head */
         final Map<Integer, List<Integer>> head_only_vid_2_loc_map = new HashMap<>();  // GVs will be removed later
         int uv_id = usedLimitedVars();
@@ -680,8 +669,6 @@ public class FragmentedCachedRule extends Rule {
         if (head_only_vid_2_loc_map.isEmpty()) {
             /* No need to extend UVs */
             head_templates.removeIf(r -> target_relation.hasRow(r.args));
-            long time_done = System.nanoTime();
-            counterexampleTime = time_done - time_start;
 
             return head_templates;
         } else {
@@ -698,8 +685,6 @@ public class FragmentedCachedRule extends Rule {
                         target_relation, counter_example_set, head_template, head_only_var_loc_lists, 0
                 );
             }
-            long time_done = System.nanoTime();
-            counterexampleTime = time_done - time_start;
 
             return counter_example_set;
         }

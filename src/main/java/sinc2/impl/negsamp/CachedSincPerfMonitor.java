@@ -20,11 +20,7 @@ public class CachedSincPerfMonitor {
     public long posCacheIndexingTime = 0;
     public long entCacheIndexingTime = 0;
     public long allCacheIndexingTime = 0;
-    public long evalTime = 0;
-    public long kbUpdateTime = 0;
-    public long counterexampleTime = 0;
     public long copyTime = 0;
-    public long pruningTime = 0;
 
     public int posCacheEntriesTotal = 0;
     public int entCacheEntriesTotal = 0;
@@ -38,19 +34,15 @@ public class CachedSincPerfMonitor {
         writer.println("\n### Cached SInC Performance Info ###\n");
         writer.println("--- Time Cost ---");
         writer.printf(
-                "(ms) %10s %10s %10s %10s %10s %10s %10s %10s %10s %10s %10s %10s %10s %10s\n",
-                "E+.Upd", "E+.Prune", "T.Upd", "E.Upd", "E+.Idx", "T.Idx", "E.Idx", "Eval", "KB Upd", "Ctr.Exp", "Copy", "Prune", "Fp", "Total"
+                "(ms) %10s %10s %10s %10s %10s %10s %10s %10s %10s\n",
+                "Copy", "E+.Upd", "E+.Prune", "T.Upd", "E.Upd", "E+.Idx", "T.Idx", "E.Idx", "Total"
         );
         writer.printf(
-                "     %10d %10d %10d %10d %10d %10d %10d %10d %10d %10d %10d %10d %10d %10d\n\n",
-                posCacheUpdateTime / NANO_PER_MILL, prunedPosCacheUpdateTime / NANO_PER_MILL, entCacheUpdateTime / NANO_PER_MILL, allCacheUpdateTime / NANO_PER_MILL,
+                "     %10d %10d %10d %10d %10d %10d %10d %10d %10d\n\n",
+                copyTime / NANO_PER_MILL, posCacheUpdateTime / NANO_PER_MILL, prunedPosCacheUpdateTime / NANO_PER_MILL, entCacheUpdateTime / NANO_PER_MILL, allCacheUpdateTime / NANO_PER_MILL,
                 posCacheIndexingTime / NANO_PER_MILL, entCacheIndexingTime / NANO_PER_MILL, allCacheIndexingTime / NANO_PER_MILL,
-                evalTime / NANO_PER_MILL, kbUpdateTime / NANO_PER_MILL, counterexampleTime / NANO_PER_MILL, copyTime / NANO_PER_MILL,
-                pruningTime / NANO_PER_MILL, Fingerprint.getConstructTime() / NANO_PER_MILL,
-                (posCacheUpdateTime + prunedPosCacheUpdateTime + entCacheUpdateTime + allCacheUpdateTime +
-                        posCacheIndexingTime + entCacheIndexingTime + allCacheIndexingTime +
-                        evalTime + kbUpdateTime + counterexampleTime + copyTime + pruningTime + Fingerprint.getConstructTime()
-                ) / NANO_PER_MILL
+                (copyTime + posCacheUpdateTime + prunedPosCacheUpdateTime + entCacheUpdateTime + allCacheUpdateTime +
+                        posCacheIndexingTime + entCacheIndexingTime + allCacheIndexingTime) / NANO_PER_MILL
         );
 
         writer.println("--- Statistics ---");

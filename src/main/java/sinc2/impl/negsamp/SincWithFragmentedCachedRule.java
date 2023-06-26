@@ -47,9 +47,6 @@ public class SincWithFragmentedCachedRule extends SInC {
         monitor.prunedPosCacheUpdateTime += rel_miner.monitor.prunedPosCacheUpdateTime;
         monitor.entCacheUpdateTime += rel_miner.monitor.entCacheUpdateTime;
         monitor.allCacheUpdateTime += rel_miner.monitor.allCacheUpdateTime;
-        monitor.kbUpdateTime += rel_miner.monitor.kbUpdateTime;
-        monitor.evalTime += rel_miner.monitor.evalTime;
-        monitor.counterexampleTime += rel_miner.monitor.counterexampleTime;
         monitor.posCacheIndexingTime += rel_miner.monitor.posCacheIndexingTime;
         monitor.entCacheIndexingTime += rel_miner.monitor.entCacheIndexingTime;
         monitor.allCacheIndexingTime += rel_miner.monitor.allCacheIndexingTime;
@@ -61,7 +58,6 @@ public class SincWithFragmentedCachedRule extends SInC {
         monitor.allCacheEntriesMax = Math.max(monitor.allCacheEntriesMax, rel_miner.monitor.allCacheEntriesMax);
         monitor.totalGeneratedRules += rel_miner.monitor.totalGeneratedRules;
         monitor.copyTime += rel_miner.monitor.copyTime;
-        monitor.pruningTime += rel_miner.monitor.pruningTime;
     }
 
     @Override
@@ -74,7 +70,7 @@ public class SincWithFragmentedCachedRule extends SInC {
         SincWithFragmentedCachedRule sinc = new SincWithFragmentedCachedRule(new SincConfig(
                 "datasets/SimpleFormat", "Fm", ".", "SincWithFrgCacheTest",
                 1, false, 5, EvalMetric.CompressionRatio, 0.05,
-                0.25, 1, 1.0,
+                0.25, 1, 0.0,
                 null, null, false
         ));
         sinc.run();

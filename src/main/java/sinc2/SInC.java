@@ -348,6 +348,10 @@ public abstract class SInC {
         }
         monitor.hypothesisRuleNumber += miner.getHypothesis().size();
         monitor.evaluatedSqls += miner.evaluatedSqls;
+        monitor.fingerprintCreationTime += miner.fingerprintCreationTime;
+        monitor.pruningTime += miner.pruningTime;
+        monitor.evalTime += miner.evalTime;
+        monitor.kbUpdateTime += miner.kbUpdateTime;
     }
 
     protected void logInfo(String msg) {

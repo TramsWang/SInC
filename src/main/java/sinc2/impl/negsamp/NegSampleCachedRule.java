@@ -30,6 +30,10 @@ public class NegSampleCachedRule extends FragmentedCachedRule {
     /** The map from negative examples to their weight. If NULL, all negative examples are weighted as 1. */
     final protected Map<Record, Float> negSampleWeightMap;
 
+    /* Monitoring info. The time (in nanoseconds) refers to the corresponding time consumption in the last update of the rule */
+    protected long negCacheUpdateTime = 0;
+    protected long negCacheIndexingTime = 0;
+
     /**
      * @param negSampleWeightMap Weight for negative samples. If NULL, all samples are weighted as 1
      * @param negSamples         All negative samples, organized as an integer table
@@ -61,7 +65,10 @@ public class NegSampleCachedRule extends FragmentedCachedRule {
 
     @Override
     public NegSampleCachedRule clone() {
-        return new NegSampleCachedRule(this);
+        long time_start = System.nanoTime();
+        NegSampleCachedRule rule =  new NegSampleCachedRule(this);
+        rule.copyTime = System.nanoTime() - time_start;
+        return rule;
     }
 
     /**
@@ -99,39 +106,62 @@ public class NegSampleCachedRule extends FragmentedCachedRule {
 
     @Override
     public void updateCacheIndices() {
-        super.updateCacheIndices();
+        long time_start = System.nanoTime();
+        posCache.buildIndices();
+        long time_pos_done = System.nanoTime();
+        entCache.buildIndices();
+        long time_ent_done = System.nanoTime();
+        for (CacheFragment fragment: allCache) {
+            fragment.buildIndices();
+        }
+        long time_all_done = System.nanoTime();
         negCache.buildIndices();
+        long time_neg_done = System.nanoTime();
+        posCacheIndexingTime = time_pos_done - time_start;
+        entCacheIndexingTime = time_ent_done - time_pos_done;
+        allCacheIndexingTime = time_all_done - time_ent_done;
+        negCacheIndexingTime = time_neg_done - time_all_done;
     }
 
     @Override
     protected UpdateStatus cvt1Uv2ExtLvHandlerPostCvg(int predIdx, int argIdx, int varId) {
+        long time_start = System.nanoTime();
         negCache.updateCase1a(predIdx, argIdx, varId);
+        negCacheUpdateTime = System.nanoTime() - time_start;
         return super.cvt1Uv2ExtLvHandlerPostCvg(predIdx, argIdx, varId);
     }
 
     @Override
     protected UpdateStatus cvt1Uv2ExtLvHandlerPostCvg(Predicate newPredicate, int argIdx, int varId) {
+        long time_start = System.nanoTime();
         SimpleRelation new_relation = kb.getRelation(newPredicate.predSymbol);
         negCache.updateCase1b(new_relation, new_relation.id, argIdx, varId);
+        negCacheUpdateTime = System.nanoTime() - time_start;
         return super.cvt1Uv2ExtLvHandlerPostCvg(newPredicate, argIdx, varId);
     }
 
     @Override
     protected UpdateStatus cvt2Uvs2NewLvHandlerPostCvg(int predIdx1, int argIdx1, int predIdx2, int argIdx2) {
+        long time_start = System.nanoTime();
         negCache.updateCase2a(predIdx1, argIdx1, predIdx2, argIdx2, usedLimitedVars() - 1);
+        negCacheUpdateTime = System.nanoTime() - time_start;
         return super.cvt2Uvs2NewLvHandlerPostCvg(predIdx1, argIdx1, predIdx2, argIdx2);
     }
 
     @Override
     protected UpdateStatus cvt2Uvs2NewLvHandlerPostCvg(Predicate newPredicate, int argIdx1, int predIdx2, int argIdx2) {
+        long time_start = System.nanoTime();
         SimpleRelation new_relation = kb.getRelation(newPredicate.predSymbol);
         negCache.updateCase2b(new_relation, new_relation.id, argIdx1, predIdx2, argIdx2, usedLimitedVars() - 1);
+        negCacheUpdateTime = System.nanoTime() - time_start;
         return super.cvt2Uvs2NewLvHandlerPostCvg(newPredicate, argIdx1, predIdx2, argIdx2);
     }
 
     @Override
     protected UpdateStatus cvt1Uv2ConstHandlerPostCvg(int predIdx, int argIdx, int constant) {
+        long time_start = System.nanoTime();
         negCache.updateCase3(predIdx, argIdx, constant);
+        negCacheUpdateTime = System.nanoTime() - time_start;
         return super.cvt1Uv2ConstHandlerPostCvg(predIdx, argIdx, constant);
     }
 

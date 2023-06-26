@@ -1,6 +1,7 @@
 package sinc2.impl.negsamp;
 
 import sinc2.SInC;
+import sinc2.common.InterruptedSignal;
 import sinc2.common.Predicate;
 import sinc2.common.Record;
 import sinc2.kb.IntTable;
@@ -9,6 +10,7 @@ import sinc2.kb.SimpleKb;
 import sinc2.rule.Eval;
 import sinc2.rule.EvalMetric;
 import sinc2.rule.Rule;
+import sinc2.rule.UpdateStatus;
 import sinc2.util.graph.GraphNode;
 
 import java.io.PrintWriter;
@@ -27,6 +29,8 @@ public class NegSampleRelationMiner extends RelationMinerWithFragmentedCachedRul
     protected final Map<Record, Float> negSampleWeightMap;
     /** All negative samples, organized as an integer table */
     protected final IntTable negSamples;
+
+    protected final NegSamplingMonitor monitor = new NegSamplingMonitor();
 
     /**
      * @param negSampleWeightMap Weight for negative samples. If NULL, all samples are weighted as 1
@@ -53,7 +57,23 @@ public class NegSampleRelationMiner extends RelationMinerWithFragmentedCachedRul
 
     @Override
     protected void selectAsBeam(Rule r) {
-        ((NegSampleCachedRule) r).updateCacheIndices();
+        NegSampleCachedRule rule = (NegSampleCachedRule) r;
+        rule.updateCacheIndices();
+        super.monitor.posCacheIndexingTime += rule.posCacheIndexingTime;
+        super.monitor.entCacheIndexingTime += rule.entCacheIndexingTime;
+        super.monitor.allCacheIndexingTime += rule.allCacheIndexingTime;
+        monitor.negCacheIndexingTime += rule.negCacheIndexingTime;
+    }
+
+    @Override
+    protected int checkThenAddRule(UpdateStatus updateStatus, Rule updatedRule, Rule originalRule, Rule[] candidates) throws InterruptedSignal {
+        if (UpdateStatus.NORMAL == updateStatus) {
+            NegSampleCachedRule rule = (NegSampleCachedRule) updatedRule;
+            monitor.negCacheEntriesTotal += rule.negCache.totalEntries();
+            monitor.negCacheEntriesMax = Math.max(monitor.negCacheEntriesMax, rule.negCache.totalEntries());
+            monitor.negCacheUpdateTime += rule.negCacheUpdateTime;
+        }
+        return super.checkThenAddRule(updateStatus, updatedRule, originalRule, candidates);
     }
 
     /**
@@ -67,7 +87,9 @@ public class NegSampleRelationMiner extends RelationMinerWithFragmentedCachedRul
         final int total_facts = kb.getRelation(targetRelation).totalRows();
         while (!SInC.interrupted && (covered_facts < total_facts) && (null != (rule = findRule()))) {
             Eval est_eval = rule.getEval();
+            long time_start = System.nanoTime();
             ((NegSampleCachedRule) rule).calcRealEval();    // Replace the estimated evaluation score with the real one
+            monitor.realEvalCalTime += System.nanoTime() - time_start;
             hypothesis.add(rule);
             covered_facts += updateKbAndDependencyGraph(rule);
             rule.releaseMemory();

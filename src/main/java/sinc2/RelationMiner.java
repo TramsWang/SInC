@@ -37,11 +37,17 @@ public abstract class RelationMiner {
     protected final Set<Record> counterexamples = new HashSet<>();
     /** The tabu set */
     protected final Map<MultiSet<Integer>, Set<Fingerprint>> tabuSet = new HashMap<>();
-    /** This member keeps track of the number of evaluated SQL queries */
-    public int evaluatedSqls = 0;
 
     /** Logger */
     protected final PrintWriter logger;
+
+    /* Basic Rule Mining Time Statistics (measured in nanoseconds) */
+    protected long fingerprintCreationTime = 0;
+    protected long pruningTime = 0;
+    protected long evalTime = 0;
+    protected long kbUpdateTime = 0;
+    /** This member keeps track of the number of evaluated SQL queries */
+    protected int evaluatedSqls = 0;
 
     /**
      * Construct by passing parameters from the compressor that loads the data.
@@ -286,6 +292,9 @@ public abstract class RelationMiner {
     protected int checkThenAddRule(
             UpdateStatus updateStatus, Rule updatedRule, Rule originalRule, Rule[] candidates
     ) throws InterruptedSignal {
+        fingerprintCreationTime += updatedRule.getFingerprintCreationTime();
+        pruningTime += updatedRule.getPruningTime();
+
         boolean updated_is_better = false;
         switch (updateStatus) {
             case NORMAL:
@@ -312,6 +321,7 @@ public abstract class RelationMiner {
                         candidates[replace_idx] = updatedRule;
                     }
                 }
+                evalTime += updatedRule.getEvalTime();
                 evaluatedSqls += 2;
                 break;
             case INVALID:
@@ -349,6 +359,7 @@ public abstract class RelationMiner {
      * @throws KbException When KB operation fails
      */
     protected int updateKbAndDependencyGraph(Rule rule) throws KbException {
+        long time_start = System.nanoTime();
         counterexamples.addAll(rule.getCounterexamples());
         EvidenceBatch evidence_batch = rule.getEvidenceAndMarkEntailment();
         for (int[][] grounding: evidence_batch.evidenceList) {
@@ -379,6 +390,7 @@ public abstract class RelationMiner {
                 return dependencies;
             });
         }
+        kbUpdateTime += System.nanoTime() - time_start;
         return evidence_batch.evidenceList.size();
     }
 
