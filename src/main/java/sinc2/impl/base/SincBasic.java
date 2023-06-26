@@ -8,7 +8,7 @@ import sinc2.common.SincException;
 import sinc2.kb.SimpleKb;
 
 /**
- * A basic implementation of SInC. Rule mining are with compact caching and tabu prunning.
+ * A basic implementation of SInC. Rule mining are with compact caching and tabu pruning.
  *
  * @since 2.0
  */

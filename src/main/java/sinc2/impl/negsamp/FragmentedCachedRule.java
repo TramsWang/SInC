@@ -53,6 +53,18 @@ public class FragmentedCachedRule extends Rule {
      *  The array indices are predicate indices. */
     protected List<TabInfo> predIdx2AllCacheTableInfo;
 
+    /* Monitoring info. The time (in nanoseconds) refers to the corresponding time consumption in the last update of the rule */
+    protected long posCacheUpdateTime = 0;
+    protected long entCacheUpdateTime = 0;
+    protected long allCacheUpdateTime = 0;
+    protected long posCacheIndexingTime = 0;
+    protected long entCacheIndexingTime = 0;
+    protected long allCacheIndexingTime = 0;
+    protected long evalTime = 0;
+    protected long kbUpdateTime = 0;
+    protected long counterexampleTime = 0;
+    protected long copyTime = 0;
+
     /**
      * Initialize the most general rule.
      *
@@ -135,7 +147,11 @@ public class FragmentedCachedRule extends Rule {
 
     @Override
     public FragmentedCachedRule clone() {
-        return new FragmentedCachedRule(this);
+        long time_start = System.nanoTime();
+        FragmentedCachedRule rule =  new FragmentedCachedRule(this);
+        long time_done = System.nanoTime();
+        rule.copyTime = time_done - time_start;
+        return rule;
     }
 
     /**
@@ -152,6 +168,7 @@ public class FragmentedCachedRule extends Rule {
     @Override
     protected Eval calculateEval() {
         /* Find all variables in the head */
+        long time_start = System.nanoTime();
         final Set<Integer> head_only_lvs = new HashSet<>();  // For the head only LVs
         int head_uv_cnt = 0;
         final Predicate head_pred = getHead();
@@ -188,6 +205,8 @@ public class FragmentedCachedRule extends Rule {
         }
         int new_pos_ent = posCache.countTableSize(HEAD_PRED_IDX);
         int already_ent = entCache.countTableSize(HEAD_PRED_IDX);
+        long time_done = System.nanoTime();
+        evalTime = time_done - time_start;
 
         /* Update evaluation score */
         /* Those already proved should be excluded from the entire entailment set. Otherwise, they are counted as negative ones */
@@ -198,11 +217,18 @@ public class FragmentedCachedRule extends Rule {
      * Update the cache indices before specialization. E.g., right after the rule is selected as one of the beams.
      */
     public void updateCacheIndices() {
+        long time_start = System.nanoTime();
         posCache.buildIndices();
+        long time_pos_done = System.nanoTime();
         entCache.buildIndices();
+        long time_ent_done = System.nanoTime();
         for (CacheFragment fragment: allCache) {
             fragment.buildIndices();
         }
+        long time_all_done = System.nanoTime();
+        posCacheIndexingTime = time_pos_done - time_start;
+        entCacheIndexingTime = time_ent_done - time_pos_done;
+        allCacheIndexingTime = time_all_done - time_ent_done;
     }
 
     /**
@@ -212,7 +238,10 @@ public class FragmentedCachedRule extends Rule {
      */
     @Override
     protected UpdateStatus cvt1Uv2ExtLvHandlerPreCvg(int predIdx, int argIdx, int varId) {
+        long time_start = System.nanoTime();
         posCache.updateCase1a(predIdx, argIdx, varId);
+        long time_done = System.nanoTime();
+        posCacheUpdateTime = time_done - time_start;
         return UpdateStatus.NORMAL;
     }
 
@@ -254,7 +283,9 @@ public class FragmentedCachedRule extends Rule {
      */
     @Override
     protected UpdateStatus cvt1Uv2ExtLvHandlerPostCvg(int predIdx, int argIdx, int varId) {
+        long time_start = System.nanoTime();
         entCache.updateCase1a(predIdx, argIdx, varId);
+        long time_ent_done = System.nanoTime();
 
         if (HEAD_PRED_IDX != predIdx) { // No need to update the E-cache if the update is in the head
             final TabInfo tab_info = predIdx2AllCacheTableInfo.get(predIdx);
@@ -291,6 +322,10 @@ public class FragmentedCachedRule extends Rule {
                 }
             }
         }
+        long time_all_done = System.nanoTime();
+        entCacheUpdateTime = time_ent_done - time_start;
+        allCacheUpdateTime = time_all_done - time_ent_done;
+
         return UpdateStatus.NORMAL;
     }
 
@@ -301,8 +336,11 @@ public class FragmentedCachedRule extends Rule {
      */
     @Override
     protected UpdateStatus cvt1Uv2ExtLvHandlerPreCvg(Predicate newPredicate, int argIdx, int varId) {
+        long time_start = System.nanoTime();
         SimpleRelation new_relation = kb.getRelation(newPredicate.predSymbol);
         posCache.updateCase1b(new_relation, new_relation.id, argIdx, varId);
+        long time_done = System.nanoTime();
+        posCacheUpdateTime = time_done - time_start;
         return UpdateStatus.NORMAL;
     }
 
@@ -313,8 +351,10 @@ public class FragmentedCachedRule extends Rule {
      */
     @Override
     protected UpdateStatus cvt1Uv2ExtLvHandlerPostCvg(Predicate newPredicate, int argIdx, int varId) {
+        long time_start = System.nanoTime();
         SimpleRelation new_relation = kb.getRelation(newPredicate.predSymbol);
         entCache.updateCase1b(new_relation, new_relation.id, argIdx, varId);
+        long time_ent_done = System.nanoTime();
 
         CacheFragment updated_fragment = null;
         for (int frag_idx = 0; frag_idx < allCache.size(); frag_idx++) {
@@ -339,6 +379,9 @@ public class FragmentedCachedRule extends Rule {
                 _fragment.clear();
             }
         }
+        long time_all_done = System.nanoTime();
+        entCacheUpdateTime = time_ent_done - time_start;
+        allCacheUpdateTime = time_all_done - time_ent_done;
 
         return UpdateStatus.NORMAL;
     }
@@ -350,7 +393,10 @@ public class FragmentedCachedRule extends Rule {
      */
     @Override
     protected UpdateStatus cvt2Uvs2NewLvHandlerPreCvg(int predIdx1, int argIdx1, int predIdx2, int argIdx2) {
+        long time_start = System.nanoTime();
         posCache.updateCase2a(predIdx1, argIdx1, predIdx2, argIdx2, usedLimitedVars() - 1);
+        long time_done = System.nanoTime();
+        posCacheUpdateTime = time_done - time_start;
         return UpdateStatus.NORMAL;
     }
 
@@ -361,8 +407,10 @@ public class FragmentedCachedRule extends Rule {
      */
     @Override
     protected UpdateStatus cvt2Uvs2NewLvHandlerPostCvg(int predIdx1, int argIdx1, int predIdx2, int argIdx2) {
+        long time_start = System.nanoTime();
         final int new_vid = usedLimitedVars() - 1;
         entCache.updateCase2a(predIdx1, argIdx1, predIdx2, argIdx2, new_vid);
+        long time_ent_done = System.nanoTime();
 
         TabInfo tab_info1 = predIdx2AllCacheTableInfo.get(predIdx1);
         TabInfo tab_info2 = predIdx2AllCacheTableInfo.get(predIdx2);
@@ -399,6 +447,9 @@ public class FragmentedCachedRule extends Rule {
                 _fragment.clear();
             }
         }
+        long time_all_done = System.nanoTime();
+        entCacheUpdateTime = time_ent_done - time_start;
+        allCacheUpdateTime = time_all_done - time_ent_done;
 
         return UpdateStatus.NORMAL;
     }
@@ -410,8 +461,11 @@ public class FragmentedCachedRule extends Rule {
      */
     @Override
     protected UpdateStatus cvt2Uvs2NewLvHandlerPreCvg(Predicate newPredicate, int argIdx1, int predIdx2, int argIdx2) {
+        long time_start = System.nanoTime();
         SimpleRelation new_relation = kb.getRelation(newPredicate.predSymbol);
         posCache.updateCase2b(new_relation, new_relation.id, argIdx1, predIdx2, argIdx2, usedLimitedVars() - 1);
+        long time_done = System.nanoTime();
+        posCacheUpdateTime = time_done - time_start;
         return UpdateStatus.NORMAL;
     }
 
@@ -422,9 +476,11 @@ public class FragmentedCachedRule extends Rule {
      */
     @Override
     protected UpdateStatus cvt2Uvs2NewLvHandlerPostCvg(Predicate newPredicate, int argIdx1, int predIdx2, int argIdx2) {
+        long time_start = System.nanoTime();
         SimpleRelation new_relation = kb.getRelation(newPredicate.predSymbol);
         final int new_vid = usedLimitedVars() - 1;
         entCache.updateCase2b(new_relation, new_relation.id, argIdx1, predIdx2, argIdx2, new_vid);
+        long time_ent_done = System.nanoTime();
 
         if (HEAD_PRED_IDX == predIdx2) {   // One is the head and the other is not
             /* Create a new fragment for the new predicate */
@@ -443,6 +499,10 @@ public class FragmentedCachedRule extends Rule {
                 }
             }
         }
+        long time_all_done = System.nanoTime();
+        entCacheUpdateTime = time_ent_done - time_start;
+        allCacheUpdateTime = time_all_done - time_ent_done;
+
         return UpdateStatus.NORMAL;
     }
 
@@ -453,7 +513,10 @@ public class FragmentedCachedRule extends Rule {
      */
     @Override
     protected UpdateStatus cvt1Uv2ConstHandlerPreCvg(int predIdx, int argIdx, int constant) {
+        long time_start = System.nanoTime();
         posCache.updateCase3(predIdx, argIdx, constant);
+        long time_done = System.nanoTime();
+        posCacheUpdateTime = time_done - time_start;
         return UpdateStatus.NORMAL;
     }
 
@@ -464,7 +527,9 @@ public class FragmentedCachedRule extends Rule {
      */
     @Override
     protected UpdateStatus cvt1Uv2ConstHandlerPostCvg(int predIdx, int argIdx, int constant) {
+        long time_start = System.nanoTime();
         entCache.updateCase3(predIdx, argIdx, constant);
+        long time_ent_done = System.nanoTime();
 
         if (HEAD_PRED_IDX != predIdx) { // No need to update the E-cache if the update is in the head
             TabInfo tab_info = predIdx2AllCacheTableInfo.get(predIdx);
@@ -476,6 +541,10 @@ public class FragmentedCachedRule extends Rule {
                 }
             }
         }
+        long time_all_done = System.nanoTime();
+        entCacheUpdateTime = time_ent_done - time_start;
+        allCacheUpdateTime = time_all_done - time_ent_done;
+
         return UpdateStatus.NORMAL;
     }
 
@@ -508,6 +577,7 @@ public class FragmentedCachedRule extends Rule {
      */
     @Override
     public EvidenceBatch getEvidenceAndMarkEntailment() {
+        long time_start = System.nanoTime();
         final int[] pred_symbols_in_rule = new int[structure.size()];
         for (int i = 0; i < pred_symbols_in_rule.length; i++) {
             pred_symbols_in_rule[i] = structure.get(i).predSymbol;
@@ -540,6 +610,9 @@ public class FragmentedCachedRule extends Rule {
                 }
             }
         }
+        long time_done = System.nanoTime();
+        kbUpdateTime = time_done - time_start;
+
         return evidence_batch;
     }
 
@@ -548,6 +621,8 @@ public class FragmentedCachedRule extends Rule {
      */
     @Override
     public Set<Record> getCounterexamples() {
+        long time_start = System.nanoTime();
+
         /* Find all variables in the head */
         final Map<Integer, List<Integer>> head_only_vid_2_loc_map = new HashMap<>();  // GVs will be removed later
         int uv_id = usedLimitedVars();
@@ -605,6 +680,9 @@ public class FragmentedCachedRule extends Rule {
         if (head_only_vid_2_loc_map.isEmpty()) {
             /* No need to extend UVs */
             head_templates.removeIf(r -> target_relation.hasRow(r.args));
+            long time_done = System.nanoTime();
+            counterexampleTime = time_done - time_start;
+
             return head_templates;
         } else {
             /* [a] Extend UVs in the templates */
@@ -620,6 +698,9 @@ public class FragmentedCachedRule extends Rule {
                         target_relation, counter_example_set, head_template, head_only_var_loc_lists, 0
                 );
             }
+            long time_done = System.nanoTime();
+            counterexampleTime = time_done - time_start;
+
             return counter_example_set;
         }
     }

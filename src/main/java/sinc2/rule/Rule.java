@@ -48,6 +48,9 @@ public abstract class Rule {
 
     /** The evaluation of the rule */
     protected Eval eval;
+    
+    /* Performance monitoring members */
+    protected long pruningTime = 0;
 
     /**
      * Parse a plain-text string into a rule structure. The allowed input can be defined by the following context-free
@@ -530,6 +533,7 @@ public abstract class Rule {
         /* Check independent fragment (may happen when looking for generalizations) */
         /* Use the disjoint set: join limited variables if they are in the same predicate */
         /* Assumption: no body predicate contains only empty or constant argument */
+        long time_start = System.nanoTime();
         DisjointSet disjoint_set = new DisjointSet(usedLimitedVars());
         Set<Predicate> predicate_set = new HashSet<>();
 
@@ -551,6 +555,7 @@ public abstract class Rule {
         if (lv_ids.isEmpty()) {
             if (structure.size() >= 2) {
                 /* The body is an independent fragment if the head contains no LV while body is not empty */
+                pruningTime += System.nanoTime() - time_start;
                 return true;
             }
         } else {
@@ -579,6 +584,7 @@ public abstract class Rule {
             if (args_complete) {
                 if (!predicate_set.add(body_pred)) {
                     /* Predicate duplicated */
+                    pruningTime += System.nanoTime() - time_start;
                     return true;
                 }
             }
@@ -586,6 +592,7 @@ public abstract class Rule {
             /* Join the LVs in the same predicate */
             if (lv_ids.isEmpty()) {
                 /* If no LV in body predicate, the predicate is certainly part of the fragment */
+                pruningTime += System.nanoTime() - time_start;
                 return true;
             } else {
                 int first_id = lv_ids.get(0);
@@ -596,6 +603,7 @@ public abstract class Rule {
         }
 
         /* Check for independent fragment */
+        pruningTime += System.nanoTime() - time_start;
         return 2 <= disjoint_set.totalSets();
     }
 
@@ -604,24 +612,30 @@ public abstract class Rule {
      * the cache.
      */
     protected boolean cacheHit() {
-        return !fingerprintCache.add(fingerprint);
+        long time_start = System.nanoTime();
+        boolean ret = !fingerprintCache.add(fingerprint);
+        pruningTime += System.nanoTime() - time_start;
+        return ret;
     }
 
     /**
      * Check if the rule structure should be pruned by the tabu set.
      */
     protected boolean tabuHit() {
+        long time_start = System.nanoTime();
         for (int subset_size = 0; subset_size < structure.size(); subset_size++) {
             for (MultiSet<Integer> category_subset : categorySubsets(subset_size)) {
                 final Set<Fingerprint> tabu_set = category2TabuSetMap.get(category_subset);
                 if (null == tabu_set) continue;
                 for (Fingerprint rfp : tabu_set) {
                     if (rfp.generalizationOf(this.fingerprint)) {
+                        pruningTime += System.nanoTime() - time_start;
                         return true;
                     }
                 }
             }
         }
+        pruningTime += System.nanoTime() - time_start;
         return false;
     }
 
@@ -667,10 +681,13 @@ public abstract class Rule {
      * Check if the coverage of the rule is below the threshold. If so, add the fingerprint to the tabu set.
      */
     protected boolean insufficientCoverage() {
+        long time_start = System.nanoTime();
         if (MIN_FACT_COVERAGE >= recordCoverage()) {
             add2TabuSet();
+            pruningTime += System.nanoTime() - time_start;
             return true;
         }
+        pruningTime += System.nanoTime() - time_start;
         return false;
     }
 
@@ -1295,6 +1312,10 @@ public abstract class Rule {
             }
         }
         return builder.toString();
+    }
+
+    public long getPruningTime() {
+        return pruningTime;
     }
 
     @Override

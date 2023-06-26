@@ -226,6 +226,14 @@ public abstract class SInC {
         logger.println();
     }
 
+    protected void showHypothesis() {
+        logInfo("\n### Hypothesis Found ###");
+        for (Rule rule : compressedKb.getHypothesis()) {
+            logInfo(rule.toString(kb));
+        }
+        logger.println();
+    }
+
     /**
      * The compress procedure.
      */
@@ -301,11 +309,7 @@ public abstract class SInC {
         monitor.dependencyAnalysisTime = time_dependency_resolved - time_hypothesis_found;
 
         /* Log the hypothesis */
-        logInfo("\n### Hypothesis Found ###");
-        for (Rule rule : compressedKb.getHypothesis()) {
-            logInfo(rule.toString(kb));
-        }
-        logger.println();
+        showHypothesis();
 
         /* Dump the compressed KB */
         try {

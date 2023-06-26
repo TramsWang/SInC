@@ -328,7 +328,8 @@ public class NegSampler {
     public static void main(String[] args) throws IOException {
         String base_path = args[0];
         String neg_base_path = args[1];
-        float[] budget_factors = new float[] {0.5f, 1, 1.5f, 2, 2.5f, 3};
+//        float[] budget_factors = new float[] {0.5f, 1, 1.5f, 2, 2.5f, 3, 3.5f, 4, 4.5f, 5};
+        float[] budget_factors = new float[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
         File base_path_file = new File(base_path);
         for (File kb_dir_file: base_path_file.listFiles()) {
             if (kb_dir_file.isDirectory()) {

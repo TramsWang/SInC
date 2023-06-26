@@ -64,12 +64,15 @@ public class Fingerprint {
     /** The rule that generates the fingerprint */
     protected final List<Predicate> rule;
 
+    protected static long constructTime = 0;
+
     /**
      * Construct the fingerprint with the structure of the rule.
      *
      * @param rule The rule structure (ordered list of predicates, where the head is the first)
      */
     public Fingerprint(List<Predicate> rule) {
+        long time_start = System.nanoTime();
         this.rule = rule;
 
         /* Count the number of LVs */
@@ -116,6 +119,7 @@ public class Fingerprint {
 
         /* Add the equivalent classes for the LVs to the fingerprint */
         equivalenceClasses.addAll(lv_equiv_classes);
+        constructTime += System.nanoTime() - time_start;
     }
 
     public MultiSet<MultiSet<ArgIndicator>> getEquivalenceClasses() {
@@ -173,6 +177,10 @@ public class Fingerprint {
             }
         }
         return true;
+    }
+
+    public static long getConstructTime() {
+        return constructTime;
     }
 
     @Override

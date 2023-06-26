@@ -6,6 +6,7 @@ import sinc2.common.Record;
 import sinc2.kb.IntTable;
 import sinc2.kb.KbException;
 import sinc2.kb.SimpleKb;
+import sinc2.rule.Eval;
 import sinc2.rule.EvalMetric;
 import sinc2.rule.Rule;
 import sinc2.util.graph.GraphNode;
@@ -65,6 +66,7 @@ public class NegSampleRelationMiner extends RelationMinerWithFragmentedCachedRul
         int covered_facts = 0;
         final int total_facts = kb.getRelation(targetRelation).totalRows();
         while (!SInC.interrupted && (covered_facts < total_facts) && (null != (rule = findRule()))) {
+            Eval est_eval = rule.getEval();
             ((NegSampleCachedRule) rule).calcRealEval();    // Replace the estimated evaluation score with the real one
             hypothesis.add(rule);
             covered_facts += updateKbAndDependencyGraph(rule);
@@ -73,6 +75,7 @@ public class NegSampleRelationMiner extends RelationMinerWithFragmentedCachedRul
                     "Found (Coverage: %.2f%%, %d/%d): %s\n", covered_facts * 100.0 / total_facts, covered_facts, total_facts,
                     rule.toDumpString(kb)
             );
+            logger.printf("Est Eval: %s\n", est_eval);
             logger.flush();
         }
         logger.println("Done");
