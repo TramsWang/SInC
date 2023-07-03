@@ -254,7 +254,7 @@ public class NegSampler {
             /* Determine the number of total negative samples within the same negative span */
             for (int j = i + 1; j <= neg_sample_insert_indices.length; j++) {
                 if (neg_sample_insert_indices.length == j || insert_index != neg_sample_insert_indices[j]) {
-                    float weight = recordsInSpan(pos_records, insert_index, totalConstants) / (j - i);
+                    float weight = recordsInInterval(pos_records, insert_index, totalConstants) / (j - i);
                     for (int k = i; k < j; k++) {
                         weight_map.put(new Record(neg_records[k]), weight);
                     }
@@ -277,7 +277,7 @@ public class NegSampler {
      * @param idx            The end index of the span (should be >= 0).
      * @param totalConstants The number of constants involved in the KB
      */
-    protected static float recordsInSpan(int[][] records, int idx, int totalConstants) {
+    public static float recordsInInterval(int[][] records, int idx, int totalConstants) {
         final int[] start_record, end_record;
         final int delta;
         if (0 == idx) {
@@ -293,11 +293,18 @@ public class NegSampler {
             end_record = records[idx];
             delta = 1;
         }
-        int diff = end_record[0] - start_record[0];
-        for (int i = 1; i < start_record.length; i++) {
-            diff = diff * totalConstants + end_record[i] - start_record[i];
+        return recordsInInterval(end_record, start_record, totalConstants) - delta;
+    }
+
+    /**
+     * The number of records in the span: [startRecord, endRecord)
+     */
+    public static int recordsInInterval(int[] startRecord, int[] endRecord, int totalConstants) {
+        int diff = endRecord[0] - startRecord[0];
+        for (int i = 1; i < startRecord.length; i++) {
+            diff = diff * totalConstants + endRecord[i] - startRecord[i];
         }
-        return diff - delta;
+        return diff;
     }
 
     /**
@@ -305,7 +312,7 @@ public class NegSampler {
      *
      * NOTE: The next of the largest record is the one itself.
      */
-    protected static int[] nextRecord(int[] record, int totalConstants) {
+    public static int[] nextRecord(int[] record, int totalConstants) {
         int[] next_record = record.clone();
         boolean is_max = true;
         for (int i = next_record.length - 1; i >= 0; i--) {

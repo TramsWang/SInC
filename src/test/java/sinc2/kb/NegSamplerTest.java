@@ -384,7 +384,7 @@ class NegSamplerTest {
         };
         int[] expected_num = new int[] {0, 249, 0, 7, 34, 694, 9, 0};
         for (int i = 0; i < expected_num.length; i++) {
-            assertEquals(expected_num[i], NegSampler.recordsInSpan(records, i, TOTAL_CONSTANT));
+            assertEquals(expected_num[i], NegSampler.recordsInInterval(records, i, TOTAL_CONSTANT));
         }
     }
 
@@ -400,7 +400,7 @@ class NegSamplerTest {
         };
         int[] expected_num = new int[] {250, 0, 7, 34, 694, 10};
         for (int i = 0; i < expected_num.length; i++) {
-            assertEquals(expected_num[i], NegSampler.recordsInSpan(records, i, TOTAL_CONSTANT));
+            assertEquals(expected_num[i], NegSampler.recordsInInterval(records, i, TOTAL_CONSTANT));
         }
     }
 
