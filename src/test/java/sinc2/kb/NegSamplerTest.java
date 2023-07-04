@@ -7,10 +7,7 @@ import sinc2.common.Record;
 import sinc2.impl.negsamp.CB;
 import sinc2.impl.negsamp.CacheFragment;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -113,7 +110,7 @@ class NegSamplerTest {
                 new int[] {5, 10, 10},
         };
         IntTable pos_tab = new IntTable(pos_records);
-        IntTable neg_tab = NegSampler.negIntervalSampling(pos_tab, TOTAL_CONSTANT);
+        IntTable neg_tab = NegSampler.negIntervalBeginningSampling(pos_tab, TOTAL_CONSTANT, 0);
 
         int[][] expected_neg_samples = new int[][] {
                 new int[] {1, 1, 1},
@@ -426,6 +423,66 @@ class NegSamplerTest {
 
         for (int i = 0; i < records.length; i++) {
             assertArrayEquals(expected_next[i], NegSampler.nextRecord(records[i], TOTAL_CONSTANT));
+        }
+
+        int step_size = 17;
+        records = new int[][] {
+                new int[]{1, 1, 10},    //  009
+                new int[]{1, 3, 7},     //  026
+                new int[]{1, 5, 4},     //  043
+                new int[]{1, 7, 1},     //  060
+                new int[]{1, 8, 8},     //  077
+                new int[]{1, 10, 5},    //  094
+                new int[]{2, 2, 2},     //  111
+                new int[]{2, 3, 9},     //  128
+                new int[]{2, 5, 6},     //  145
+        };
+        for (int i = 1; i < records.length; i++) {
+            int[] next_record = NegSampler.nextRecord(records[i-1], TOTAL_CONSTANT, step_size);
+            assertArrayEquals(records[i], next_record);
+        }
+
+        step_size = 117;
+        records = new int[][] {
+                new int[]{1, 1, 10},    //  009
+                new int[]{2, 3, 7},     //  126
+                new int[]{3, 5, 4},     //  243
+                new int[]{4, 7, 1},     //  360
+                new int[]{5, 8, 8},     //  477
+                new int[]{6, 10, 5},    //  594
+                new int[]{8, 2, 2},     //  711
+                new int[]{9, 3, 9},     //  828
+                new int[]{10, 5, 6},     //  945
+                new int[]{10, 10, 10},     //  999
+        };
+        for (int i = 1; i < records.length; i++) {
+            int[] next_record = NegSampler.nextRecord(records[i-1], TOTAL_CONSTANT, step_size);
+            assertArrayEquals(records[i], next_record);
+        }
+    }
+
+    @Test
+    void testPreviousRecord() {
+        final int TOTAL_CONSTANT = 10;
+        int[][] records = new int[][] {
+                new int[]{3, 6, 1},
+                new int[]{1, 1, 1},
+                new int[]{10, 10, 10},
+                new int[]{3, 6, 10},
+                new int[]{3, 1, 1},
+                new int[]{10, 5, 1},
+        };
+        int[][] expected_previous = new int[][] {
+                new int[]{3, 5, 10},
+                new int[]{1, 1, 1},
+                new int[]{10, 10, 9},
+                new int[]{3, 6, 9},
+                new int[]{2, 10, 10},
+                new int[]{10, 4, 10},
+        };
+
+        for (int i = 0; i < records.length; i++) {
+            assertArrayEquals(expected_previous[i], NegSampler.previousRecord(records[i], TOTAL_CONSTANT));
         }
     }
 

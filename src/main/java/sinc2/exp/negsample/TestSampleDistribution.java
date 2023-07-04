@@ -42,8 +42,8 @@ public class TestSampleDistribution {
 
 //        testDistInInterval(pos_base_path, pos_kb_name, neg_base_path, neg_kb_name, out_file_name);
 //        testDistOverAll(pos_base_path, pos_kb_name, neg_base_path, neg_kb_name, out_file_name);
-//        dumpRemainingNegSamples(pos_base_path, pos_kb_name, neg_base_path, neg_kb_name, out_file_name);
-        testOrder(pos_base_path, pos_kb_name, neg_base_path, neg_kb_name, out_file_name);
+        dumpRemainingNegSamples(pos_base_path, pos_kb_name, neg_base_path, neg_kb_name, out_file_name);
+//        testOrder(pos_base_path, pos_kb_name, neg_base_path, neg_kb_name, out_file_name);
     }
 
     ///////////////////////////////////////////////////////////////

@@ -86,53 +86,265 @@ public class NegSampler {
     }
 
     /**
-     * This method samples negative records from negative intervals. The lower bound of each negative interval is selected.
-     * Therefore, at most n+1 (n is the number of positive records) negative samples will be selected under this strategy.
+     * This method samples negative records from negative intervals. The lower and upper bounds of each negative interval
+     * are selected. Therefore, at most 2n+2 (n is the number of positive records) negative samples will be selected under
+     * this strategy.
      *
      * @param posRelation    The set of positive records
      * @param totalConstants The number of constants involved in the KB
+     * @param enhance        If > 0, split the alphabetically ordered list of all possible records into many intervals,
+     *                       the number of which is "enhance", and sample the beginning record of each interval to enhance
+     *                       the sample set
      * @return A set of negative samples organized as an IntTable
      */
-    public static IntTable negIntervalSampling(IntTable posRelation, int totalConstants) {
-        List<int[]> neg_samples = new ArrayList<>();
+    public static IntTable negIntervalSampling(IntTable posRelation, int totalConstants, int enhance) {
+        Set<Record> neg_samples = new HashSet<>();
         int[][] pos_records = posRelation.getAllRows();
 
-        /* Check the first negative interval */
-        boolean bottom_interval_exists = false;
-        int[] pos_record = pos_records[0];
-        for (int arg: pos_record) {
-            if (1 < arg) {  // [1, 1, ..., 1] is the smallest record
-                bottom_interval_exists = true;
-                break;
-            }
-        }
-        if (bottom_interval_exists) {
-            neg_samples.add(ArrayOperation.initArrayWithValue(pos_record.length, 1));
+        /* Neg interval beginnings */
+        int[] first_rec = ArrayOperation.initArrayWithValue(posRelation.totalCols(), 1);
+        if (0 != IntTable.rowComparator.compare(first_rec, pos_records[0])) {
+            neg_samples.add(new Record(first_rec));
         }
 
-        /* Check the last negative interval */
-        boolean top_interval_exists = false;
-        pos_record = pos_records[pos_records.length - 1];
-        for (int arg: pos_record) {
-            if (arg < totalConstants) { // [n, n, ..., n] is the largest record
-                top_interval_exists = true;
-                break;
-            }
-        }
-        if (top_interval_exists) {
-            neg_samples.add(nextRecord(pos_record, totalConstants));
-        }
-
-        /* Select the lower bound of each negative interval */
         int lim = pos_records.length - 1;
         for (int i = 0; i < lim; i++) {
             int[] next_record = nextRecord(pos_records[i], totalConstants);
             if (0 != IntTable.rowComparator.compare(next_record, pos_records[i+1])) {
-                neg_samples.add(next_record);
+                neg_samples.add(new Record(next_record));
+            }
+        }
+        int[] next_record = nextRecord(pos_records[lim], totalConstants);
+        if (0 != IntTable.rowComparator.compare(next_record, pos_records[lim])) {
+            neg_samples.add(new Record(next_record));
+        }
+
+        /* Neg interval endings */
+        int[] last_rec = ArrayOperation.initArrayWithValue(posRelation.totalCols(), totalConstants);
+        if (0 != IntTable.rowComparator.compare(last_rec, pos_records[lim])) {
+            neg_samples.add(new Record(last_rec));
+        }
+        for (int i = 1; i < pos_records.length; i++) {
+            int[] prev_record = previousRecord(pos_records[i], totalConstants);
+            if (0 != IntTable.rowComparator.compare(prev_record, pos_records[i-1])) {
+                neg_samples.add(new Record(prev_record));
+            }
+        }
+        int[] prev_record = previousRecord(pos_records[0], totalConstants);
+        if (0 != IntTable.rowComparator.compare(prev_record, pos_records[0])) {
+            neg_samples.add(new Record(prev_record));
+        }
+
+        return new IntTable(collectionToArray(neg_samples));
+    }
+
+    /**
+     * This method samples negative records from negative intervals. The lower bound of each negative interval is selected.
+     * Therefore, at most 2n+2 (n is the number of positive records) negative samples will be selected under this strategy.
+     *
+     * @param posRelation    The set of positive records
+     * @param totalConstants The number of constants involved in the KB
+     * @param enhance        If > 0, split the alphabetically ordered list of all possible records into many intervals,
+     *                       the number of which is "enhance", and sample the beginning record of each interval to enhance
+     *                       the sample set
+     * @return A set of negative samples organized as an IntTable
+     */
+    public static IntTable negIntervalBeginningSampling(IntTable posRelation, int totalConstants, int enhance) {
+        Set<Record> neg_samples = new HashSet<>();
+        int[][] pos_records = posRelation.getAllRows();
+
+        /* Neg interval beginnings */
+        int[] first_rec = ArrayOperation.initArrayWithValue(posRelation.totalCols(), 1);
+        if (0 != IntTable.rowComparator.compare(first_rec, pos_records[0])) {
+            neg_samples.add(new Record(first_rec));
+        }
+
+        int lim = pos_records.length - 1;
+        for (int i = 0; i < lim; i++) {
+            int[] next_record = nextRecord(pos_records[i], totalConstants);
+            if (0 != IntTable.rowComparator.compare(next_record, pos_records[i+1])) {
+                neg_samples.add(new Record(next_record));
+            }
+        }
+        int[] next_record = nextRecord(pos_records[lim], totalConstants);
+        if (0 != IntTable.rowComparator.compare(next_record, pos_records[lim])) {
+            neg_samples.add(new Record(next_record));
+        }
+
+        enhanceViaEvenlySampling(posRelation, totalConstants, neg_samples, enhance);
+
+        return new IntTable(collectionToArray(neg_samples));
+    }
+
+    /**
+     * This method samples negative records from negative intervals. The upper bounds of each negative interval is selected.
+     * Therefore, at most 2n+2 (n is the number of positive records) negative samples will be selected under this strategy.
+     *
+     * @param posRelation    The set of positive records
+     * @param totalConstants The number of constants involved in the KB
+     * @param enhance        If > 0, split the alphabetically ordered list of all possible records into many intervals,
+     *                       the number of which is "enhance", and sample the beginning record of each interval to enhance
+     *                       the sample set
+     * @return A set of negative samples organized as an IntTable
+     */
+    public static IntTable negIntervalEndingSampling(IntTable posRelation, int totalConstants, int enhance) {
+        Set<Record> neg_samples = new HashSet<>();
+        int[][] pos_records = posRelation.getAllRows();
+        int lim = pos_records.length - 1;
+
+        /* Neg interval endings */
+        int[] last_rec = ArrayOperation.initArrayWithValue(posRelation.totalCols(), totalConstants);
+        if (0 != IntTable.rowComparator.compare(last_rec, pos_records[lim])) {
+            neg_samples.add(new Record(last_rec));
+        }
+        for (int i = 1; i < pos_records.length; i++) {
+            int[] prev_record = previousRecord(pos_records[i], totalConstants);
+            if (0 != IntTable.rowComparator.compare(prev_record, pos_records[i-1])) {
+                neg_samples.add(new Record(prev_record));
+            }
+        }
+        int[] prev_record = previousRecord(pos_records[0], totalConstants);
+        if (0 != IntTable.rowComparator.compare(prev_record, pos_records[0])) {
+            neg_samples.add(new Record(prev_record));
+        }
+
+        enhanceViaEvenlySampling(posRelation, totalConstants, neg_samples, enhance);
+
+        return new IntTable(collectionToArray(neg_samples));
+    }
+
+    /**
+     * This method samples negative records from alphabetical neighbors of positive records. For each positive record r,
+     * generate at most d relevant negative samples, where d is the arity of r:
+     *   - For each dimension i = 1, 2, ..., d, change r.i to r.i + 1
+     *   - If the new record is not in the KB, add the record to the negative sample set
+     *
+     * @param posRelation    The set of positive records
+     * @param totalConstants The number of constants involved in the KB
+     * @param enhance        If > 0, split the alphabetically ordered list of all possible records into many intervals,
+     *                       the number of which is "enhance", and sample the beginning record of each interval to enhance
+     *                       the sample set
+     * @return A set of negative samples organized as an IntTable
+     */
+    public static IntTable alphaNeighborUpperSampling(IntTable posRelation, int totalConstants, int enhance) {
+        Set<Record> neg_samples = new HashSet<>();
+
+        for (int[] pos_record: posRelation.getAllRows()) {
+            for (int arg_idx = 0; arg_idx < pos_record.length; arg_idx++) {
+                /* r.i + 1 */
+                if (pos_record[arg_idx] < totalConstants) {
+                    int[] new_rec = pos_record.clone();
+                    new_rec[arg_idx]++;
+                    if (!posRelation.hasRow(new_rec)) {
+                        neg_samples.add(new Record(new_rec));
+                    }
+                }
             }
         }
 
-        return new IntTable(neg_samples.toArray(new int[0][]));
+        enhanceViaEvenlySampling(posRelation, totalConstants, neg_samples, enhance);
+
+        return new IntTable(collectionToArray(neg_samples));
+    }
+
+    /**
+     * Enhance negative sampling sets by evenly selecting records from the alphabetically sorted list of all possible
+     * records.
+     *
+     * @param enhance The number of samples selected from the overall sorted list
+     */
+    protected static void enhanceViaEvenlySampling(
+            IntTable posRelation, int totalConstants, Set<Record> negSamples, int enhance
+    ) {
+        if (enhance <= 0) {
+            return;
+        }
+
+        final int step_size = posRelation.totalRows() / enhance + ((0 == posRelation.totalRows() % enhance) ? 0 : 1);
+        int[] record_template = ArrayOperation.initArrayWithValue(posRelation.totalCols(), 1);
+        for (int i = 0; i < enhance; i++) {
+            if (!posRelation.hasRow(record_template)) {
+                negSamples.add(new Record(record_template));
+            }
+            record_template = nextRecord(record_template, totalConstants, step_size);
+        }
+    }
+
+    /**
+     * This method samples negative records from alphabetical neighbors of positive records. For each positive record r,
+     * generate at most 2d relevant negative samples, where d is the arity of r:
+     *   - For each dimension i = 1, 2, ..., d, change r.i to r.i + 1 and r.i - 1
+     *   - If the new record is not in the KB, add the record to the negative sample set
+     *
+     * @param posRelation    The set of positive records
+     * @param totalConstants The number of constants involved in the KB
+     * @param enhance        If > 0, split the alphabetically ordered list of all possible records into many intervals,
+     *                       the number of which is "enhance", and sample the beginning record of each interval to enhance
+     *                       the sample set
+     * @return A set of negative samples organized as an IntTable
+     */
+    public static IntTable alphaNeighborLowerSampling(IntTable posRelation, int totalConstants, int enhance) {
+        Set<Record> neg_samples = new HashSet<>();
+
+        for (int[] pos_record: posRelation.getAllRows()) {
+            for (int arg_idx = 0; arg_idx < pos_record.length; arg_idx++) {
+                /* r.i - 1*/
+                if (pos_record[arg_idx] > 1) {
+                    int[] new_rec = pos_record.clone();
+                    new_rec[arg_idx]--;
+                    if (!posRelation.hasRow(new_rec)) {
+                        neg_samples.add(new Record(new_rec));
+                    }
+                }
+            }
+        }
+
+        enhanceViaEvenlySampling(posRelation, totalConstants, neg_samples, enhance);
+
+        return new IntTable(collectionToArray(neg_samples));
+    }
+
+    /**
+     * This method samples negative records from alphabetical neighbors of positive records. For each positive record r,
+     * generate at most 2d relevant negative samples, where d is the arity of r:
+     *   - For each dimension i = 1, 2, ..., d, change r.i to r.i + 1 and r.i - 1
+     *   - If the new record is not in the KB, add the record to the negative sample set
+     *
+     * @param posRelation    The set of positive records
+     * @param totalConstants The number of constants involved in the KB
+     * @param enhance        If > 0, split the alphabetically ordered list of all possible records into many intervals,
+     *                       the number of which is "enhance", and sample the beginning record of each interval to enhance
+     *                       the sample set
+     * @return A set of negative samples organized as an IntTable
+     */
+    public static IntTable alphaNeighborSampling(IntTable posRelation, int totalConstants, int enhance) {
+        Set<Record> neg_samples = new HashSet<>();
+
+        for (int[] pos_record: posRelation.getAllRows()) {
+            for (int arg_idx = 0; arg_idx < pos_record.length; arg_idx++) {
+                /* r.i + 1 */
+                if (pos_record[arg_idx] < totalConstants) {
+                    int[] new_rec = pos_record.clone();
+                    new_rec[arg_idx]++;
+                    if (!posRelation.hasRow(new_rec)) {
+                        neg_samples.add(new Record(new_rec));
+                    }
+                }
+
+                /* r.i - 1*/
+                if (pos_record[arg_idx] > 1) {
+                    int[] new_rec = pos_record.clone();
+                    new_rec[arg_idx]--;
+                    if (!posRelation.hasRow(new_rec)) {
+                        neg_samples.add(new Record(new_rec));
+                    }
+                }
+            }
+        }
+
+        enhanceViaEvenlySampling(posRelation, totalConstants, neg_samples, enhance);
+
+        return new IntTable(collectionToArray(neg_samples));
     }
 
     /**
@@ -293,7 +505,7 @@ public class NegSampler {
             end_record = records[idx];
             delta = 1;
         }
-        return recordsInInterval(end_record, start_record, totalConstants) - delta;
+        return recordsInInterval(start_record, end_record, totalConstants) - delta;
     }
 
     /**
@@ -328,6 +540,54 @@ public class NegSampler {
     }
 
     /**
+     * Return the record that is "stepSize" records behind the given one in the alphabetical order.
+     *
+     * NOTE: If the next record is "larger" than the maximum record, the max will be returned.
+     */
+    public static int[] nextRecord(int[] record, int totalConstants, int stepSize) {
+        int[] next_record = record.clone();
+        int carry = 0;
+        for (int i = next_record.length - 1; i >= 0 && (stepSize > 0 || carry > 0); i--) {
+            int addition = stepSize % totalConstants;
+            stepSize = stepSize / totalConstants;
+            next_record[i] += addition + carry;
+            carry = (next_record[i] - 1) / totalConstants;
+            next_record[i] = (next_record[i] - 1) % totalConstants + 1;
+        }
+        return (0 == carry) ? next_record : ArrayOperation.initArrayWithValue(record.length, totalConstants);
+    }
+
+    /**
+     * Return the previous record of the given one in alphabetical order.
+     *
+     * NOTE: The previous of the smallest record is the one itself.
+     */
+    public static int[] previousRecord(int[] record, int totalConstants) {
+        int[] prev_record = record.clone();
+        boolean is_min = true;
+        for (int i = prev_record.length - 1; i >= 0; i--) {
+            if (prev_record[i] > 1) {
+                prev_record[i]--;
+                is_min = false;
+                break;
+            } else {
+                prev_record[i] = totalConstants;
+            }
+        }
+        return is_min ? record.clone() : prev_record;
+    }
+
+    protected static int[][] collectionToArray(Collection<Record> records) {
+        int[][] _records = new int[records.size()][];
+        int idx = 0;
+        for (Record record: records) {
+            _records[idx] = record.args;
+            idx++;
+        }
+        return _records;
+    }
+
+    /**
      * Use this method to generate negative samples in each dataset. There are two arguments in the array:
      *   1. The path to the KBs
      *   2. The path where the negative KB will be dumped
@@ -353,9 +613,24 @@ public class NegSampler {
                     NegSampleKb pos_rel_neg_kb = posRelativeGenerator(kb, budget_factor);
                     pos_rel_neg_kb.dump(neg_base_path);
                 }
-                System.out.println("Neg Interval ...");
-                NegSampleKb neg_intv_neg_kb = negIntervalGenerator(kb);
-                neg_intv_neg_kb.dump(neg_base_path);
+
+                for (boolean enhance: new boolean[] {false, true}) {
+                    System.out.println("Neg Interval ...");
+                    NegSampleKb neg_intv_neg_kb = negIntervalGenerator(kb, enhance);
+                    neg_intv_neg_kb.dump(neg_base_path);
+                    NegSampleKb nib_neg_kb = negIntervalBeginningGenerator(kb, enhance);
+                    nib_neg_kb.dump(neg_base_path);
+                    NegSampleKb nie_neg_kb = negIntervalEndingGenerator(kb, enhance);
+                    nie_neg_kb.dump(neg_base_path);
+
+                    System.out.println("Alphabetical Neighbor ...");
+                    NegSampleKb an_neg_kb = alphaNeighborGenerator(kb, enhance);
+                    an_neg_kb.dump(neg_base_path);
+                    NegSampleKb anl_neg_kb = alphaNeighborLowerGenerator(kb, enhance);
+                    anl_neg_kb.dump(neg_base_path);
+                    NegSampleKb anu_neg_kb = alphaNeighborUpperGenerator(kb, enhance);
+                    anu_neg_kb.dump(neg_base_path);
+                }
             }
         }
     }
@@ -396,17 +671,87 @@ public class NegSampler {
         return new NegSampleKb(String.format("%s_neg_pos_rel_%.1f", kb.getName(), budget_factor), neg_tables, weight_maps);
     }
 
-    protected static NegSampleKb negIntervalGenerator(SimpleKb kb) {
+    protected static NegSampleKb negIntervalGenerator(SimpleKb kb, boolean enhance) {
         SimpleRelation[] relations = kb.getRelations();
         int total_constants = kb.totalConstants();
         IntTable[] neg_tables = new IntTable[relations.length];
         Map<Record, Float>[] weight_maps = new Map[relations.length];
         for (int rel_idx = 0; rel_idx < relations.length; rel_idx++) {
             SimpleRelation relation = relations[rel_idx];
-            IntTable neg_table = NegSampler.negIntervalSampling(relation, total_constants);
+            IntTable neg_table = NegSampler.negIntervalSampling(relation, total_constants, enhance ? relation.totalRows() : 0);
             neg_tables[rel_idx] = neg_table;
             weight_maps[rel_idx] = NegSampler.calcNegSampleWeight(relation, neg_table, total_constants);
         }
-        return new NegSampleKb(String.format("%s_neg_neg_intv", kb.getName()), neg_tables, weight_maps);
+        return new NegSampleKb(String.format(enhance ? "%s_neg_NI+" : "%s_neg_NI", kb.getName()), neg_tables, weight_maps);
+    }
+
+    protected static NegSampleKb negIntervalBeginningGenerator(SimpleKb kb, boolean enhance) {
+        SimpleRelation[] relations = kb.getRelations();
+        int total_constants = kb.totalConstants();
+        IntTable[] neg_tables = new IntTable[relations.length];
+        Map<Record, Float>[] weight_maps = new Map[relations.length];
+        for (int rel_idx = 0; rel_idx < relations.length; rel_idx++) {
+            SimpleRelation relation = relations[rel_idx];
+            IntTable neg_table = NegSampler.negIntervalBeginningSampling(relation, total_constants, enhance ? relation.totalRows() : 0);
+            neg_tables[rel_idx] = neg_table;
+            weight_maps[rel_idx] = NegSampler.calcNegSampleWeight(relation, neg_table, total_constants);
+        }
+        return new NegSampleKb(String.format(enhance ? "%s_neg_NIB+" : "%s_neg_NIB", kb.getName()), neg_tables, weight_maps);
+    }
+
+    protected static NegSampleKb negIntervalEndingGenerator(SimpleKb kb, boolean enhance) {
+        SimpleRelation[] relations = kb.getRelations();
+        int total_constants = kb.totalConstants();
+        IntTable[] neg_tables = new IntTable[relations.length];
+        Map<Record, Float>[] weight_maps = new Map[relations.length];
+        for (int rel_idx = 0; rel_idx < relations.length; rel_idx++) {
+            SimpleRelation relation = relations[rel_idx];
+            IntTable neg_table = NegSampler.negIntervalEndingSampling(relation, total_constants, enhance ? relation.totalRows() : 0);
+            neg_tables[rel_idx] = neg_table;
+            weight_maps[rel_idx] = NegSampler.calcNegSampleWeight(relation, neg_table, total_constants);
+        }
+        return new NegSampleKb(String.format(enhance ? "%s_neg_NIE+" : "%s_neg_NIE", kb.getName()), neg_tables, weight_maps);
+    }
+
+    protected static NegSampleKb alphaNeighborGenerator(SimpleKb kb, boolean enhance) {
+        SimpleRelation[] relations = kb.getRelations();
+        int total_constants = kb.totalConstants();
+        IntTable[] neg_tables = new IntTable[relations.length];
+        Map<Record, Float>[] weight_maps = new Map[relations.length];
+        for (int rel_idx = 0; rel_idx < relations.length; rel_idx++) {
+            SimpleRelation relation = relations[rel_idx];
+            IntTable neg_table = NegSampler.alphaNeighborSampling(relation, total_constants, enhance ? relation.totalRows() : 0);
+            neg_tables[rel_idx] = neg_table;
+            weight_maps[rel_idx] = NegSampler.calcNegSampleWeight(relation, neg_table, total_constants);
+        }
+        return new NegSampleKb(String.format(enhance ? "%s_neg_AN+" : "%s_neg_AN", kb.getName()), neg_tables, weight_maps);
+    }
+
+    protected static NegSampleKb alphaNeighborLowerGenerator(SimpleKb kb, boolean enhance) {
+        SimpleRelation[] relations = kb.getRelations();
+        int total_constants = kb.totalConstants();
+        IntTable[] neg_tables = new IntTable[relations.length];
+        Map<Record, Float>[] weight_maps = new Map[relations.length];
+        for (int rel_idx = 0; rel_idx < relations.length; rel_idx++) {
+            SimpleRelation relation = relations[rel_idx];
+            IntTable neg_table = NegSampler.alphaNeighborLowerSampling(relation, total_constants, enhance ? relation.totalRows() : 0);
+            neg_tables[rel_idx] = neg_table;
+            weight_maps[rel_idx] = NegSampler.calcNegSampleWeight(relation, neg_table, total_constants);
+        }
+        return new NegSampleKb(String.format(enhance ? "%s_neg_ANL+" : "%s_neg_ANL", kb.getName()), neg_tables, weight_maps);
+    }
+
+    protected static NegSampleKb alphaNeighborUpperGenerator(SimpleKb kb, boolean enhance) {
+        SimpleRelation[] relations = kb.getRelations();
+        int total_constants = kb.totalConstants();
+        IntTable[] neg_tables = new IntTable[relations.length];
+        Map<Record, Float>[] weight_maps = new Map[relations.length];
+        for (int rel_idx = 0; rel_idx < relations.length; rel_idx++) {
+            SimpleRelation relation = relations[rel_idx];
+            IntTable neg_table = NegSampler.alphaNeighborUpperSampling(relation, total_constants, enhance ? relation.totalRows() : 0);
+            neg_tables[rel_idx] = neg_table;
+            weight_maps[rel_idx] = NegSampler.calcNegSampleWeight(relation, neg_table, total_constants);
+        }
+        return new NegSampleKb(String.format(enhance ? "%s_neg_ANU+" : "%s_neg_ANU", kb.getName()), neg_tables, weight_maps);
     }
 }
