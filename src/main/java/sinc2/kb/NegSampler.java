@@ -6,19 +6,24 @@ import sinc2.impl.negsamp.CB;
 import sinc2.impl.negsamp.CacheFragment;
 import sinc2.rule.Rule;
 import sinc2.util.ArrayOperation;
+import sinc2.util.io.IntReader;
+import sinc2.util.kb.NumeratedKb;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * This class is used for negative sampling from KBs under closed-word assumption (CWA). Four strategies are implemented
+ * This class is used for negative sampling from KBs under closed-word assumption (CWA). Five strategies are implemented
  * currently:
  *   1. Uniform Sampling
  *   2. Positive-relative Sampling
  *   3. Negative Interval Sampling
- *   4. Adversarial Sampling
+ *   4. Constant Relevance Sampling
+ *   5. Adversarial Sampling
  *
  * This class also calculates the weight of each negative sample w.r.t. the given KB.
  *
@@ -348,6 +353,87 @@ public class NegSampler {
     }
 
     /**
+     * This method generates a negative KB by constant relevance. The method reads a partially completed KB data, where
+     * negative samples are given without weight, from the dump written by a Python script "gen_neg_con_rel.py" in this
+     * package. The parameters of this method are used to find the intermediate dump. This method will generate kdn
+     * negative samples, where k is the parameter "TopK", d is the arity of the relation, and n is the number of records
+     * in the positive relation.
+     *
+     * @param kb   The positive KB
+     * @param hop  The number of hops used to calculate the relevance matrix
+     * @param topK Top k relevant constants used to generate neg samples
+     */
+    public static void constantRelevanceSampling(SimpleKb kb, int hop, int topK, String basePath) throws IOException {
+        String neg_kb_name = String.format("%s_neg_con_rel_h%dk%di", kb.name, hop, topK);
+        completeWeight(neg_kb_name, basePath, kb);
+    }
+
+//    /**
+//     * This method generates a negative KB by constant relevance. The method reads a partially completed KB data, where
+//     * negative samples are given without weight, from the dump written by a Python script "gen_neg_con_rel.py" in this
+//     * package. The parameters of this method are used to find the intermediate dump. This method will generate rdn
+//     * negative samples, where r is the parameter "round", d is the arity of the relation, and n is the number of records
+//     * in the positive relation.
+//     *
+//     * @param kb         The positive KB
+//     * @param hop        The number of hops used to calculate the relevance matrix
+//     * @param percentage Top percentages of relevant constants used to generate neg samples
+//     * @param rounds     The number of alternated constants generated from one argument in a positive record
+//     */
+//    public static void constantRelevanceSampling(SimpleKb kb, int hop, int percentage, int rounds, String basePath) throws IOException {
+//        String neg_kb_name = String.format("%s_neg_con_rel_h%dp%dr%d", kb.name, hop, percentage, rounds);
+//        completeWeight(neg_kb_name, basePath, kb);
+//    }
+
+//    /**
+//     * This method generates a negative KB by constant relevance. The method reads a partially completed KB data, where
+//     * negative samples are given without weight, from the dump written by a Python script "gen_neg_con_rel.py" in this
+//     * package. The parameters of this method are used to find the intermediate dump. This method will generate kdn
+//     * negative samples, where k is the parameter "TopK", d is the arity of the relation, and n is the number of records
+//     * in the positive relation.
+//     *
+//     * @param kb     The positive KB
+//     * @param hop    The number of hops used to calculate the relevance matrix
+//     * @param rounds The number of alternated constants generated from one argument in a positive record
+//     */
+//    public static void constantRelevanceSampling(SimpleKb kb, int hop, int rounds, String basePath) throws IOException {
+//        String neg_kb_name = String.format("%s_neg_con_rel_h%dr%d", kb.name, hop, rounds);
+//        completeWeight(neg_kb_name, basePath, kb);
+//    }
+
+    /**
+     * This method is only used to complete the weight of negative samples in a partially completed neg KB and dump the
+     * completed KB to the original location.
+     */
+    protected static void completeWeight(String negKbName, String basePath, SimpleKb kb) throws IOException {
+        /* Load relation information */
+        String dir_path = NumeratedKb.getKbPath(negKbName, basePath).toString();
+        File rel_info_file = Paths.get(dir_path, NegSampleKb.REL_INFO_FILE_NAME).toFile();
+        IntReader rel_info_reader = new IntReader(rel_info_file);
+        int total_relations = rel_info_reader.next();
+
+        IntTable[] negSampleTabs = new IntTable[total_relations];
+        Map<Record, Float>[] negSampleWeightMaps = new Map[total_relations];
+        for (int rel_id = 0; rel_id < total_relations; rel_id++) {
+            /* Load negative samples and weight */
+            int arity = rel_info_reader.next();
+            int total_records = rel_info_reader.next();
+            int[][] neg_samples = SimpleRelation.loadFile(
+                    Paths.get(dir_path, NegSampleKb.getNegRelFileName(rel_id)).toFile(), arity, total_records
+            );
+            IntTable neg_table = new IntTable(neg_samples);
+            Map<Record, Float> weight_map = calcNegSampleWeight(kb.getRelation(rel_id), neg_table, kb.totalConstants());
+            negSampleWeightMaps[rel_id] = weight_map;
+            negSampleTabs[rel_id] = neg_table;
+        }
+        rel_info_reader.close();
+
+        /* Dump new neg KB */
+        NegSampleKb neg_kb = new NegSampleKb(negKbName, negSampleTabs, negSampleWeightMaps);
+        neg_kb.dump(basePath);
+    }
+
+    /**
      * This method samples negative records from current entailment. Harder negative records will be sampled with higher
      * probability. The hardness of samples is measured by the number of possible evidence that entails the sample. Given
      * that the negative samples will be harder to sample when the quality of rule is improving, the budget here stands
@@ -604,33 +690,35 @@ public class NegSampler {
                 System.out.println("Sampling from: " + kb_name);
                 SimpleKb kb = new SimpleKb(kb_name, base_path);
 
-                for (float budget_factor: budget_factors) {
-                    System.out.printf("Uniform (%.2f) ...\n", budget_factor);
-                    NegSampleKb uniform_neg_kb = uniformGenerator(kb, budget_factor);
-                    uniform_neg_kb.dump(neg_base_path);
+//                for (float budget_factor: budget_factors) {
+//                    System.out.printf("Uniform (%.2f) ...\n", budget_factor);
+//                    NegSampleKb uniform_neg_kb = uniformGenerator(kb, budget_factor);
+//                    uniform_neg_kb.dump(neg_base_path);
+//
+//                    System.out.printf("Pos Relative (%.2f) ...\n", budget_factor);
+//                    NegSampleKb pos_rel_neg_kb = posRelativeGenerator(kb, budget_factor);
+//                    pos_rel_neg_kb.dump(neg_base_path);
+//                }
+//
+//                for (boolean enhance: new boolean[] {false, true}) {
+//                    System.out.println("Neg Interval ...");
+//                    NegSampleKb neg_intv_neg_kb = negIntervalGenerator(kb, enhance);
+//                    neg_intv_neg_kb.dump(neg_base_path);
+//                    NegSampleKb nib_neg_kb = negIntervalBeginningGenerator(kb, enhance);
+//                    nib_neg_kb.dump(neg_base_path);
+//                    NegSampleKb nie_neg_kb = negIntervalEndingGenerator(kb, enhance);
+//                    nie_neg_kb.dump(neg_base_path);
+//
+//                    System.out.println("Alphabetical Neighbor ...");
+//                    NegSampleKb an_neg_kb = alphaNeighborGenerator(kb, enhance);
+//                    an_neg_kb.dump(neg_base_path);
+//                    NegSampleKb anl_neg_kb = alphaNeighborLowerGenerator(kb, enhance);
+//                    anl_neg_kb.dump(neg_base_path);
+//                    NegSampleKb anu_neg_kb = alphaNeighborUpperGenerator(kb, enhance);
+//                    anu_neg_kb.dump(neg_base_path);
+//                }
 
-                    System.out.printf("Pos Relative (%.2f) ...\n", budget_factor);
-                    NegSampleKb pos_rel_neg_kb = posRelativeGenerator(kb, budget_factor);
-                    pos_rel_neg_kb.dump(neg_base_path);
-                }
-
-                for (boolean enhance: new boolean[] {false, true}) {
-                    System.out.println("Neg Interval ...");
-                    NegSampleKb neg_intv_neg_kb = negIntervalGenerator(kb, enhance);
-                    neg_intv_neg_kb.dump(neg_base_path);
-                    NegSampleKb nib_neg_kb = negIntervalBeginningGenerator(kb, enhance);
-                    nib_neg_kb.dump(neg_base_path);
-                    NegSampleKb nie_neg_kb = negIntervalEndingGenerator(kb, enhance);
-                    nie_neg_kb.dump(neg_base_path);
-
-                    System.out.println("Alphabetical Neighbor ...");
-                    NegSampleKb an_neg_kb = alphaNeighborGenerator(kb, enhance);
-                    an_neg_kb.dump(neg_base_path);
-                    NegSampleKb anl_neg_kb = alphaNeighborLowerGenerator(kb, enhance);
-                    anl_neg_kb.dump(neg_base_path);
-                    NegSampleKb anu_neg_kb = alphaNeighborUpperGenerator(kb, enhance);
-                    anu_neg_kb.dump(neg_base_path);
-                }
+                constRelevanceGenerator(kb, neg_base_path);
             }
         }
     }
@@ -753,5 +841,30 @@ public class NegSampler {
             weight_maps[rel_idx] = NegSampler.calcNegSampleWeight(relation, neg_table, total_constants);
         }
         return new NegSampleKb(String.format(enhance ? "%s_neg_ANU+" : "%s_neg_ANU", kb.getName()), neg_tables, weight_maps);
+    }
+
+    protected static void constRelevanceGenerator(SimpleKb kb, String negBasePath) throws IOException {
+        for (int hop : new int[]{0, 1, 2, 3}) {
+            for (int top_k: new int[]{1, 2, 3, 4, 5}) {
+                System.out.printf("Hop = %d, K = %d\n", hop, top_k);
+                constantRelevanceSampling(kb, hop, top_k, negBasePath);
+            }
+        }
+
+//        for (int hop : new int[]{0, 1, 2, 3}) {
+//            for (int percentage: new int[]{10, 20, 30, 40, 50}) {
+//                for (int rounds: new int[]{1, 2, 3, 4, 5}) {
+//                    System.out.printf("Hop = %d, Percentage = %d, R = %d\n", hop, percentage, rounds);
+//                    constantRelevanceSampling(kb, hop, percentage, rounds, negBasePath);
+//                }
+//            }
+//        }
+
+//        for (int hop : new int[]{0, 1, 2, 3}) {
+//            for (int rounds: new int[]{1, 2, 3, 4, 5}) {
+//                System.out.printf("Hop = %d, Rounds = %d\n", hop, rounds);
+//                constantRelevanceSampling(kb, hop, rounds, negBasePath);
+//            }
+//        }
     }
 }

@@ -9,7 +9,7 @@ import java.util.*;
  *
  * @since 1.0
  */
-public class MultiSet<T> {
+public class MultiSet<T> implements Iterable<Map.Entry<T, Integer>> {
     private final Map<T, Integer> cntMap;
     private int size = 0;
 
@@ -197,5 +197,10 @@ public class MultiSet<T> {
     @Override
     public int hashCode() {
         return Objects.hash(cntMap, size);
+    }
+
+    @Override
+    public Iterator<Map.Entry<T, Integer>> iterator() {
+        return cntMap.entrySet().iterator();
     }
 }
