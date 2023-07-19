@@ -22,9 +22,9 @@ public class FragmentedCachedRule extends Rule {
     /**
      * This class is for mapping predicates in the rule to tables in cache fragments in the E-cache.
      */
-    static class TabInfo {
-        int fragmentIdx;
-        int tabIdx;
+    protected static class TabInfo {
+        public int fragmentIdx;
+        public int tabIdx;
 
         public TabInfo(int fragmentIdx, int tabIdx) {
             this.fragmentIdx = fragmentIdx;

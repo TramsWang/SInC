@@ -4,8 +4,8 @@ import sinc2.common.ArgLocation;
 import sinc2.common.Argument;
 import sinc2.common.Predicate;
 import sinc2.common.Record;
-import sinc2.impl.base.CachedRule;
-import sinc2.impl.base.CompliedBlock;
+import sinc2.impl.negsamp.CB;
+import sinc2.impl.negsamp.FragmentedCachedRule;
 import sinc2.kb.SimpleKb;
 import sinc2.kb.SimpleRelation;
 import sinc2.rule.*;
@@ -14,32 +14,28 @@ import sinc2.util.MultiSet;
 
 import java.util.*;
 
-/**
- * This rule is a specialization of cached rule that estimates the evaluation of each possible specialization.
- *
- * @since 2.1
- */
-public class EstRule extends CachedRule {
+public class FragmentedEstRule extends FragmentedCachedRule {
+
     protected final BodyVarLinkManager bodyVarLinkManager;
 
-    public EstRule(int headPredSymbol, int arity, Set<Fingerprint> fingerprintCache, Map<MultiSet<Integer>, Set<Fingerprint>> category2TabuSetMap, SimpleKb kb) {
+    public FragmentedEstRule(int headPredSymbol, int arity, Set<Fingerprint> fingerprintCache, Map<MultiSet<Integer>, Set<Fingerprint>> category2TabuSetMap, SimpleKb kb) {
         super(headPredSymbol, arity, fingerprintCache, category2TabuSetMap, kb);
         bodyVarLinkManager = new BodyVarLinkManager(structure, 0);
     }
 
-    public EstRule(List<Predicate> structure, Set<Fingerprint> fingerprintCache, Map<MultiSet<Integer>, Set<Fingerprint>> category2TabuSetMap, SimpleKb kb) {
+    public FragmentedEstRule(List<Predicate> structure, Set<Fingerprint> fingerprintCache, Map<MultiSet<Integer>, Set<Fingerprint>> category2TabuSetMap, SimpleKb kb) {
         super(structure, fingerprintCache, category2TabuSetMap, kb);
-        bodyVarLinkManager = new BodyVarLinkManager(structure, usedLimitedVars());
+        bodyVarLinkManager = new BodyVarLinkManager(structure, 0);
     }
 
-    public EstRule(EstRule another) {
+    public FragmentedEstRule(FragmentedEstRule another) {
         super(another);
         this.bodyVarLinkManager = new BodyVarLinkManager(another.bodyVarLinkManager, structure);
     }
 
     @Override
-    public EstRule clone() {
-        return new EstRule(this);
+    public FragmentedEstRule clone() {
+        return new FragmentedEstRule(this);
     }
 
     @Override
@@ -88,40 +84,41 @@ public class EstRule extends CachedRule {
             }
             vars_in_preds[pred_idx] = vars_in_pred;
         }
-        for (List<CompliedBlock> cache_entry: posCache) {
+        for (List<CB> cache_entry: posCache) {
             for (int pred_idx = HEAD_PRED_IDX; pred_idx < structure.size(); pred_idx++) {
-                CompliedBlock cb = cache_entry.get(pred_idx);
+                CB cb = cache_entry.get(pred_idx);
                 MultiSet<Integer>[] arg_sets = column_values_in_pos_cache.get(pred_idx);
-                for (int arg_idx = 0; arg_idx < cb.partAsgnRecord.length; arg_idx++) {
+                for (int arg_idx = 0; arg_idx < cb.complianceSet[0].length; arg_idx++) {
                     MultiSet<Integer> arg_set = arg_sets[arg_idx];
-                    for (int[] record: cb.complSet) {
+                    for (int[] record: cb.complianceSet) {
                         arg_set.add(record[arg_idx]);
                     }
                 }
             }
         }
-        for (List<CompliedBlock> cache_entry: entCache) {
+        for (List<CB> cache_entry: entCache) {
             for (int pred_idx = HEAD_PRED_IDX; pred_idx < structure.size(); pred_idx++) {
-                CompliedBlock cb = cache_entry.get(pred_idx);
+                CB cb = cache_entry.get(pred_idx);
                 MultiSet<Integer>[] arg_sets = column_values_in_ent_cache.get(pred_idx);
-                for (int arg_idx = 0; arg_idx < cb.partAsgnRecord.length; arg_idx++) {
+                for (int arg_idx = 0; arg_idx < cb.complianceSet[0].length; arg_idx++) {
                     MultiSet<Integer> arg_set = arg_sets[arg_idx];
-                    for (int[] record: cb.complSet) {
+                    for (int[] record: cb.complianceSet) {
                         arg_set.add(record[arg_idx]);
                     }
                 }
             }
-            for (int[] record: cache_entry.get(HEAD_PRED_IDX).complSet) {
+            for (int[] record: cache_entry.get(HEAD_PRED_IDX).complianceSet) {
                 entailed_records.add(new Record(record));
             }
         }
-        for (List<CompliedBlock> cache_entry: allCache) {
-            for (int pred_idx = FIRST_BODY_PRED_IDX; pred_idx < structure.size(); pred_idx++) {
-                CompliedBlock cb = cache_entry.get(pred_idx);
-                MultiSet<Integer>[] arg_sets = column_values_in_all_cache.get(pred_idx);
-                for (int arg_idx = 0; arg_idx < cb.partAsgnRecord.length; arg_idx++) {
+        for (int pred_idx = FIRST_BODY_PRED_IDX; pred_idx < structure.size(); pred_idx++) {
+            TabInfo tab_info = predIdx2AllCacheTableInfo.get(pred_idx);
+            MultiSet<Integer>[] arg_sets = column_values_in_all_cache.get(pred_idx);
+            for (List<CB> cache_entry: allCache.get(tab_info.fragmentIdx)) {
+                CB cb = cache_entry.get(tab_info.tabIdx);
+                for (int arg_idx = 0; arg_idx < cb.complianceSet[0].length; arg_idx++) {
                     MultiSet<Integer> arg_set = arg_sets[arg_idx];
-                    for (int[] record: cb.complSet) {
+                    for (int[] record: cb.complianceSet) {
                         arg_set.add(record[arg_idx]);
                     }
                 }
@@ -164,9 +161,9 @@ public class EstRule extends CachedRule {
                     /* There is another occurrence of var in the same predicate */
                     // Todo: Random sampling may be applied here
                     int remaining_rows = 0;
-                    for (List<CompliedBlock> cache_entry: posCache) {
-                        CompliedBlock cb = cache_entry.get(vacant.predIdx);
-                        for (int[] record: cb.complSet) {
+                    for (List<CB> cache_entry: posCache) {
+                        CB cb = cache_entry.get(vacant.predIdx);
+                        for (int[] record: cb.complianceSet) {
                             remaining_rows += record[another_arg_idx] == record[vacant.argIdx] ? 1 : 0;
                         }
                     }
@@ -177,9 +174,9 @@ public class EstRule extends CachedRule {
                         est_already_ent = 0;
                     } else {
                         remaining_rows = 0;
-                        for (List<CompliedBlock> cache_entry : entCache) {
-                            CompliedBlock cb = cache_entry.get(vacant.predIdx);
-                            for (int[] record : cb.complSet) {
+                        for (List<CB> cache_entry : entCache) {
+                            CB cb = cache_entry.get(vacant.predIdx);
+                            for (int[] record : cb.complianceSet) {
                                 remaining_rows += record[another_arg_idx] == record[vacant.argIdx] ? 1 : 0;
                             }
                         }
@@ -191,9 +188,10 @@ public class EstRule extends CachedRule {
                     } else {
                         // Todo: Random sampling may be applied here
                         remaining_rows = 0;
-                        for (List<CompliedBlock> cache_entry: allCache) {
-                            CompliedBlock cb = cache_entry.get(vacant.predIdx);
-                            for (int[] record: cb.complSet) {
+                        TabInfo tab_info = predIdx2AllCacheTableInfo.get(vacant.predIdx);
+                        for (List<CB> cache_entry: allCache.get(tab_info.fragmentIdx)) {
+                            CB cb = cache_entry.get(tab_info.tabIdx);
+                            for (int[] record: cb.complianceSet) {
                                 remaining_rows += record[another_arg_idx] == record[vacant.argIdx] ? 1 : 0;
                             }
                         }
@@ -375,9 +373,9 @@ public class EstRule extends CachedRule {
                     /* The new args are in the same predicate */
                     // Todo: Random sampling may be applied here
                     int remaining_rows = 0;
-                    for (List<CompliedBlock> cache_entry: posCache) {
-                        CompliedBlock cb = cache_entry.get(empty_arg_loc_1.predIdx);
-                        for (int[] record: cb.complSet) {
+                    for (List<CB> cache_entry: posCache) {
+                        CB cb = cache_entry.get(empty_arg_loc_1.predIdx);
+                        for (int[] record: cb.complianceSet) {
                             remaining_rows += record[empty_arg_loc_1.argIdx] == record[empty_arg_loc_2.argIdx] ? 1 : 0;
                         }
                     }
@@ -388,9 +386,9 @@ public class EstRule extends CachedRule {
                     } else {
                         // Todo: Random sampling may be applied here
                         remaining_rows = 0;
-                        for (List<CompliedBlock> cache_entry : entCache) {
-                            CompliedBlock cb = cache_entry.get(empty_arg_loc_1.predIdx);
-                            for (int[] record : cb.complSet) {
+                        for (List<CB> cache_entry : entCache) {
+                            CB cb = cache_entry.get(empty_arg_loc_1.predIdx);
+                            for (int[] record : cb.complianceSet) {
                                 remaining_rows += record[empty_arg_loc_1.argIdx] == record[empty_arg_loc_2.argIdx] ? 1 : 0;
                             }
                         }
@@ -402,9 +400,10 @@ public class EstRule extends CachedRule {
                     } else {
                         // Todo: Random sampling may be applied here
                         remaining_rows = 0;
-                        for (List<CompliedBlock> cache_entry: allCache) {
-                            CompliedBlock cb = cache_entry.get(empty_arg_loc_1.predIdx);
-                            for (int[] record: cb.complSet) {
+                        TabInfo tab_info = predIdx2AllCacheTableInfo.get(empty_arg_loc_1.predIdx);
+                        for (List<CB> cache_entry: allCache.get(tab_info.fragmentIdx)) {
+                            CB cb = cache_entry.get(tab_info.tabIdx);
+                            for (int[] record: cb.complianceSet) {
                                 remaining_rows += record[empty_arg_loc_1.argIdx] == record[empty_arg_loc_2.argIdx] ? 1 : 0;
                             }
                         }
