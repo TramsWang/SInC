@@ -2,6 +2,8 @@ import struct
 import numpy as np
 import bisect
 import os
+import time
+import psutil
 
 # This file is used for generating negative KB by constant relevance.
 # However, the following code only generate part of KB, with no weight information included.
@@ -68,11 +70,13 @@ def calcRelevanceMatrices(relevanceLists):
     rand_walk_matrices = [None] * (MAX_HOPS + 1)
     rand_walk_matrices[0] = direct_relevance_matrix / 2
     for hop in range(1, MAX_HOPS + 1):
+        print("Matrix Exp: %d" % (hop + 1))
         rand_walk_matrices[hop] = np.matmul(rand_walk_matrices[hop-1], rand_walk_matrices[0])
 
     relevance_matrices = [None] * (MAX_HOPS + 1)
     relevance_matrices[0] = direct_relevance_matrix
     for hop in range(1, MAX_HOPS + 1):
+        print("Relevance Matrix: %d" % (hop + 1))
         rel_matrix = rand_walk_matrices[0].copy()
         for i in range(1, hop):
             rel_matrix += rand_walk_matrices[i]
@@ -98,6 +102,7 @@ def calcRankedRelevanceLists(relevanceLists):
     sort_index_matrices = calcSortIndexMatrices(relevance_matrices)
     ranked_relevance_lists = []
     for hop in range(MAX_HOPS + 1):
+        print("Rank Matrix: %d" % (hop + 1))
         relevance_matrix = relevance_matrices[hop]
         sort_index_matrix = sort_index_matrices[hop]
         ranked_relevance_list = [None] * total_constants
@@ -235,6 +240,7 @@ def genNegKbByAllPercent(posRelations, rankedRelevanceLists, rounds):
 
     # Add top P% relevant constants in-turn
     for rel_idx in range(total_relations):
+        print("Rel: %d" % (rel_idx))
         pos_relation = posRelations[rel_idx]
         neg_relation = set()
         neg_relations[rel_idx] = neg_relation
@@ -282,21 +288,26 @@ def dumpNegKb(negRelations, kbName, basePath):
                     rel_file.write(struct.pack("<i", arg))
 
 if __name__ == "__main__":
-    for kb_name in ["Fs", "Fm", "UMLS"]:
-    # for kb_name in ["UMLS"]:
+    # for kb_name in ["Fs", "Fm", "UMLS", "Cs"]:
+    # for kb_name in ["Cs", "WN18", "NELL-500"]:
+    for kb_name in ["Cs"]:
         print(kb_name)
         kb = loadPosKb("pos/%s" % kb_name)
         relevance_lists = loadRelevanceLists("%s/%s.dat" % (DUMP_DIR, kb_name))
-        relevance_matrices = calcRelevanceMatrices(relevance_lists)
-        sort_index_matrices = calcSortIndexMatrices(relevance_matrices)
-        # ranked_relevance_lists = calcRankedRelevanceLists(relevance_lists)
-        for hop in range(MAX_HOPS + 1):
-            for top_k in range(1, MAX_TOP_K + 1):
-                print("Hop = %d, K = %d" % (hop, top_k))
-                neg_kb = genNegKb(kb, sort_index_matrices[hop], relevance_matrices[hop], top_k)
-                # dumpNegKb(neg_kb, "%s_neg_con_rel_h%dk%d" % (kb_name, hop, top_k), DUMP_DIR)
-                # dumpNegKb(neg_kb, "%s_neg_con_rel_h%dk%d+" % (kb_name, hop, top_k), DUMP_DIR)
-                dumpNegKb(neg_kb, "%s_neg_con_rel_h%dk%di" % (kb_name, hop, top_k), DUMP_DIR)
+        # relevance_matrices = calcRelevanceMatrices(relevance_lists)
+        # sort_index_matrices = calcSortIndexMatrices(relevance_matrices)
+        time_start = time.time()
+        mem_start = psutil.Process(os.getpid()).memory_info().rss
+        ranked_relevance_lists = calcRankedRelevanceLists(relevance_lists)
+        time_matrix_calc = time.time() - time_start
+        # for hop in range(MAX_HOPS + 1):
+        for hop in [3]:
+            # for top_k in range(1, MAX_TOP_K + 1):
+            #     print("Hop = %d, K = %d" % (hop, top_k))
+            #     neg_kb = genNegKb(kb, sort_index_matrices[hop], relevance_matrices[hop], top_k)
+            #     # dumpNegKb(neg_kb, "%s_neg_con_rel_h%dk%d" % (kb_name, hop, top_k), DUMP_DIR)
+            #     # dumpNegKb(neg_kb, "%s_neg_con_rel_h%dk%d+" % (kb_name, hop, top_k), DUMP_DIR)
+            #     dumpNegKb(neg_kb, "%s_neg_con_rel_h%dk%di" % (kb_name, hop, top_k), DUMP_DIR)
 
             # for top_p in range(10, MAX_PERCENTAGE + 1, 10):
             #     for rounds in range(1, MAX_ROUNDS + 1):
@@ -305,6 +316,26 @@ if __name__ == "__main__":
             #         dumpNegKb(neg_kb, "%s_neg_con_rel_h%dp%dr%d" % (kb_name, hop, top_p, rounds), DUMP_DIR)
 
             # for rounds in range(1, MAX_ROUNDS + 1):
-            #     print("Hop = %d, Rounds = %d" % (hop, rounds))
-            #     neg_kb = genNegKbByAllPercent(kb, ranked_relevance_lists[hop], rounds)
-            #     dumpNegKb(neg_kb, "%s_neg_con_rel_h%dr%d" % (kb_name, hop, rounds), DUMP_DIR)
+            for rounds in [5]:
+                print("Hop = %d, Rounds = %d" % (hop, rounds))
+                time_start = time.time()
+                neg_kb = genNegKbByAllPercent(kb, ranked_relevance_lists[hop], rounds)
+                time_gen = time.time() - time_start
+                mem_cost = psutil.Process(os.getpid()).memory_info().rss - mem_start
+                dumpNegKb(neg_kb, "%s_neg_con_rel_h%dr%d" % (kb_name, hop, rounds), DUMP_DIR)
+                print("Time Cost: %.5f(s)" % (time_matrix_calc + time_gen))
+                print("Memory Cost: %d(B)" % mem_cost)
+
+            # # Dump ranked relevance lists
+            # # Format:
+            # #   - Total number of constants
+            # #   - For each constant of 1, 2, ...:
+            # #     - Total number of relevant constants
+            # #     - Relevant constant numerations ... (relevance from high to low)
+            # ranked_relevance_list = ranked_relevance_lists[hop]
+            # with open("%s/%s_rank_list_h%d.dat" % (DUMP_DIR, kb_name, hop), "wb") as of:
+            #     of.write(struct.pack("<i", len(ranked_relevance_list)))
+            #     for list_of_a_const in ranked_relevance_list:
+            #         of.write(struct.pack("<i", len(list_of_a_const)))
+            #         for rel_const in list_of_a_const:
+            #             of.write(struct.pack("<i", rel_const))
