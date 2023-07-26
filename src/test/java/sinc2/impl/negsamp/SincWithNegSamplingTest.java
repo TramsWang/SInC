@@ -44,7 +44,7 @@ class SincWithNegSamplingTest {
             final SincConfig config = new SincConfig(
                     TMP_DIR, kb_name, TMP_DIR, compressed_kb_name, 1, true, 5,
                     eval_type, 0.05, 0.25, 1, 1.0,
-                    null, null, false
+                    null, null, 0, false
             );
             SincWithFragmentedCachedRule sinc = new SincWithFragmentedCachedRule(config);
             sinc.run();
@@ -93,7 +93,7 @@ class SincWithNegSamplingTest {
             final SincConfig config = new SincConfig(
                     TMP_DIR, kb_name, TMP_DIR, compressed_kb_name, 1, true, 5,
                     eval_type, 0.05, 0.25, 1, 1.0,
-                    TMP_DIR, neg_kb.getName(), false
+                    TMP_DIR, neg_kb.getName(), 0, false
             );
             SincWithFragmentedCachedRule sinc = new SincWithFragmentedCachedRule(config);
             sinc.run();

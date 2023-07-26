@@ -73,7 +73,7 @@ public class SincWithNegSampling extends SincWithFragmentedCachedRule {
                 "datasets/SimpleFormat", "Fm", ".", "SincWithNegSamplingTest",
                 1, false, 5, EvalMetric.CompressionRatio, 0.05,
                 0.25, 1, 0.0,
-                "datasets/Neg", "Fm_neg_pos_rel_5.0", true
+                "datasets/Neg", "Fm_neg_pos_rel_5.0", 0, true
         ));
         sinc.run();
     }

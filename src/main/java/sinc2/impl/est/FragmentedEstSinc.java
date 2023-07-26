@@ -28,7 +28,7 @@ public class FragmentedEstSinc extends SincWithFragmentedCachedRule {
         final SincConfig config = new SincConfig(
                 "./datasets/SimpleFormat", "NELL-", ".", "TestFragEstSinc-NELL-", 1, false, 5,
                 EvalMetric.CompressionRatio, 0.05, 0.25, 1, 5.0,
-                null, null, false
+                null, null, 0, false
         );
         FragmentedEstSinc sinc = new FragmentedEstSinc(config);
         sinc.run();

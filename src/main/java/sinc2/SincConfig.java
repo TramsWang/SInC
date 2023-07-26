@@ -45,6 +45,9 @@ public class SincConfig {
     public String negKbBasePath;
     /** The name of the negative sample KB. */
     public String negKbName;
+    /** The factor of the number of expected negative samples over the number of positive ones. If < 1, normal sampling
+     *  strategy is used (depend on the strategy that generates the negative KB). otherwise, adversarial sampling is used */
+    public float budgetFactor;
     /** Whether negative samples are weighted differently */
     public boolean weightedNegSamples;
 
@@ -52,7 +55,7 @@ public class SincConfig {
             String basePath, String kbName, String dumpPath, String dumpName, int threads, boolean validation,
             int beamwidth, EvalMetric evalMetric, double minFactCoverage, double minConstantCoverage,
             double stopCompressionRatio, double observationRatio,
-            String negKbBasePath, String negKbName, boolean weightedNegSamples
+            String negKbBasePath, String negKbName, float budgetFactor, boolean weightedNegSamples
     ) {
         this.basePath = basePath;
         this.kbName = kbName;
@@ -68,6 +71,7 @@ public class SincConfig {
         this.observationRatio = Math.max(1.0, observationRatio);
         this.negKbBasePath = negKbBasePath;
         this.negKbName = negKbName;
+        this.budgetFactor = budgetFactor;
         this.weightedNegSamples = weightedNegSamples;
     }
 }

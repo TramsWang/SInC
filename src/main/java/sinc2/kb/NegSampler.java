@@ -604,7 +604,8 @@ public class NegSampler {
      * @param ruleStructure  Current structure of rule for sampling
      * @param kb             KB used for sampling
      * @return The returned structure contains a set of negative samples organized as an IntTable and a cache fragment
-     * that entails the negative samples and can be operated to filter negative samples
+     * that entails the negative samples and can be operated to filter negative samples. If no negative samples are
+     * generated, a NULL will be returned
      */
     public static AdversarialSampledResult adversarialSampling(
             IntTable posRelation, int totalConstants, int budget, List<CacheFragment> allCache,
@@ -671,6 +672,12 @@ public class NegSampler {
                 neg_sample_set.add(new Record(sample));
             }
         }
+
+        /* Construct cache structure */
+        if (neg_sample_set.isEmpty()) {
+            return null;
+        }
+
         int[][] neg_samples = new int[neg_sample_set.size()][];
         int idx = 0;
         for (Record neg_record: neg_sample_set) {
@@ -678,7 +685,6 @@ public class NegSampler {
             idx++;
         }
 
-        /* Construct cache structure */
         IntTable neg_table = new IntTable(neg_samples);
         IntTable[] tables = new IntTable[ruleStructure.size()];
         tables[0] = neg_table;

@@ -71,7 +71,7 @@ public class SincWithFragmentedCachedRule extends SInC {
                 "datasets/SimpleFormat", "Fm", ".", "SincWithFrgCacheTest",
                 1, false, 5, EvalMetric.CompressionRatio, 0.05,
                 0.25, 1, 0.0,
-                null, null, false
+                null, null, 0, false
         ));
         sinc.run();
     }

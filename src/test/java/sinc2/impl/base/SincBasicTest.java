@@ -79,7 +79,7 @@ class SincBasicTest {
             final SincConfig config = new SincConfig(
                     TMP_DIR, kb_name, TMP_DIR, compressed_kb_name, 1, true, 5,
                     eval_type, 0.05, 0.25, 1, 1.0,
-                    null, null, false
+                    null, null, 0, false
             );
             Set<Fingerprint> rule_set_sinc = new HashSet<>();
             SincBasic sinc = new SincBasic(config);
@@ -183,7 +183,7 @@ class SincBasicTest {
             final SincConfig config = new SincConfig(
                     TMP_DIR, kb_name, TMP_DIR, compressed_kb_name, 1, true, 5,
                     eval_type, 0.05, 0.25, 1, 1.0,
-                    null, null, false
+                    null, null, 0, false
             );
             Set<Fingerprint> rule_set_sinc = new HashSet<>();
             SincBasic sinc = new SincBasic(config);

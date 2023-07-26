@@ -28,7 +28,7 @@ public class NegSampleCachedRule extends FragmentedCachedRule {
      *  predicates are linked to the head. */
     protected CacheFragment negCache;
     /** The map from negative examples to their weight. If NULL, all negative examples are weighted as 1. */
-    final protected Map<Record, Float> negSampleWeightMap;
+    protected Map<Record, Float> negSampleWeightMap;
 
     /* Monitoring info. The time (in nanoseconds) refers to the corresponding time consumption in the last update of the rule */
     protected long negCacheUpdateTime = 0;

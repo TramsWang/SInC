@@ -49,7 +49,7 @@ public class TestSincOnSampledFm {
                     null, null, "/dev/shm/TestSampling", "edge_sampled_comp_" + (i + 1),
                     1, false, 5, EvalMetric.CompressionRatio, Rule.MIN_FACT_COVERAGE,
                     0.25, 1, 1.0,
-                    null, null, false
+                    null, null, 0, false
             );
             SInC sinc = new SincBasic(config, sampling_info.sampledKb);
             sinc.run();
@@ -63,7 +63,7 @@ public class TestSincOnSampledFm {
                     null, null, "/dev/shm/TestSampling", "mdrw_sampled_comp_" + (i + 1),
                     1, false, 5, EvalMetric.CompressionRatio, Rule.MIN_FACT_COVERAGE,
                     0.25, 1, 1.0,
-                    null, null, false
+                    null, null, 0, false
             );
             sinc = new SincBasic(config, sampling_info.sampledKb);
             sinc.run();

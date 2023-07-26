@@ -3,6 +3,7 @@ package sinc2;
 import org.apache.commons.cli.*;
 import sinc2.common.SincException;
 import sinc2.impl.est.EstSinc;
+import sinc2.impl.negsamp.SincWithAdvNegSampling;
 import sinc2.impl.negsamp.SincWithFragmentedCachedRule;
 import sinc2.impl.negsamp.SincWithNegSampling;
 import sinc2.rule.EvalMetric;
@@ -17,13 +18,15 @@ public class Main {
     public static final double DEFAULT_STOP_COMPRESSION_RATE = 0.9;
     public static final double DEFAULT_OBSERVATION_RATIO = 2.0;
     public static final EvalMetric DEFAULT_EVAL_METRIC = EvalMetric.CompressionCapacity;
+    public static final float DEFAULT_BUDGET_FACTOR = 0;
     public static final int HELP_WIDTH = 125;
 
     private static final String SHORT_OPT_HELP = "h";
     private static final String SHORT_OPT_INPUT = "I";
     private static final String SHORT_OPT_OUTPUT = "O";
     private static final String SHORT_OPT_NEG_INPUT = "N";
-    private static final String SHORT_OPT_NEG_ADVERSARIAL = "A";
+//    private static final String SHORT_OPT_NEG_ADVERSARIAL = "A";
+    private static final String SHORT_OPT_NEG_BUDGET_FACTOR = "g";
     private static final String SHORT_OPT_NEG_WEIGHT = "w";
     private static final String SHORT_OPT_THREAD = "t";
     private static final String SHORT_OPT_VALIDATE = "v";
@@ -37,7 +40,8 @@ public class Main {
     private static final String LONG_OPT_INPUT = "input";
     private static final String LONG_OPT_OUTPUT = "output";
     private static final String LONG_OPT_NEG_INPUT = "neg-samples";
-    private static final String LONG_OPT_NEG_ADVERSARIAL = "neg-adv";
+//    private static final String LONG_OPT_NEG_ADVERSARIAL = "neg-adv";
+    private static final String LONG_OPT_NEG_BUDGET_FACTOR = "neg-budget";
     private static final String LONG_OPT_NEG_WEIGHT = "neg-weight";
     private static final String LONG_OPT_THREAD = "thread";
     private static final String LONG_OPT_VALIDATE = "validate";
@@ -59,8 +63,10 @@ public class Main {
     private static final Option OPTION_NEG_INPUT = Option.builder(SHORT_OPT_NEG_INPUT).longOpt(LONG_OPT_NEG_INPUT)
             .numberOfArgs(2).argName("path> <name")
             .desc("The path to the negative KB and the name of the KB. If specified, negative sampling is turned on.").build();
-    private static final Option OPTION_NEG_ADVERSARIAL = Option.builder(SHORT_OPT_NEG_ADVERSARIAL).longOpt(LONG_OPT_NEG_ADVERSARIAL)
-            .desc("Using adversarial negative sampling.").build();
+//    private static final Option OPTION_NEG_ADVERSARIAL = Option.builder(SHORT_OPT_NEG_ADVERSARIAL).longOpt(LONG_OPT_NEG_ADVERSARIAL)
+//            .desc("Using adversarial negative sampling.").build();
+    private static final Option OPTION_NEG_BUDGET_FACTOR = Option.builder(SHORT_OPT_NEG_BUDGET_FACTOR).longOpt(LONG_OPT_NEG_BUDGET_FACTOR)
+            .hasArg().argName("budget").type(Float.class).desc("The budget factor of negative sampling. If negative sampling is adopted and budget factor >= 1, the adversarial sampling will be employed").build();
     private static final Option OPTION_NEG_WEIGHT = Option.builder(SHORT_OPT_NEG_WEIGHT).longOpt(LONG_OPT_NEG_WEIGHT)
             .desc("Whether negative samples have different weight. This is only affective when negative sampling is turned on.").build();
     private static final Option OPTION_THREAD = Option.builder(SHORT_OPT_THREAD).longOpt(LONG_OPT_THREAD)
@@ -147,9 +153,14 @@ public class Main {
             neg_base_path = values[0];
             neg_kb_name = values[1];
             System.out.printf("Negative sampling on: %s/%s (weight=%b)\n", neg_base_path, neg_kb_name, neg_weight);
-        } else if (cmd.hasOption(OPTION_NEG_ADVERSARIAL)) {
-            neg_base_path = "";
-            System.out.printf("Negative sampling on: Adversarial (weight=%b)\n", neg_weight);
+        }
+        float budget_factor = DEFAULT_BUDGET_FACTOR;
+        if (cmd.hasOption(OPTION_NEG_BUDGET_FACTOR)) {
+            String value = cmd.getOptionValue(OPTION_NEG_BUDGET_FACTOR);
+            if (null != value) {
+                budget_factor = Float.parseFloat(value);
+                System.out.printf("Budget factor set to (Adversarial %s): %.2f\n", budget_factor >= 1 ? "ON" : "OFF", budget_factor);
+            }
         }
 
         /* Assign Run-time parameters */
@@ -218,14 +229,15 @@ public class Main {
         SincConfig config = new SincConfig(
                 input_path, input_kb_name, output_path, output_kb_name,
                 threads, validation, beam, metric, fc, cc, scr, or,
-                neg_base_path, neg_kb_name, neg_weight
+                neg_base_path, neg_kb_name, budget_factor, neg_weight
         );
         if (1.0 > or) {
             if (null != neg_base_path) {
-                if (null != neg_kb_name) {
+                /* Negative sampling */
+                if (1.0 > budget_factor) {
                     return new SincWithNegSampling(config);
                 } else {
-                    throw new Error("Adversarial negative sampling has not yet been implemented");  // Todo: Implement here
+                    return new SincWithAdvNegSampling(config);
                 }
             }
             return new SincWithFragmentedCachedRule(config);
@@ -242,14 +254,11 @@ public class Main {
 
         /* Input/output options */
         options.addOption(OPTION_INPUT_PATH);
-//        options.addOption(OPTION_INPUT_KB);
         options.addOption(OPTION_OUTPUT_PATH);
-//        options.addOption(OPTION_OUTPUT_KB);
 
         /* Negative sampling options */
-        OptionGroup neg_sampling_group = new OptionGroup();
-        neg_sampling_group.addOption(OPTION_NEG_INPUT).addOption(OPTION_NEG_ADVERSARIAL);
-        options.addOptionGroup(neg_sampling_group);
+        options.addOption(OPTION_NEG_INPUT);
+        options.addOption(OPTION_NEG_BUDGET_FACTOR);
         options.addOption(OPTION_NEG_WEIGHT);
 
         /* Run-time parameter options */
