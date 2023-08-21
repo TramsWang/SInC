@@ -68,7 +68,7 @@ public class SincWithFragmentedCachedRule extends SInC {
 
     public static void main(String[] args) throws SincException {
         SincWithFragmentedCachedRule sinc = new SincWithFragmentedCachedRule(new SincConfig(
-                "datasets/SimpleFormat", "Fm", ".", "SincWithFrgCacheTest",
+                "datasets/SimpleFormat", "WN18", ".", "SincWithFrgCacheTest-WN",
                 1, false, 5, EvalMetric.CompressionRatio, 0.05,
                 0.25, 1, 0.0,
                 null, null, 0, false
