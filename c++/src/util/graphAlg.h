@@ -61,29 +61,28 @@ namespace sinc {
     };
 }
 
-using sinc::GraphNode;
 /**
  * This is for hashing "GraphNode<T>" in unordered containers.
  */
 template<class T>
-struct std::hash<GraphNode<T>> {
-    size_t operator()(const GraphNode<T>& r) const;
+struct std::hash<sinc::GraphNode<T>> {
+    size_t operator()(const sinc::GraphNode<T>& r) const;
 };
 
 /**
  * This is for hashing "GraphNode<T>*" in unordered containers.
  */
 template<class T>
-struct std::hash<GraphNode<T>*> {
-    size_t operator()(const GraphNode<T> *r) const;
+struct std::hash<sinc::GraphNode<T>*> {
+    size_t operator()(const sinc::GraphNode<T> *r) const;
 };
 
 /**
  * This is for checking equivalence "GraphNode<T>*" in unordered containers.
  */
 template<class T>
-struct std::equal_to<GraphNode<T>*> {
-    bool operator()(const GraphNode<T> *r1, const GraphNode<T> *r2) const;
+struct std::equal_to<sinc::GraphNode<T>*> {
+    bool operator()(const sinc::GraphNode<T> *r1, const sinc::GraphNode<T> *r2) const;
 };
 
 namespace sinc {

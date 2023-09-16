@@ -364,6 +364,7 @@ bool std::equal_to<ArgLocation*>::operator()(const ArgLocation *r1, const ArgLoc
 /**
  * ArgIndicator 
  */
+using sinc::ArgIndicator;
 ArgIndicator* ArgIndicator::constantIndicator(int const constNumeration) {
     return new ArgIndicator(constNumeration, -1);
 }

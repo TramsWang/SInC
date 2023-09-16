@@ -120,29 +120,28 @@ namespace sinc {
     };
 }
 
-using sinc::Record;
 /**
  * This is for hashing "Record" in unordered containers.
  */
 template <>
-struct std::hash<Record> {
-    size_t operator()(const Record& r) const;
+struct std::hash<sinc::Record> {
+    size_t operator()(const sinc::Record& r) const;
 };
 
 /**
  * This is for hashing "Record*" in unordered containers.
  */
 template <>
-struct std::hash<Record*> {
-    size_t operator()(const Record *r) const;
+struct std::hash<sinc::Record*> {
+    size_t operator()(const sinc::Record *r) const;
 };
 
 /**
  * This is for checking equivalence "Record*" in unordered containers.
  */
 template <>
-struct std::equal_to<Record*> {
-    bool operator()(const Record *r1, const Record *r2) const;
+struct std::equal_to<sinc::Record*> {
+    bool operator()(const sinc::Record *r1, const sinc::Record *r2) const;
 };
 
 namespace sinc {
@@ -183,29 +182,28 @@ namespace sinc {
     };
 }
 
-using sinc::Predicate;
 /**
  * This is for hashing "Predicate" in unordered containers.
  */
 template <>
-struct std::hash<Predicate> {
-    size_t operator()(const Predicate& r) const;
+struct std::hash<sinc::Predicate> {
+    size_t operator()(const sinc::Predicate& r) const;
 };
 
 /**
  * This is for hashing "Predicate*" in unordered containers.
  */
 template <>
-struct std::hash<Predicate*> {
-    size_t operator()(const Predicate *r) const;
+struct std::hash<sinc::Predicate*> {
+    size_t operator()(const sinc::Predicate *r) const;
 };
 
 /**
  * This is for checking equivalence "Predicate*" in unordered containers.
  */
 template <>
-struct std::equal_to<Predicate*> {
-    bool operator()(const Predicate *r1, const Predicate *r2) const;
+struct std::equal_to<sinc::Predicate*> {
+    bool operator()(const sinc::Predicate *r1, const sinc::Predicate *r2) const;
 };
 
 namespace sinc {
@@ -279,29 +277,28 @@ namespace sinc {
     };
 }
 
-using sinc::ParsedArg;
 /**
  * This is for hashing "ParsedArg" in unordered containers.
  */
 template <>
-struct std::hash<ParsedArg> {
-    size_t operator()(const ParsedArg& r) const;
+struct std::hash<sinc::ParsedArg> {
+    size_t operator()(const sinc::ParsedArg& r) const;
 };
 
 /**
  * This is for hashing "ParsedArg*" in unordered containers.
  */
 template <>
-struct std::hash<ParsedArg*> {
-    size_t operator()(const ParsedArg *r) const;
+struct std::hash<sinc::ParsedArg*> {
+    size_t operator()(const sinc::ParsedArg *r) const;
 };
 
 /**
  * This is for checking equivalence "ParsedArg*" in unordered containers.
  */
 template <>
-struct std::equal_to<ParsedArg*> {
-    bool operator()(const ParsedArg *r1, const ParsedArg *r2) const;
+struct std::equal_to<sinc::ParsedArg*> {
+    bool operator()(const sinc::ParsedArg *r1, const sinc::ParsedArg *r2) const;
 };
 
 namespace sinc {
@@ -342,29 +339,28 @@ namespace sinc {
     };
 }
 
-using sinc::ParsedPred;
 /**
  * This is for hashing "ParsedPred" in unordered containers.
  */
 template <>
-struct std::hash<ParsedPred> {
-    size_t operator()(const ParsedPred& r) const;
+struct std::hash<sinc::ParsedPred> {
+    size_t operator()(const sinc::ParsedPred& r) const;
 };
 
 /**
  * This is for hashing "ParsedPred*" in unordered containers.
  */
 template <>
-struct std::hash<ParsedPred*> {
-    size_t operator()(const ParsedPred *r) const;
+struct std::hash<sinc::ParsedPred*> {
+    size_t operator()(const sinc::ParsedPred *r) const;
 };
 
 /**
  * This is for checking equivalence "ParsedPred*" in unordered containers.
  */
 template <>
-struct std::equal_to<ParsedPred*> {
-    bool operator()(const ParsedPred *r1, const ParsedPred *r2) const;
+struct std::equal_to<sinc::ParsedPred*> {
+    bool operator()(const sinc::ParsedPred *r1, const sinc::ParsedPred *r2) const;
 };
 
 namespace sinc {
@@ -385,29 +381,28 @@ namespace sinc {
     };
 }
 
-using sinc::ArgLocation;
 /**
  * This is for hashing "ArgLocation" in unordered containers.
  */
 template <>
-struct std::hash<ArgLocation> {
-    size_t operator()(const ArgLocation& r) const;
+struct std::hash<sinc::ArgLocation> {
+    size_t operator()(const sinc::ArgLocation& r) const;
 };
 
 /**
  * This is for hashing "ArgLocation*" in unordered containers.
  */
 template <>
-struct std::hash<ArgLocation*> {
-    size_t operator()(const ArgLocation *r) const;
+struct std::hash<sinc::ArgLocation*> {
+    size_t operator()(const sinc::ArgLocation *r) const;
 };
 
 /**
  * This is for checking equivalence "ArgLocation*" in unordered containers.
  */
 template <>
-struct std::equal_to<ArgLocation*> {
-    bool operator()(const ArgLocation *r1, const ArgLocation *r2) const;
+struct std::equal_to<sinc::ArgLocation*> {
+    bool operator()(const sinc::ArgLocation *r1, const sinc::ArgLocation *r2) const;
 };
 
 namespace sinc {
@@ -423,6 +418,8 @@ namespace sinc {
 
         /**
          * Create an indicator of a constant
+         * 
+         * NOTE: The returned pointer SHOULD be maintained by USER
          *
          * @param constNumeration The numeration of the constant name
          * @return The constant indicator
@@ -431,6 +428,8 @@ namespace sinc {
 
         /**
          * Create an indicator of a variable
+         * 
+         * NOTE: The returned pointer SHOULD be maintained by USER
          *
          * @param functor The numeration of the functor name
          * @param idx The argument index of the variable in the predicate
@@ -446,27 +445,26 @@ namespace sinc {
     };
 }
 
-using sinc::ArgIndicator;
 /**
  * This is for hashing "ArgIndicator" in unordered containers.
  */
 template <>
-struct std::hash<ArgIndicator> {
-    size_t operator()(const ArgIndicator& r) const;
+struct std::hash<sinc::ArgIndicator> {
+    size_t operator()(const sinc::ArgIndicator& r) const;
 };
 
 /**
  * This is for hashing "ArgIndicator*" in unordered containers.
  */
 template <>
-struct std::hash<ArgIndicator*> {
-    size_t operator()(const ArgIndicator *r) const;
+struct std::hash<sinc::ArgIndicator*> {
+    size_t operator()(const sinc::ArgIndicator *r) const;
 };
 
 /**
  * This is for checking equivalence "ArgIndicator*" in unordered containers.
  */
 template <>
-struct std::equal_to<ArgIndicator*> {
-    bool operator()(const ArgIndicator *r1, const ArgIndicator *r2) const;
+struct std::equal_to<sinc::ArgIndicator*> {
+    bool operator()(const sinc::ArgIndicator *r1, const sinc::ArgIndicator *r2) const;
 };

@@ -24,7 +24,10 @@ namespace sinc {
         MultiSet(const MultiSet<T>& another);
         MultiSet(T* const elements, const int length);
 
-        void add(const T& element);
+        /**
+         * @return The number of `element` after insertion.
+         */
+        int add(const T& element);
         void addAll(T* const elements, const int length);
         void addAll(const MultiSet<T>& another);
 
@@ -74,29 +77,28 @@ namespace sinc {
     };
 }
 
-using sinc::MultiSet;
 /**
  * This is for hashing "MultiSet" in unordered containers.
  */
 template <class T>
-struct std::hash<MultiSet<T>> {
-    size_t operator()(const MultiSet<T>& r) const;
+struct std::hash<sinc::MultiSet<T>> {
+    size_t operator()(const sinc::MultiSet<T>& r) const;
 };
 
 /**
  * This is for hashing "MultiSet*" in unordered containers.
  */
 template <class T>
-struct std::hash<MultiSet<T>*> {
-    size_t operator()(const MultiSet<T> *r) const;
+struct std::hash<sinc::MultiSet<T>*> {
+    size_t operator()(const sinc::MultiSet<T> *r) const;
 };
 
 /**
  * This is for checking equivalence "MultiSet*" in unordered containers.
  */
 template <class T>
-struct std::equal_to<MultiSet<T>*> {
-    bool operator()(const MultiSet<T> *r1, const MultiSet<T> *r2) const;
+struct std::equal_to<sinc::MultiSet<T>*> {
+    bool operator()(const sinc::MultiSet<T> *r1, const sinc::MultiSet<T> *r2) const;
 };
 
 namespace sinc {
@@ -209,29 +211,28 @@ namespace sinc {
     };
 }
 
-using sinc::ComparableArray;
 /**
  * This is for hashing "ComparableArray<T>" in unordered containers.
  */
 template <class T>
-struct std::hash<ComparableArray<T>> {
-    size_t operator()(const ComparableArray<T>& r) const;
+struct std::hash<sinc::ComparableArray<T>> {
+    size_t operator()(const sinc::ComparableArray<T>& r) const;
 };
 
 /**
  * This is for hashing "ComparableArray<T>*" in unordered containers.
  */
 template <class T>
-struct std::hash<ComparableArray<T>*> {
-    size_t operator()(const ComparableArray<T> *r) const;
+struct std::hash<sinc::ComparableArray<T>*> {
+    size_t operator()(const sinc::ComparableArray<T> *r) const;
 };
 
 /**
  * This is for checking equivalence "ComparableArray<T>*" in unordered containers.
  */
 template <class T>
-struct std::equal_to<ComparableArray<T>*> {
-    bool operator()(const ComparableArray<T> *r1, const ComparableArray<T> *r2) const;
+struct std::equal_to<sinc::ComparableArray<T>*> {
+    bool operator()(const sinc::ComparableArray<T> *r1, const sinc::ComparableArray<T> *r2) const;
 };
 
 namespace sinc {

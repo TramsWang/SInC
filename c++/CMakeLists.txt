@@ -11,12 +11,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Add all sub-directories
 add_subdirectory(src/util)
 add_subdirectory(src/kb)
-add_subdirectory(external/nvwa)
+add_subdirectory(src/rule)
 
 # Build SInC executable
 add_executable(sinc main.cpp)
 target_link_libraries(sinc PRIVATE util)
 target_link_libraries(sinc PRIVATE kb)
+target_link_libraries(sinc PRIVATE rule)
 target_link_libraries(sinc PRIVATE "stdc++fs")  # Use namespace `std::filesystem`
 
 # if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -41,10 +42,12 @@ add_executable(test_sinc
   test/kb/testKbUtils.cpp
   test/kb/intTable_test.cpp
   test/kb/simpleKb_test.cpp
+  test/rule/components_test.cpp
 )
 
 target_link_libraries(test_sinc PRIVATE util)
 target_link_libraries(test_sinc PRIVATE kb)
+target_link_libraries(test_sinc PRIVATE rule)
 target_link_libraries(test_sinc PRIVATE GTest::gtest_main)
 target_link_libraries(test_sinc PRIVATE "stdc++fs")  # Use namespace `std::filesystem`
 

@@ -19,12 +19,13 @@ MultiSet<T>::MultiSet(T* const elements, const int length) : cntMap(maptype()), 
 }
 
 template<class T>
-void MultiSet<T>::add(const T& element) {
+int MultiSet<T>::add(const T& element) {
     std::pair<typename std::unordered_map<T, int>::iterator, bool> ret = cntMap.emplace(element, 1);
     if (!ret.second) {
         ++(ret.first->second);
     }
     size++;
+    return ret.first->second;
 }
 
 template<class T>
@@ -107,7 +108,17 @@ const typename MultiSet<T>::maptype& MultiSet<T>::getCntMap() {
 
 template<class T>
 bool MultiSet<T>::operator==(const MultiSet<T> &another) const {
-    return size == another.size && cntMap == another.cntMap;
+    if (size != another.size) {
+        return false;
+    }
+    for (std::pair<T, int> const& kv: cntMap) {
+        typename maptype::const_iterator itr = another.cntMap.find(kv.first);
+        if (another.cntMap.end() == itr || kv.second != itr->second) {
+            return false;
+        }
+    }
+    return true;
+    // return size == another.size && cntMap == another.cntMap;
 }
 
 template<class T>
@@ -146,6 +157,14 @@ template class MultiSet<sinc::ArgLocation>;
 template class std::hash<MultiSet<sinc::ArgLocation>>;
 template class std::hash<MultiSet<sinc::ArgLocation>*>;
 template class std::equal_to<MultiSet<sinc::ArgLocation>*>;
+template class MultiSet<sinc::ArgIndicator*>;
+template class std::hash<MultiSet<sinc::ArgIndicator*>>;
+template class std::hash<MultiSet<sinc::ArgIndicator*>*>;
+template class std::equal_to<MultiSet<sinc::ArgIndicator*>*>;
+template class MultiSet<sinc::MultiSet<sinc::ArgIndicator*>*>;
+template class std::hash<MultiSet<sinc::MultiSet<sinc::ArgIndicator*>*>>;
+template class std::hash<MultiSet<sinc::MultiSet<sinc::ArgIndicator*>*>*>;
+template class std::equal_to<MultiSet<sinc::MultiSet<sinc::ArgIndicator*>*>*>;
 
 /**
  * IntWriter
