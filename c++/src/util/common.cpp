@@ -176,7 +176,7 @@ const char* InterruptionSignal::what() const throw() {
 using sinc::ParsedArg;
 ParsedArg::~ParsedArg() {
     if (nullptr != name) {
-        delete name;
+        free((void*)name);  // as `strdup()` uses `malloc()`
     }
 }
 

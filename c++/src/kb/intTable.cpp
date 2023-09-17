@@ -61,6 +61,14 @@ IntTable::IntTable(int** rows, int const _totalRows, int const _totalCols) :
     }
 }
 
+IntTable::IntTable(int** const rows, int const totalRows, int const totalCols, bool releaseRowArray) :
+    IntTable(rows, totalRows, totalCols)
+{
+    if (releaseRowArray) {
+        delete[] rows;
+    }
+}
+
 IntTable::~IntTable() {
     for (int col = 0; col < totalCols; col++) {
         delete[] sortedRowsByCols[col];
@@ -68,6 +76,8 @@ IntTable::~IntTable() {
         delete[] startOffsetsByCols[col];
     }
     delete[] sortedRowsByCols;
+    delete[] valuesByCols;
+    delete[] startOffsetsByCols;
     delete[] valuesByColsLengths;
 }
 
@@ -110,7 +120,7 @@ int* IntTable::operator[](int i) const {
 IntTable::sliceType* IntTable::getSlice(int const col, int const val) const {
     int* const values_by_cols = valuesByCols[col];
     int const idx = std::lower_bound(values_by_cols, values_by_cols + valuesByColsLengths[col], val) - values_by_cols;
-    if (val != values_by_cols[idx]) {
+    if (idx >= valuesByColsLengths[col] || val != values_by_cols[idx]) {
         /* Not found. Return nullptr */
         return nullptr;
     }
@@ -178,14 +188,14 @@ MatchedSubTables* IntTable::matchSlices(const IntTable& tab1, int const col1, co
     return result;
 }
 
-IntTable::slicesType** IntTable::matchSlices(IntTable** const tables, int* const cols, int const length) {
-    IntTable::slicesType** slices_lists = new IntTable::slicesType*[length];
-    int*** const sorted_rows_arr = new int**[length];
-    int** const values_arr = new int*[length];
-    int** const start_offsets_arr = new int*[length];
-    int* const num_values_arr = new int[length];
-    int* const idxs = new int[length]{0};
-    for (int i = 0; i < length; i++) {
+IntTable::slicesType** IntTable::matchSlices(IntTable** const tables, int* const cols, int const numTables) {
+    IntTable::slicesType** slices_lists = new IntTable::slicesType*[numTables];
+    int*** const sorted_rows_arr = new int**[numTables];
+    int** const values_arr = new int*[numTables];
+    int** const start_offsets_arr = new int*[numTables];
+    int* const num_values_arr = new int[numTables];
+    int* const idxs = new int[numTables]{0};
+    for (int i = 0; i < numTables; i++) {
         slices_lists[i] = new IntTable::slicesType();
         IntTable* table = tables[i];
         int col = cols[i];
@@ -201,7 +211,7 @@ IntTable::slicesType** IntTable::matchSlices(IntTable** const tables, int* const
         int max_val = values_arr[0][idxs[0]];
         int max_idx = 0;
         bool all_match = true;
-        for (int i = 1; i < length; i++) {
+        for (int i = 1; i < numTables; i++) {
             int val = values_arr[i][idxs[i]];
             all_match &= (val == max_val);
             if (val > max_val) {
@@ -212,15 +222,18 @@ IntTable::slicesType** IntTable::matchSlices(IntTable** const tables, int* const
 
         /* Match */
         if (all_match) {
-            for (int i = 0; i < length; i++) {
+            for (int i = 0; i < numTables; i++) {
                 int** const sorted_rows = sorted_rows_arr[i];
                 int** const begin = sorted_rows + start_offsets_arr[i][idxs[i]];
                 int** const end = sorted_rows + start_offsets_arr[i][++idxs[i]];
                 slices_lists[i]->push_back(new IntTable::sliceType(begin, end));
+                if (idxs[i] >= num_values_arr[i]) {
+                    not_finished = false;
+                }
             }
         } else {
             /* Update idxs */
-            for (int i = 0; i < length; i++) {
+            for (int i = 0; i < numTables; i++) {
                 if (i == max_idx) {
                     continue;
                 }

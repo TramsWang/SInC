@@ -99,7 +99,7 @@ void releaseRows(int** rows, int length) {
     for (int i =0; i < length; i++) {
         delete[] rows[i];
     }
-    delete rows;
+    delete[] rows;
 };
 
 TEST(TestIntTable, TestCreation) {

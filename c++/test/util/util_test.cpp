@@ -23,11 +23,11 @@ TEST(TestUtil, TestMultiSetConstructor) {
 
     int* elements = new int[3]{1, 3, 2};
     EXPECT_EQ(s1.itemCount(elements, 3), 4);
-    delete elements;
+    delete[] elements;
 
     elements = new int[4]{0, 3, 2, 1};
     EXPECT_EQ(s1.itemCount(elements, 4), 4);
-    delete elements;
+    delete[] elements;
 
     MultiSet<int> s2(s1);
 
@@ -40,15 +40,15 @@ TEST(TestUtil, TestMultiSetConstructor) {
 
     elements = new int[3]{1, 3, 2};
     EXPECT_EQ(s2.itemCount(elements, 3), 4);
-    delete elements;
+    delete[] elements;
 
     elements = new int[4]{0, 3, 2, 1};
     EXPECT_EQ(s2.itemCount(elements, 4), 4);
-    delete elements;
+    delete[] elements;
 
     elements = new int[4]{3, 1, 1, 2};
     MultiSet<int> s3(elements, 4);
-    delete elements;
+    delete[] elements;
 
     EXPECT_EQ(s3.getSize(), 4);
     EXPECT_EQ(s3.differentValues(), 3);
@@ -59,11 +59,11 @@ TEST(TestUtil, TestMultiSetConstructor) {
 
     elements = new int[3]{1, 3, 2};
     EXPECT_EQ(s3.itemCount(elements, 3), 4);
-    delete elements;
+    delete[] elements;
 
     elements = new int[4]{0, 3, 2, 1};
     EXPECT_EQ(s3.itemCount(elements, 4), 4);
-    delete elements;
+    delete[] elements;
 }
 
 TEST(TestUtil, TestMultiSetAdd) {
@@ -82,18 +82,18 @@ TEST(TestUtil, TestMultiSetAdd) {
 
     int* elements = new int[3]{1, 3, 2};
     EXPECT_EQ(mset.itemCount(elements, 3), 4);
-    delete elements;
+    delete[] elements;
 
     elements = new int[4]{0, 3, 2, 1};
     EXPECT_EQ(mset.itemCount(elements, 4), 4);
-    delete elements;
+    delete[] elements;
 }
 
 TEST(TestUtil, TestMultiSetAddAll) {
     int* elements = new int[4]{1, 3, 1, 2};
     MultiSet<int> mset;
     mset.addAll(elements, 4);
-    delete elements;
+    delete[] elements;
 
     EXPECT_EQ(mset.getSize(), 4);
     EXPECT_EQ(mset.differentValues(), 3);
@@ -104,16 +104,16 @@ TEST(TestUtil, TestMultiSetAddAll) {
 
     elements = new int[3]{1, 3, 2};
     EXPECT_EQ(mset.itemCount(elements, 3), 4);
-    delete elements;
+    delete[] elements;
 
     elements = new int[4]{0, 3, 2, 1};
     EXPECT_EQ(mset.itemCount(elements, 4), 4);
-    delete elements;
+    delete[] elements;
 
     elements = new int[4]{3, 3, 5, 6};
     MultiSet<int> mset2;
     mset2.addAll(elements, 4);
-    delete elements;
+    delete[] elements;
     mset2.addAll(mset);
 
     EXPECT_EQ(mset2.getSize(), 8);
@@ -128,11 +128,11 @@ TEST(TestUtil, TestMultiSetAddAll) {
 
     elements = new int[8]{0, 1, 2, 3, 4, 5, 6, 7};
     EXPECT_EQ(mset2.itemCount(elements, 8), 8);
-    delete elements;
+    delete[] elements;
 
     elements = new int[4]{0, 3, 2, 1};
     EXPECT_EQ(mset2.itemCount(elements, 4), 6);
-    delete elements;
+    delete[] elements;
 }
 
 TEST(TestUtil, TestMultiSetRemove) {
@@ -152,11 +152,11 @@ TEST(TestUtil, TestMultiSetRemove) {
 
     int* elements = new int[3]{1, 3, 2};
     EXPECT_EQ(mset.itemCount(elements, 3), 4);
-    delete elements;
+    delete[] elements;
 
     elements = new int[4]{0, 3, 2, 1};
     EXPECT_EQ(mset.itemCount(elements, 4), 4);
-    delete elements;
+    delete[] elements;
     
     EXPECT_EQ(mset.remove(1), 1);
     EXPECT_EQ(mset.getSize(), 3);
@@ -168,11 +168,11 @@ TEST(TestUtil, TestMultiSetRemove) {
 
     elements = new int[3]{1, 3, 2};
     EXPECT_EQ(mset.itemCount(elements, 3), 3);
-    delete elements;
+    delete[] elements;
 
     elements = new int[4]{0, 3, 2, 1};
     EXPECT_EQ(mset.itemCount(elements, 4), 3);
-    delete elements;
+    delete[] elements;
     
     EXPECT_EQ(mset.remove(2), 0);
     EXPECT_EQ(mset.getSize(), 2);
@@ -184,33 +184,33 @@ TEST(TestUtil, TestMultiSetRemove) {
 
     elements = new int[3]{1, 3, 2};
     EXPECT_EQ(mset.itemCount(elements, 3), 2);
-    delete elements;
+    delete[] elements;
 
     elements = new int[4]{0, 3, 2, 1};
     EXPECT_EQ(mset.itemCount(elements, 4), 2);
-    delete elements;
+    delete[] elements;
 }
 
 TEST(TestUtil, TestMultiSetSubsetOf) {
     int* elements = new int[4]{1, 3, 1, 2};
     MultiSet<int> s1;
     s1.addAll(elements, 4);
-    delete elements;
+    delete[] elements;
 
     elements = new int[3]{1, 1, 3};
     MultiSet<int> s2;
     s2.addAll(elements, 3);
-    delete elements;
+    delete[] elements;
 
     elements = new int[3]{2, 5, 3};
     MultiSet<int> s3;
     s3.addAll(elements, 3);
-    delete elements;
+    delete[] elements;
 
     elements = new int[4]{1, 1, 1, 3};
     MultiSet<int> s4;
     s4.addAll(elements, 4);
-    delete elements;
+    delete[] elements;
 
     EXPECT_TRUE(s2.subsetOf(s1));
     EXPECT_TRUE(s2.subsetOf(s4));
@@ -224,12 +224,12 @@ TEST(TestUtil, TestMultiSetEquivalence) {
     int* elements = new int[4]{1, 3, 1, 2};
     MultiSet<int> s1;
     s1.addAll(elements, 4);
-    delete elements;
+    delete[] elements;
 
     elements = new int[4]{1, 1, 3, 2};
     MultiSet<int> s2;
     s2.addAll(elements, 4);
-    delete elements;
+    delete[] elements;
 
     MultiSet<int> s3;
     s3.add(3);
@@ -240,7 +240,7 @@ TEST(TestUtil, TestMultiSetEquivalence) {
     elements = new int[4]{1, 1, 1, 3};
     MultiSet<int> s4;
     s4.addAll(elements, 4);
-    delete elements;
+    delete[] elements;
 
     EXPECT_TRUE(s1 == s2);
     EXPECT_TRUE(s1 == s3);

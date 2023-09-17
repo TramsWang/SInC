@@ -18,7 +18,7 @@ TestKbManager::TestKbManager() : kbName(), kbPath() {
 }
 
 TestKbManager::~TestKbManager() {
-    delete kbName;
+    free((void*)kbName);    // as `strdup()` uses `malloc()`
 }
 
 void TestKbManager::cleanUpKb() {

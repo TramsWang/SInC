@@ -136,10 +136,10 @@ namespace sinc {
          *
          * @param tables The n table pointers
          * @param cols   n column numbers, each of the corresponding table
-         * @param length n
+         * @param numTables n
          * @return n pointers to vectors of slices. Slices in a vector is from the same table.
          */
-        static slicesType** matchSlices(IntTable** const tables, int* const cols, int const length);
+        static slicesType** matchSlices(IntTable** const tables, int* const cols, int const numTables);
 
         /**
          * Split the current table into slices, and in each slice, the arguments of the two columns are the same.
@@ -208,6 +208,13 @@ namespace sinc {
         int* const valuesByColsLengths;
         /** Comparator for rows in this table */
         IntArrayComparator const comparator;
+
+        /**
+         * If `releaseRowArray` is true, this constructor releases the array `rows` (but not the pointers in it) when finish.
+         * 
+         * NOTE: This should only be called where release of `rows` is not possible. E.g., in the load constructor of `SimpleRelation`.
+         */
+        IntTable(int** const rows, int const totalRows, int const totalCols, bool releaseRowArray);
 
         /**
          * Find the offset of the row in the table w.r.t. alphabetical order.

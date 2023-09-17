@@ -52,16 +52,22 @@ int** SimpleRelation::loadFile(const path& filePath, int const arity, int const 
 }
 
 SimpleRelation::SimpleRelation(const std::string& _name, int const _id, int** _records, int const _arity, int const _totalRecords) : 
-    IntTable(_records, _totalRecords, _arity), name(strdup(_name.c_str())), id(_id),
+    IntTable(_records, _totalRecords, _arity), name(strdup(_name.c_str())), id(_id), maintainRecords(false),
     entailmentFlags(new int[NUM_FLAG_INTS(_totalRecords)]{0}), flagLength(NUM_FLAG_INTS(_totalRecords)) {}
 
 SimpleRelation::SimpleRelation(
             const std::string& _name, int const _id, int const _arity, int const _totalRecords, const path& _filePath
-) : IntTable(loadFile(_filePath, _arity, _totalRecords), _totalRecords, _arity), name(strdup(_name.c_str())), id(_id),
-    entailmentFlags(new int[NUM_FLAG_INTS(_totalRecords)]{0}), flagLength(NUM_FLAG_INTS(_totalRecords)) {}
+) : IntTable(loadFile(_filePath, _arity, _totalRecords), _totalRecords, _arity, true), name(strdup(_name.c_str())), id(_id),
+    maintainRecords(true), entailmentFlags(new int[NUM_FLAG_INTS(_totalRecords)]{0}), flagLength(NUM_FLAG_INTS(_totalRecords)) {}
 
 SimpleRelation::~SimpleRelation() {
-    delete name;
+    free((void*)name);  // as `strdup()` uses `malloc()`
+    if (maintainRecords) {
+        int** const rows = sortedRowsByCols[0];
+        for (int i = 0; i < totalRows; i++) {
+            delete[] rows[i];
+        }
+    }
     delete[] entailmentFlags;
 }
 
@@ -332,7 +338,10 @@ SimpleKb::SimpleKb(const SimpleKb& another) : name(strdup(another.name)),
 }
 
 SimpleKb::~SimpleKb() {
-    delete name;
+    free((void*)name);  // as `strdup()` uses `malloc()`
+    for (SimpleRelation* const& r: *relations) {
+        delete r;
+    }
     delete relations;
     delete relationNameMap;
     releasePromisingConstants();

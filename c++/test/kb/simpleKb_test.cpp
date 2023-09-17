@@ -27,7 +27,7 @@ protected:
         for (int i =0; i < length; i++) {
             delete[] rows[i];
         }
-        delete rows;
+        delete[] rows;
     };
 
 };
@@ -61,7 +61,7 @@ TEST_F(TestSimpleRelation, TestLoadFile) {
         }
         delete[] rows[i];
     }
-    delete rows;
+    delete[] rows;
     std::filesystem::remove(relation_file_path);
 }
 
@@ -408,6 +408,7 @@ protected:
     static void TearDownTestSuite() {
         std::cout << "Remove Test KB: " << testKb->getKbPath() << std::endl;
         testKb->cleanUpKb();
+        delete testKb;
         testKb = nullptr;
     }
 
@@ -415,7 +416,7 @@ protected:
         for (int i =0; i < length; i++) {
             delete[] rows[i];
         }
-        delete rows;
+        delete[] rows;
     };
 
 };
@@ -528,7 +529,7 @@ TEST_F(TestSimpleKb, TestDump) {
     std::string map_names[12] {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"};
     std::string names[2] {"rel62", "rel41"};
     int** const recs[2] {rel1, rel2};
-    int arities[2] {6, 2};
+    int arities[2] {6, 1};
     int total_rows[2] {2, 4};
     SimpleKb kb("testSimpleKbDump", (int***)recs, names, arities, total_rows, 2);
     kb.dump(TestKbManager::MEM_DIR_PATH, map_names);

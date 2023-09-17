@@ -46,6 +46,8 @@ namespace sinc {
 
         /**
          * Initialize by the user defined content.
+         * 
+         * NOTE: The content SHOULD be maintained by user.
          */
         GraphNode(const T* content);
 

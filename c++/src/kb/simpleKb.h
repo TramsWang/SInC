@@ -74,11 +74,17 @@ namespace sinc {
         const char* const name;
         /** The ID number of the relation */
         int const id;
+        /** 
+         * Denote whether records should be maintained by this object. If `true`, the records will be released in destructor.
+         * 
+         * This will be set to `true` if the object is constructed by loading from files.
+         */
+        bool maintainRecords;
 
         /**
          * This method loads a relation file as a 2D array of integers. Please refer to "KbRelation" for the file format.
          *
-         * @param filePath     The file containing the relation datale
+         * @param filePath     The file containing the relation data
          * @param arity        The arity of the relation
          * @param totalRecords The number of records in the relation
          */

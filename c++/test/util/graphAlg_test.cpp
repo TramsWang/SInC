@@ -32,6 +32,7 @@ void releaseGraph(Tarjan<int>::graphType graph, GraphNode<int>** nodes, int leng
     }
     for (int i = 0; i < length; i++) {
         delete nodes[i]->content;
+        delete nodes[i];
     }
     delete[] nodes;
 };

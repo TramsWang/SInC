@@ -275,8 +275,8 @@ TEST(TestCommon, TestParsedPred) {
     delete p3;
     delete args[0];
     delete args[1];
-    delete args;
-    delete args2;
+    delete[] args;
+    delete[] args2;
 }
 
 TEST(TestCommon, TestArgLocation) {
