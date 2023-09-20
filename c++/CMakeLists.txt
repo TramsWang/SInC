@@ -43,6 +43,7 @@ add_executable(test_sinc
   test/kb/intTable_test.cpp
   test/kb/simpleKb_test.cpp
   test/rule/components_test.cpp
+  test/rule/rule_test.cpp
 )
 
 target_link_libraries(test_sinc PRIVATE util)

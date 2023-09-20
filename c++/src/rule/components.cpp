@@ -102,6 +102,27 @@ std::string Eval::toString() const {
     return os.str();
 }
 
+Eval& Eval::operator=(const Eval& another) {
+    allEtls = another.allEtls;
+    posEtls = another.posEtls;
+    negEtls = another.negEtls;
+    ruleLength = another.ruleLength;
+    compRatio = another.compRatio;
+    compCapacity = another.compCapacity;
+    infoGain = another.infoGain;
+    return *this;
+}
+
+/**
+ * EvidenceBatch
+ */
+using sinc::EvidenceBatch;
+EvidenceBatch::EvidenceBatch(int const _numPredicates): numPredicates(_numPredicates), predicateSymbolsInRule(new int[_numPredicates]) {}
+
+EvidenceBatch::~EvidenceBatch() {
+    delete[] predicateSymbolsInRule;
+}
+
 /**
  * PredicateWithClass
  */
@@ -156,8 +177,8 @@ Fingerprint::Fingerprint(const std::vector<Predicate>& _rule) : rule(_rule) {
     /* Assumption: The IDs for the variables start from 0 and are continuous */
     int max_lv_id = -1;
     for (Predicate const& predicate: rule) {
-        for (int arg_idx = 0; arg_idx < predicate.arity; arg_idx++) {
-            int argument = predicate.args[arg_idx];
+        for (int arg_idx = 0; arg_idx < predicate.getArity(); arg_idx++) {
+            int argument = predicate.getArg(arg_idx);
             if (ARG_IS_VARIABLE(argument)) {
                 max_lv_id = std::max(max_lv_id, ARG_DECODE(argument));
             }
@@ -172,20 +193,20 @@ Fingerprint::Fingerprint(const std::vector<Predicate>& _rule) : rule(_rule) {
     /* Construct equivalence classes */
     classedStructure.reserve(rule.size());
     for (Predicate const& predicate : rule) {
-        PredicateWithClass& pred_with_class = classedStructure.emplace_back(predicate.predSymbol, predicate.arity);
+        PredicateWithClass& pred_with_class = classedStructure.emplace_back(predicate.getPredSymbol(), predicate.getArity());
         // PredicateWithClass& pred_with_class = classedStructure.back();
-        for (int arg_idx = 0; arg_idx < predicate.arity; arg_idx++) {
-            int argument = predicate.args[arg_idx];
+        for (int arg_idx = 0; arg_idx < predicate.getArity(); arg_idx++) {
+            int argument = predicate.getArg(arg_idx);
             if (ARG_IS_EMPTY(argument)) {
                 equivalenceClassType* eqc = new equivalenceClassType();
                 equivalenceClassPtrs.push_back(eqc);
-                eqc->add(ArgIndicator::variableIndicator(predicate.predSymbol, arg_idx));
+                eqc->add(ArgIndicator::variableIndicator(predicate.getPredSymbol(), arg_idx));
                 equivalenceClasses.add(eqc);
                 pred_with_class.classArgs[arg_idx] = eqc;
             } else if (ARG_IS_VARIABLE(argument)) {
                 int var_id = ARG_DECODE(argument);
                 equivalenceClassType* eqc = lv_equiv_classes[var_id];
-                ArgIndicator* var_indicator = ArgIndicator::variableIndicator(predicate.predSymbol, arg_idx);
+                ArgIndicator* var_indicator = ArgIndicator::variableIndicator(predicate.getPredSymbol(), arg_idx);
                 if (1 < eqc->add(var_indicator)) {
                     delete var_indicator;
                 }
@@ -194,7 +215,7 @@ Fingerprint::Fingerprint(const std::vector<Predicate>& _rule) : rule(_rule) {
                 int constant = ARG_DECODE(argument);
                 equivalenceClassType* eqc = new equivalenceClassType();
                 equivalenceClassPtrs.push_back(eqc);
-                eqc->add(ArgIndicator::variableIndicator(predicate.predSymbol, arg_idx));
+                eqc->add(ArgIndicator::variableIndicator(predicate.getPredSymbol(), arg_idx));
                 eqc->add(ArgIndicator::constantIndicator(constant));
                 equivalenceClasses.add(eqc);
                 pred_with_class.classArgs[arg_idx] = eqc;
@@ -268,7 +289,7 @@ size_t Fingerprint::hash() const {
 }
 
 void Fingerprint::releaseEquivalenceClass(equivalenceClassType* eqc) {
-    for (std::pair<ArgIndicator*, int> const& kv: eqc->getCntMap()) {
+    for (std::pair<const ArgIndicator*, int> const& kv: eqc->getCntMap()) {
         delete kv.first;
     }
     delete eqc;
@@ -286,3 +307,26 @@ bool Fingerprint::generalizationOf(const PredicateWithClass& predicate, const Pr
     return true;
 }
 
+size_t std::hash<Fingerprint>::operator()(const Fingerprint& r) const {
+    return r.hash();
+}
+
+size_t std::hash<Fingerprint*>::operator()(const Fingerprint *r) const {
+    return r->hash();
+}
+
+bool std::equal_to<Fingerprint*>::operator()(const Fingerprint *r1, const Fingerprint *r2) const {
+    return (*r1) == (*r2);
+}
+
+/**
+ * RuleParseException
+ */
+using sinc::RuleParseException;
+RuleParseException::RuleParseException() : message("Rule Parse Error") {}
+
+RuleParseException::RuleParseException(const std::string& msg) : message(msg) {}
+
+const char* RuleParseException::what() const throw() {
+    return message.c_str();
+}

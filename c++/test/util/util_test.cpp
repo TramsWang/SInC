@@ -351,4 +351,10 @@ TEST(TestUtil, TestComparableArray) {
     std::hash<ComparableArray<Record>> hasher;
     EXPECT_EQ(hasher(a1), hasher(a2));
     EXPECT_NE(hasher(a1), hasher(a3));
+
+    for (int i = 0; i < 3; i++) {
+        delete[] a1.arr[i].getArgs();
+        delete[] a2.arr[i].getArgs();
+        delete[] a3.arr[i].getArgs();
+    }
 }

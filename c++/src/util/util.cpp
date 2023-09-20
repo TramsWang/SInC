@@ -2,6 +2,7 @@
 #include <unordered_map>
 #include "common.h"
 #include <fstream>
+#include <chrono>
 
 /**
  * MultiSet
@@ -37,7 +38,7 @@ void MultiSet<T>::addAll(T* const elements, const int length) {
 
 template<class T>
 void MultiSet<T>::addAll(const MultiSet<T>& another) {
-    for (auto& kv: another.cntMap) {
+    for (std::pair<const T, int> const& kv: another.cntMap) {
         std::pair<typename std::unordered_map<T, int>::iterator, bool> ret = cntMap.emplace(kv.first, kv.second);
         size += kv.second;
         if (!ret.second) {
@@ -111,7 +112,7 @@ bool MultiSet<T>::operator==(const MultiSet<T> &another) const {
     if (size != another.size) {
         return false;
     }
-    for (std::pair<T, int> const& kv: cntMap) {
+    for (std::pair<const T, int> const& kv: cntMap) {
         typename maptype::const_iterator itr = another.cntMap.find(kv.first);
         if (another.cntMap.end() == itr || kv.second != itr->second) {
             return false;
@@ -126,8 +127,8 @@ size_t MultiSet<T>::hash() const {
     size_t h = size * 31 + cntMap.size();
     size_t _h = 0;
     std::hash<T> hasher;
-    for (auto itr = cntMap.begin(); itr != cntMap.end(); itr++) {
-        _h += hasher(itr->first);
+    for (std::pair<const T, int> const& kv: cntMap) {
+        _h += hasher(kv.first) * kv.second;
     }
     h = h * 31 + _h;
     return h;
@@ -296,3 +297,10 @@ template class ComparableArray<sinc::Record>;
 template class std::hash<ComparableArray<sinc::Record>>;
 template class std::hash<ComparableArray<sinc::Record>*>;
 template class std::equal_to<ComparableArray<sinc::Record>*>;
+
+/** The timing function */
+uint64_t sinc::currentTimeInNano() {
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()
+    ).count();
+}

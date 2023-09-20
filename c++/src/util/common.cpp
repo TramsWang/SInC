@@ -1,6 +1,7 @@
 #include "common.h"
 #include <cstring>
 #include <sstream>
+#include "../kb/simpleKb.h"
 
 /* 
  * Container Helpers
@@ -19,18 +20,19 @@ void sinc::clearSet(std::unordered_set<T*>& set) {
  * Record
  */
 using sinc::Record;
-Record::Record(int a): arity(a), args(new int[a]{0}) {}
-
 Record::Record(int *g, int a): args(g), arity(a) {}
 
-Record::~Record() {
-    delete[] args;
+void Record::setArgs(int* const newArgs, int const _arity) {
+    args = newArgs;
+    arity = _arity;
 }
 
-void Record::setArgs(int *newArgs) {
-    for (int i = 0; i < arity; i++) {
-        args[i] = newArgs[i];
-    }
+int* Record::getArgs() const {
+    return args;
+}
+
+int Record::getArity() const {
+    return arity;
 }
 
 bool Record::operator==(const Record& another) const {
@@ -84,7 +86,43 @@ int* copyIntArray(int* const arr,int  const length) {
 Predicate::Predicate(const Predicate& another): predSymbol(another.predSymbol), args(copyIntArray(another.args, another.arity)), arity(another.arity) {}
 
 Predicate::~Predicate() {
-    delete[] args;
+    if (nullptr != args) {
+        delete[] args;
+    }
+}
+
+int Predicate::getPredSymbol() const {
+    return predSymbol;
+}
+
+int* Predicate::getArgs() const {
+    return args;
+}
+
+int Predicate::getArg(int const idx) const {
+    return args[idx];
+}
+
+void Predicate::setArg(int const idx, int const arg) {
+    args[idx] = arg;
+}
+
+int Predicate::getArity() const {
+    return arity;
+}
+
+Predicate& Predicate::operator=(Predicate&& another) noexcept {
+    if (this == &another) {
+        return *this;
+    }
+    if (nullptr != args) {
+        delete[] args;
+    }
+    predSymbol = another.predSymbol;
+    args = another.args;
+    arity = another.arity;
+    another.args = nullptr;
+    return *this;
 }
 
 bool Predicate::operator==(const Predicate &another) const {
@@ -111,6 +149,32 @@ size_t Predicate::hash() const {
 std::string Predicate::toString() const {
     std::ostringstream os;
     os << predSymbol << '(';
+    if (0 < arity) {
+        if (ARG_IS_EMPTY(args[0])) {
+            os << '?';
+        } else if (ARG_IS_VARIABLE(args[0])) {
+            os << 'X' << ARG_DECODE(args[0]);
+        } else {
+            os << ARG_DECODE(args[0]);
+        }
+        for (int i = 1; i < arity; i++) {
+            os << ',';
+            if (ARG_IS_EMPTY(args[i])) {
+                os << '?';
+            } else if (ARG_IS_VARIABLE(args[i])) {
+                os << 'X' << ARG_DECODE(args[i]);
+            } else {
+                os << ARG_DECODE(args[i]);
+            }
+        }
+    }
+    os << ')';
+    return os.str();
+}
+
+std::string Predicate::toString(const SimpleKb& kb) const {
+    std::ostringstream os;
+    os << kb.getRelation(predSymbol)->name << '(';
     if (0 < arity) {
         if (ARG_IS_EMPTY(args[0])) {
             os << '?';
@@ -198,6 +262,28 @@ bool ParsedArg::isConstant() const {
     return nullptr != name;
 }
 
+const char* ParsedArg::getName() const {
+    return name;
+}
+
+int ParsedArg::getId() const {
+    return id;
+}
+
+ParsedArg& ParsedArg::operator=(ParsedArg&& another) {
+    if (this == &another) {
+        return *this;
+    }
+    if (nullptr != name) {
+        free((void*)name);
+    }
+    name = another.name;
+    id = another.id;
+    another.name = nullptr;
+    return *this;
+}
+
+
 bool ParsedArg::operator==(const ParsedArg &another) const {
     if (id != another.id) {
         return false;
@@ -267,12 +353,53 @@ ParsedArg** copyParsedArgs(ParsedArg** const args, int const length) {
 ParsedPred::ParsedPred(const ParsedPred& another): predSymbol(another.predSymbol), args(copyParsedArgs(another.args, another.arity)), arity(another.arity) {}
 
 ParsedPred::~ParsedPred() {
-    for (int i = 0; i < arity; i++) {
-        if (nullptr != args[i]) {
-            delete args[i];
+    if (nullptr != args) {
+        for (int i = 0; i < arity; i++) {
+            if (nullptr != args[i]) {
+                delete args[i];
+            }
         }
+        delete[] args;
     }
-    delete[] args;
+}
+
+const std::string& ParsedPred::getPredSymbol() const {
+    return predSymbol;
+}
+
+ParsedArg** ParsedPred::getArgs() const {
+    return args;
+}
+
+int ParsedPred::getArity() const {
+    return arity;
+}
+
+ParsedArg* ParsedPred::getArg(int const idx) const {
+    return args[idx];
+}
+
+void ParsedPred::setArg(int const idx, ParsedArg* const arg) {
+    args[idx] = arg;
+}
+
+ParsedPred& ParsedPred::operator=(ParsedPred&& another) {
+    if (this == &another) {
+        return *this;
+    }
+    if (nullptr != args) {
+        for (int i = 0; i < arity; i++) {
+            if (nullptr != args[i]) {
+                delete args[i];
+            }
+        }
+        delete[] args;
+    }
+    args = another.args;
+    predSymbol = another.predSymbol;
+    arity = another.arity;
+    another.args = nullptr;
+    return *this;
 }
 
 bool ParsedPred::operator==(const ParsedPred &another) const {
@@ -340,6 +467,14 @@ bool std::equal_to<ParsedPred*>::operator()(const ParsedPred *r1, const ParsedPr
 using sinc::ArgLocation;
 ArgLocation::ArgLocation(int const _predIdx, int const _argIdx): predIdx(_predIdx), argIdx(_argIdx) {}
 
+ArgLocation::ArgLocation(const ArgLocation& another) : predIdx(another.predIdx), argIdx(another.argIdx) {}
+
+ArgLocation& ArgLocation::operator=(ArgLocation&& another) {
+    predIdx = another.predIdx;
+    argIdx = another.argIdx;
+    return *this;
+}
+
 bool ArgLocation::operator==(const ArgLocation &another) const {
     return predIdx == another.predIdx && argIdx == another.argIdx;
 }
@@ -371,6 +506,20 @@ ArgIndicator* ArgIndicator::constantIndicator(int const constNumeration) {
 
 ArgIndicator* ArgIndicator::variableIndicator(int const functor, int const idx) {
     return new ArgIndicator(functor, idx);
+}
+
+int ArgIndicator::getFunctor() const {
+    return functor;
+}
+
+int ArgIndicator::getIdx() const {
+    return idx;
+}
+
+ArgIndicator& ArgIndicator::operator=(ArgIndicator&& another) {
+    functor = another.functor;
+    idx = another.idx;
+    return *this;
 }
 
 bool ArgIndicator::operator==(const ArgIndicator &another) const {

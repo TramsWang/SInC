@@ -35,27 +35,31 @@ TEST(TestCommon, TestMacros) {
 
 TEST(TestCommon, TestRecord) {
     /* Test Constructor */
-    Record r1(3);
-    EXPECT_EQ(r1.arity, 3);
-    EXPECT_EQ(r1.args[0], 0);
-    EXPECT_EQ(r1.args[1], 0);
-    EXPECT_EQ(r1.args[2], 0);
+    int a1[3]{0};
+    Record r1(a1, 3);
+    EXPECT_EQ(r1.getArity(), 3);
+    EXPECT_EQ(r1.getArgs()[0], 0);
+    EXPECT_EQ(r1.getArgs()[1], 0);
+    EXPECT_EQ(r1.getArgs()[2], 0);
 
-    Record r2(new int[2]{10, 13}, 2);
-    EXPECT_EQ(r2.arity, 2);
-    EXPECT_EQ(r2.args[0], 10);
-    EXPECT_EQ(r2.args[1], 13);
+    int a2[2]{10, 13};
+    Record r2(a2, 2);
+    EXPECT_EQ(r2.getArity(), 2);
+    EXPECT_EQ(r2.getArgs()[0], 10);
+    EXPECT_EQ(r2.getArgs()[1], 13);
 
-    Record *r3 = new Record(new int[2]{10, 13}, 2);
-    EXPECT_EQ(r3->arity, 2);
-    EXPECT_EQ(r3->args[0], 10);
-    EXPECT_EQ(r3->args[1], 13);
+    int a3[2]{10, 13};
+    Record *r3 = new Record(a3, 2);
+    EXPECT_EQ(r3->getArity(), 2);
+    EXPECT_EQ(r3->getArgs()[0], 10);
+    EXPECT_EQ(r3->getArgs()[1], 13);
 
-    Record *r4 = new Record(new int[3]{10, 13, 0}, 3);
-    EXPECT_EQ(r4->arity, 3);
-    EXPECT_EQ(r4->args[0], 10);
-    EXPECT_EQ(r4->args[1], 13);
-    EXPECT_EQ(r4->args[2], 0);
+    int a4[3]{10, 13, 0};
+    Record *r4 = new Record(a4, 3);
+    EXPECT_EQ(r4->getArity(), 3);
+    EXPECT_EQ(r4->getArgs()[0], 10);
+    EXPECT_EQ(r4->getArgs()[1], 13);
+    EXPECT_EQ(r4->getArgs()[2], 0);
 
     /* Test Equivalence */
     EXPECT_FALSE(r1 == r2);
@@ -89,28 +93,28 @@ TEST(TestCommon, TestRecord) {
 TEST(TestCommon, TestPredicate) {
     /* Test Constructor */
     Predicate p1(1, new int[2]{1, 2}, 2);
-    EXPECT_EQ(p1.predSymbol, 1);
-    EXPECT_EQ(p1.args[0], 1);
-    EXPECT_EQ(p1.args[1], 2);
-    EXPECT_EQ(p1.arity, 2);
+    EXPECT_EQ(p1.getPredSymbol(), 1);
+    EXPECT_EQ(p1.getArgs()[0], 1);
+    EXPECT_EQ(p1.getArgs()[1], 2);
+    EXPECT_EQ(p1.getArity(), 2);
 
     Predicate p2(1, 2);
-    EXPECT_EQ(p2.predSymbol, 1);
-    EXPECT_EQ(p2.args[0], 0);
-    EXPECT_EQ(p2.args[1], 0);
-    EXPECT_EQ(p2.arity, 2);
+    EXPECT_EQ(p2.getPredSymbol(), 1);
+    EXPECT_EQ(p2.getArgs()[0], 0);
+    EXPECT_EQ(p2.getArgs()[1], 0);
+    EXPECT_EQ(p2.getArity(), 2);
 
     Predicate *p3 = new Predicate(1, new int[2]{1, 2}, 2);
-    EXPECT_EQ(p3->predSymbol, 1);
-    EXPECT_EQ(p3->args[0], 1);
-    EXPECT_EQ(p3->args[1], 2);
-    EXPECT_EQ(p3->arity, 2);
+    EXPECT_EQ(p3->getPredSymbol(), 1);
+    EXPECT_EQ(p3->getArgs()[0], 1);
+    EXPECT_EQ(p3->getArgs()[1], 2);
+    EXPECT_EQ(p3->getArity(), 2);
 
     Predicate *p4 = new Predicate(p1);
-    EXPECT_EQ(p4->predSymbol, 1);
-    EXPECT_EQ(p4->args[0], 1);
-    EXPECT_EQ(p4->args[1], 2);
-    EXPECT_EQ(p4->arity, 2);
+    EXPECT_EQ(p4->getPredSymbol(), 1);
+    EXPECT_EQ(p4->getArgs()[0], 1);
+    EXPECT_EQ(p4->getArgs()[1], 2);
+    EXPECT_EQ(p4->getArity(), 2);
 
     /* Test Equivalence */
     EXPECT_TRUE(p1 == *p3);
@@ -137,13 +141,36 @@ TEST(TestCommon, TestPredicate) {
 
     /* Test toString */
     EXPECT_EQ(p1.toString(), "1(1,2)");
-    p2.args[1] = 5;
+    p2.getArgs()[1] = 5;
     EXPECT_EQ(p2.toString(), "1(?,5)");
     EXPECT_EQ(p3->toString(), "1(1,2)");
     EXPECT_EQ(p4->toString(), "1(1,2)");
 
     delete p3;
     delete p4;
+}
+
+TEST(TestCommon, TestPredicateVector) {
+    std::vector<Predicate> v;
+    v.emplace_back(1, 1);
+    v.emplace_back(2, 2);
+    v.emplace_back(3, 3);
+    v.emplace_back(4, 4);
+
+    std::vector<Predicate>::iterator itr = v.begin();
+    itr++;
+    while (itr != v.end()) {
+        if (itr->getPredSymbol() == 2) {
+            itr = v.erase(itr);
+        } else {
+            itr++;
+        }
+    }
+
+    EXPECT_EQ(v.size(), 3);
+    EXPECT_EQ(v[0].getPredSymbol(), 1);
+    EXPECT_EQ(v[1].getPredSymbol(), 3);
+    EXPECT_EQ(v[2].getPredSymbol(), 4);
 }
 
 TEST(TestCommon, TestSincException) {
@@ -161,43 +188,43 @@ TEST(TestCommon, TestInterruptionSignal) {
 TEST(TestCommon, TestParsedArg) {
     /* Test Construction */
     ParsedArg *c1 = ParsedArg::constant("c");
-    EXPECT_STREQ(c1->name, "c");
-    EXPECT_EQ(c1->id, 0);
+    EXPECT_STREQ(c1->getName(), "c");
+    EXPECT_EQ(c1->getId(), 0);
     EXPECT_TRUE(c1->isConstant());
     EXPECT_FALSE(c1->isVariable());
     EXPECT_EQ(c1->toString(), "c");
 
     ParsedArg *c2 = ParsedArg::constant("c");
-    EXPECT_STREQ(c2->name, "c");
-    EXPECT_EQ(c2->id, 0);
+    EXPECT_STREQ(c2->getName(), "c");
+    EXPECT_EQ(c2->getId(), 0);
     EXPECT_TRUE(c2->isConstant());
     EXPECT_FALSE(c2->isVariable());
     EXPECT_EQ(c2->toString(), "c");
 
     ParsedArg *c3 = ParsedArg::constant("d");
-    EXPECT_STREQ(c3->name, "d");
-    EXPECT_EQ(c3->id, 0);
+    EXPECT_STREQ(c3->getName(), "d");
+    EXPECT_EQ(c3->getId(), 0);
     EXPECT_TRUE(c3->isConstant());
     EXPECT_FALSE(c3->isVariable());
     EXPECT_EQ(c3->toString(), "d");
 
     ParsedArg *v1 = ParsedArg::variable(0);
-    EXPECT_EQ(v1->name, nullptr);
-    EXPECT_EQ(v1->id, 0);
+    EXPECT_EQ(v1->getName(), nullptr);
+    EXPECT_EQ(v1->getId(), 0);
     EXPECT_FALSE(v1->isConstant());
     EXPECT_TRUE(v1->isVariable());
     EXPECT_EQ(v1->toString(), "X0");
 
     ParsedArg *v2 = ParsedArg::variable(0);
-    EXPECT_EQ(v2->name, nullptr);
-    EXPECT_EQ(v2->id, 0);
+    EXPECT_EQ(v2->getName(), nullptr);
+    EXPECT_EQ(v2->getId(), 0);
     EXPECT_FALSE(v2->isConstant());
     EXPECT_TRUE(v2->isVariable());
     EXPECT_EQ(v2->toString(), "X0");
 
     ParsedArg *v3 = ParsedArg::variable(10);
-    EXPECT_EQ(v3->name, nullptr);
-    EXPECT_EQ(v3->id, 10);
+    EXPECT_EQ(v3->getName(), nullptr);
+    EXPECT_EQ(v3->getId(), 10);
     EXPECT_FALSE(v3->isConstant());
     EXPECT_TRUE(v3->isVariable());
     EXPECT_EQ(v3->toString(), "X10");
@@ -231,10 +258,10 @@ TEST(TestCommon, TestParsedArg) {
 }
 
 void expectParsedPredArgEq(const ParsedPred &p, ParsedArg** const args, int const arity) {
-    ASSERT_EQ(p.arity, arity);
+    ASSERT_EQ(p.getArity(), arity);
     std::equal_to<ParsedArg*> equals;
     for (int i = 0; i < arity; i++) {
-        EXPECT_TRUE((nullptr == args[i] && nullptr == p.args[i]) || equals(p.args[i], args[i]));
+        EXPECT_TRUE((nullptr == args[i] && nullptr == p.getArgs()[i]) || equals(p.getArgs()[i], args[i]));
     }
 }
 
@@ -244,18 +271,18 @@ TEST(TestCommon, TestParsedPred) {
         ParsedArg::constant("c"), ParsedArg::variable(1), nullptr
     };
     ParsedPred p1("p", new ParsedArg*[3]{ParsedArg::constant("c"), ParsedArg::variable(1), nullptr}, 3);
-    EXPECT_EQ(p1.predSymbol, "p");
+    EXPECT_EQ(p1.getPredSymbol(), "p");
     expectParsedPredArgEq(p1, args, 3);
     EXPECT_EQ(p1.toString(), "p(c,X1,?)");
 
     ParsedArg** const args2 = new ParsedArg*[3] {nullptr, nullptr, nullptr};
     ParsedPred p2("p", 3);
-    EXPECT_EQ(p2.predSymbol, "p");
+    EXPECT_EQ(p2.getPredSymbol(), "p");
     expectParsedPredArgEq(p2, args2, 3);
     EXPECT_EQ(p2.toString(), "p(?,?,?)");
 
     ParsedPred *p3 = new ParsedPred(p1);
-    EXPECT_EQ(p3->predSymbol, "p");
+    EXPECT_EQ(p3->getPredSymbol(), "p");
     expectParsedPredArgEq(*p3, args, 3);
     EXPECT_EQ(p3->toString(), "p(c,X1,?)");
 
@@ -312,28 +339,28 @@ TEST(TestCommon, TestArgLocation) {
 TEST(TestCommon, TestArgIndicator) {
     /* Test Construction */
     ArgIndicator *c1 = ArgIndicator::constantIndicator(1);
-    EXPECT_EQ(c1->functor, 1);
-    EXPECT_EQ(c1->idx, -1);
+    EXPECT_EQ(c1->getFunctor(), 1);
+    EXPECT_EQ(c1->getIdx(), -1);
 
     ArgIndicator *c2 = ArgIndicator::constantIndicator(1);
-    EXPECT_EQ(c2->functor, 1);
-    EXPECT_EQ(c2->idx, -1);
+    EXPECT_EQ(c2->getFunctor(), 1);
+    EXPECT_EQ(c2->getIdx(), -1);
 
     ArgIndicator *c3 = ArgIndicator::constantIndicator(255);
-    EXPECT_EQ(c3->functor, 255);
-    EXPECT_EQ(c3->idx, -1);
+    EXPECT_EQ(c3->getFunctor(), 255);
+    EXPECT_EQ(c3->getIdx(), -1);
 
     ArgIndicator *v1 = ArgIndicator::variableIndicator(5, 3);
-    EXPECT_EQ(v1->functor, 5);
-    EXPECT_EQ(v1->idx, 3);
+    EXPECT_EQ(v1->getFunctor(), 5);
+    EXPECT_EQ(v1->getIdx(), 3);
 
     ArgIndicator *v2 = ArgIndicator::variableIndicator(5, 3);
-    EXPECT_EQ(v2->functor, 5);
-    EXPECT_EQ(v2->idx, 3);
+    EXPECT_EQ(v2->getFunctor(), 5);
+    EXPECT_EQ(v2->getIdx(), 3);
 
     ArgIndicator *v3 = ArgIndicator::variableIndicator(0, 0);
-    EXPECT_EQ(v3->functor, 0);
-    EXPECT_EQ(v3->idx, 0);
+    EXPECT_EQ(v3->getFunctor(), 0);
+    EXPECT_EQ(v3->getIdx(), 0);
 
     /* Test Equivalence */
     std::equal_to<ArgIndicator*> equals;

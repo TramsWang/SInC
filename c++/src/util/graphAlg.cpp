@@ -68,8 +68,8 @@ Tarjan<T>::~Tarjan() {
 
 template <class T>
 void Tarjan<T>::clearMarkers() {
-    for (const std::pair<GraphNode<T>*, typename Tarjan<T>::nodeSetType*>& kv: *graph) {
-        GraphNode<T>* source_node = kv.first;
+    for (const std::pair<const GraphNode<T>*, typename Tarjan<T>::nodeSetType*>& kv: *graph) {
+        GraphNode<T>* source_node = (GraphNode<T>*)kv.first;
         source_node->index = NO_TARJAN_INDEX;
         source_node->lowLink = NO_TARJAN_LOW_LINK;
         source_node->onStack = false;
@@ -83,10 +83,9 @@ void Tarjan<T>::clearMarkers() {
 
 template <class T>
 const typename Tarjan<T>::resultType& Tarjan<T>::run() {
-    for (const std::pair<GraphNode<T>*, typename Tarjan<T>::nodeSetType*>& kv: *graph) {
-        GraphNode<T>* source_node = kv.first;
-        if (NO_TARJAN_INDEX == source_node->index) {
-            strongConnect(source_node);
+    for (const std::pair<const GraphNode<T>*, typename Tarjan<T>::nodeSetType*>& kv: *graph) {
+        if (NO_TARJAN_INDEX == kv.first->index) {
+            strongConnect((GraphNode<T>*)kv.first);
         }
     }
     return result;

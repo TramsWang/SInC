@@ -247,4 +247,9 @@ namespace sinc {
         std::copy(v.begin(), v.end(), arr);
         return arr;
     }
+
+    /**
+     * A timing function that returns current time in nano seconds
+     */
+    uint64_t currentTimeInNano();
 }

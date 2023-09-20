@@ -97,26 +97,32 @@ namespace sinc {
 
 namespace sinc {
     /**
-     * Wrapper class for an integer array, which is, a record.
+     * Wrapper class for an integer array, which is, a record. A record can be hashed and compared.
      * 
      * @since 2.0
      */
     class Record {
     public:
-        int* const args;
-        int const arity;
-
-        Record(int arity);
+        /**
+         * Create a record with an existing argument array.
+         * 
+         * NOTE: This array will NOT be released by the record.
+         */
         Record(int *args, int arity);
-        ~Record();
 
         /**
          * This method copies the contents in "newArgs" to the array. It assumes the two arrays have the same length.
          */
-        void setArgs(int *newArgs);
+        void setArgs(int* const newArgs, int const arity);
+
+        int* getArgs() const;
+        int getArity() const;
 
         bool operator==(const Record &another) const;
         size_t hash() const;
+    protected:
+        int* args;
+        int arity;
     };
 }
 
@@ -151,12 +157,9 @@ namespace sinc {
      *
      * @since 1.0
      */
+    class SimpleKb;
     class Predicate {
     public:
-        int const predSymbol;
-        int* const args;
-        int const arity;
-
         /**
          * Initialize by the predicate symbol and the arguments specifically.
          */
@@ -170,15 +173,25 @@ namespace sinc {
         Predicate(int const predSymbol, int const arity);
 
         Predicate(const Predicate& another);
-
         ~Predicate();
 
+        int getPredSymbol() const;
+        int* getArgs() const;
+        int getArg(int const idx) const;
+        void setArg(int const idx, int const arg);
+        int getArity() const;
+
+        Predicate& operator=(Predicate&& another) noexcept;
         bool operator==(const Predicate &another) const;
         size_t hash() const;
 
         std::string toString() const;
+        std::string toString(const SimpleKb& kb) const;
         //Todo: std::string toString(const NumerationMap& map) const;
-        //Todo: std::string toString(const SimpleKb& kb) const;
+    protected:
+        int predSymbol;
+        int* args;
+        int arity;
     };
 }
 
@@ -247,11 +260,6 @@ namespace sinc {
      */
     class ParsedArg {
     public:
-        /** If the argument is a constant, the name denotes the constant symbol. Otherwise, it is nullptr */
-        const char* const name;
-        /** If the argument is a variable, the id denotes the variable id. */
-        int const id;
-
         ParsedArg(const ParsedArg& another);
         ~ParsedArg();
 
@@ -267,12 +275,19 @@ namespace sinc {
 
         bool isVariable() const;
         bool isConstant() const;
+        const char* getName() const;
+        int getId() const;
 
+        ParsedArg& operator=(ParsedArg&& another);
         bool operator==(const ParsedArg &another) const;
         size_t hash() const;
         std::string toString() const;
 
     private:
+        /** If the argument is a constant, the name denotes the constant symbol. Otherwise, it is nullptr */
+        const char* name;
+        /** If the argument is a variable, the id denotes the variable id. */
+        int id;
         ParsedArg(const char* const name, int const id);
     };
 }
@@ -309,15 +324,6 @@ namespace sinc {
      */
     class ParsedPred {
     public:
-        /** The name of the predicate symbol */
-        std::string const predSymbol;
-        /**
-         * The list of arguments. Elements in the array will be deleted in the destructor of this class. 
-         * 
-         * NOTE: When replacing elements in the argument list, remember to delete replaced elements manually.
-         */
-        ParsedArg** const args;
-        int const arity;
 
         /**
          * Construct by explicitly assign a list of arguments.
@@ -333,9 +339,27 @@ namespace sinc {
         ParsedPred(const ParsedPred& another);
         ~ParsedPred();
 
+        const std::string& getPredSymbol() const;
+        ParsedArg** getArgs() const;
+        ParsedArg* getArg(int const idx) const;
+        void setArg(int const idx, ParsedArg* const arg);
+        int getArity() const;
+
+        ParsedPred& operator=(ParsedPred&& another);
         bool operator==(const ParsedPred &another) const;
         size_t hash() const;
         std::string toString() const;
+
+    protected:
+        /** The name of the predicate symbol */
+        std::string predSymbol;
+        /**
+         * The list of arguments. Elements in the array will be deleted in the destructor of this class. 
+         * 
+         * NOTE: When replacing elements in the argument list, remember to delete replaced elements manually.
+         */
+        ParsedArg** args;
+        int arity;
     };
 }
 
@@ -371,11 +395,13 @@ namespace sinc {
      */
     class ArgLocation {
     public:
-        int const predIdx;
-        int const argIdx;
+        int predIdx;
+        int argIdx;
 
         ArgLocation(int const predIdx, int const argIdx);
+        ArgLocation(const ArgLocation& another);
 
+        ArgLocation& operator=(ArgLocation&& another);
         bool operator==(const ArgLocation &another) const;
         size_t hash() const;
     };
@@ -413,9 +439,6 @@ namespace sinc {
      */
     class ArgIndicator {
     public:
-        int const functor;
-        int const idx;
-
         /**
          * Create an indicator of a constant
          * 
@@ -437,11 +460,18 @@ namespace sinc {
          */
         static ArgIndicator* variableIndicator(int const functor, int const idx);
 
+        int getFunctor() const;
+        int getIdx() const;
+
+        ArgIndicator& operator=(ArgIndicator&& another);
         bool operator==(const ArgIndicator &another) const;
         size_t hash() const;
 
     private:
         ArgIndicator(int const functor, int const idx);
+        int functor;
+        int idx;
+
     };
 }
 
