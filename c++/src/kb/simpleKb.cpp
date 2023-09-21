@@ -7,6 +7,8 @@
 #include <fstream>
 #include <iostream>
 
+namespace fs = std::filesystem;
+
 /**
  * KbException
  */
@@ -288,7 +290,7 @@ SimpleKb::SimpleKb(const std::string& _name, const path& _basePath) : name(strdu
             std::getline(ls, total_records_str, '\t');
             path rel_file_path = getRelDataFilePath(line_num, name, _basePath);
             line_num++;
-            if (std::filesystem::exists(rel_file_path)) {
+            if (fs::exists(rel_file_path)) {
                 /* Load from file */
                 int rel_id = relations->size();
                 SimpleRelation* relation = new SimpleRelation(
@@ -361,7 +363,7 @@ void SimpleKb::releasePromisingConstants() {
 void SimpleKb::dump(const path& basePath, std::string* mappedNames) const {
     /* Check & create dir */
     path kb_dir = getKbDirPath(name, basePath);
-    if (!std::filesystem::exists(kb_dir) && !std::filesystem::create_directories(kb_dir)) {
+    if (!fs::exists(kb_dir) && !fs::create_directories(kb_dir)) {
         std::cerr << "Failed to dump SimpleKb '" << name << "': Failed to create dir: " << kb_dir << std::endl;
         return;
     }
@@ -477,5 +479,207 @@ int SimpleKb::totalRecords() const {
 
 int SimpleKb::totalConstants() const {
     return constants;
+}
+
+/**
+ * SimpleCompressedKb
+ */
+using sinc::SimpleCompressedKb;
+
+path SimpleCompressedKb::getCounterexampleFilePath(int const relId, const char* const kbName, const path& basePath) {
+    std::ostringstream os;
+    os << relId << COUNTEREXAMPLE_FILE_SUFFIX;
+    return basePath / path(kbName) / path(os.str());
+}
+
+SimpleCompressedKb::SimpleCompressedKb(const std::string& _name, SimpleKb* const _originalKb) : name(strdup(_name.c_str())),
+    originalKb(_originalKb), fvsRecords(new std::vector<int*>[_originalKb->totalRelations()]),
+    counterexampleSets(new std::unordered_set<Record>[_originalKb->totalRelations()]) {}
+
+SimpleCompressedKb::~SimpleCompressedKb() {
+    free((void*)name);
+    for (Rule* const& r: hypothesis) {
+        delete r;
+    }
+    for (int rel_id = 0; rel_id < originalKb->totalRelations(); rel_id++) {
+        for (Record const& r: counterexampleSets[rel_id]) {
+            delete[] r.getArgs();
+        }
+    }
+    delete[] fvsRecords;
+    delete[] counterexampleSets;
+}
+
+void SimpleCompressedKb::addFvsRecord(int const relId, int* const record) {
+    fvsRecords[relId].push_back(record);
+}
+
+void SimpleCompressedKb::addCounterexamples(int const relId, const std::unordered_set<Record>& records) {
+    std::unordered_set<Record>& set = counterexampleSets[relId];
+    for (Record const& r: records) {
+        if (!set.emplace(r.getArgs(), r.getArity()).second) {
+            delete[] r.getArgs();
+        }
+    }
+}
+
+void SimpleCompressedKb::addHypothesisRules(const std::vector<Rule*>& rules) {
+    for (Rule* const& r: rules) {
+        hypothesis.push_back(r);
+    }
+}
+
+void SimpleCompressedKb::updateSupplementaryConstants() {
+    /* Build flags for all constants */
+    int flags[NUM_FLAG_INTS(originalKb->totalConstants())]{0};
+
+    /* Remove all occurred arguments*/
+    for (int i = 0; i < originalKb->totalRelations(); i++) {
+        SimpleRelation* relation = originalKb->getRelation(i);
+        relation->setFlagOfReservedConstants(flags);
+        for (int* const& record: fvsRecords[i]) {
+            for (int arg_idx = 0; arg_idx < relation->getTotalCols(); arg_idx++) {
+                int arg = record[arg_idx];
+                flags[arg / BITS_PER_INT] |= 1 << (arg % BITS_PER_INT);
+            }
+        }
+        for (Record const& record: counterexampleSets[i]) {
+            for (int arg_idx = 0; arg_idx < relation->getTotalCols(); arg_idx++) {
+                int arg = record.getArgs()[arg_idx];
+                flags[arg / BITS_PER_INT] |= 1 << (arg % BITS_PER_INT);
+            }
+        }
+    }
+    for (Rule* const& rule: hypothesis) {
+        for (int pred_idx = 0; pred_idx < rule->numPredicates(); pred_idx++) {
+            const Predicate& predicate = rule->getPredicate(pred_idx);
+            for (int arg_idx = 0; arg_idx < predicate.getArity(); arg_idx++) {
+                int argument = predicate.getArg(arg_idx);
+                if (ARG_IS_CONSTANT(argument)) {
+                    int arg = ARG_DECODE(argument);
+                    flags[arg / BITS_PER_INT] |= 1 << (arg % BITS_PER_INT);
+                }
+            }
+        }
+    }
+
+    /* Find all integers that are not flagged */
+    flags[0] |= 0x1;    // 0 should not be marked as a supplementary constant
+    supplementaryConstants.clear();
+    int base_offset = 0;
+    for (int sub_flag: flags) {
+        for (int i = 0; i < BITS_PER_INT && base_offset + i < originalKb->totalConstants(); i++) {
+            if (0 == (sub_flag & 1)) {
+                supplementaryConstants.push_back(base_offset + i);
+            }
+            sub_flag >>= 1;
+        }
+        base_offset += BITS_PER_INT;
+    }
+}
+
+void SimpleCompressedKb::dump(const path& basePath) {
+    path dir_path = basePath / path(name);
+    if (!fs::exists(dir_path) && !fs::create_directories(dir_path)) {
+        std::cerr << "Failed to dump Compressed Kb '" << name << "': Failed to create dir: " << dir_path << std::endl;
+        return;
+    }
+
+    /* Dump necessary records & counterexamples */
+    const char* names[originalKb->totalRelations()];
+    std::ofstream ofs(SimpleKb::getRelInfoFilePath(name, basePath), std::ios::out);
+    for (int rel_id = 0; rel_id < originalKb->totalRelations(); rel_id++) {
+        SimpleRelation* relation = originalKb->getRelation(rel_id);
+        relation->dumpNecessaryRecords(SimpleKb::getRelDataFilePath(rel_id, name, basePath), fvsRecords[rel_id]);
+        names[rel_id] = relation->name;
+
+        /* Dump counterexamples */
+        const std::unordered_set<Record>& counterexamples = counterexampleSets[rel_id];
+        if (0 < counterexamples.size()) {
+            /* Dump only non-empty relations */
+            IntWriter writer(getCounterexampleFilePath(rel_id, name, basePath).c_str());
+            for (Record const& counterexample : counterexamples) {
+                for (int arg_idx = 0; arg_idx < relation->getTotalCols(); arg_idx++) {
+                    int arg = counterexample.getArgs()[arg_idx];
+                    writer.write(arg);
+                }
+            }
+            writer.close();
+        }
+
+        /* Dump relation info */
+        int necessary_records = relation->getTotalRows() - relation->totalEntailedRecords() + fvsRecords[rel_id].size();
+        ofs << relation->name << '\t' << relation->getTotalCols() << '\t' << necessary_records << '\t' << counterexamples.size() << '\n';
+    }
+    ofs.close();
+
+    /* Dump hypothesis */
+    if (0 < hypothesis.size()) {
+        std::ofstream ofs(dir_path / path(HYPOTHESIS_FILE_NAME), std::ios::out);
+        for (Rule* const& rule : hypothesis) {
+            ofs << rule->toDumpString(names) << '\n';
+        }
+        ofs.close();
+    }
+
+    /* Dump supplementary constants */
+    updateSupplementaryConstants();
+    if (0 < supplementaryConstants.size()) {
+        IntWriter writer((dir_path / path(SUPPLEMENTARY_CONSTANTS_FILE_NAME)).c_str());
+        for (int const& i : supplementaryConstants) {
+            writer.write(i);
+        }
+        writer.close();
+    }
+}
+
+const std::vector<sinc::Rule*>& SimpleCompressedKb::getHypothesis() const {
+    return hypothesis;
+}
+
+int SimpleCompressedKb::totalNecessaryRecords() const {
+    int cnt = 0;
+    for (int rel_id = 0; rel_id < originalKb->totalRelations(); rel_id++) {
+        SimpleRelation* relation = originalKb->getRelation(rel_id);
+        cnt += relation->getTotalRows() - relation->totalEntailedRecords();
+    }
+    cnt += totalFvsRecords();
+    return cnt;
+}
+
+int SimpleCompressedKb::totalFvsRecords() const {
+    int cnt = 0;
+    for (int rel_id = 0; rel_id < originalKb->totalRelations(); rel_id++) {
+        cnt += fvsRecords[rel_id].size();
+    }
+    return cnt;
+}
+
+int SimpleCompressedKb::totalCounterexamples() const {
+    int cnt = 0;
+    for (int rel_id = 0; rel_id < originalKb->totalRelations(); rel_id++) {
+        cnt += counterexampleSets[rel_id].size();
+    }
+    return cnt;
+}
+
+int SimpleCompressedKb::totalHypothesisSize() const {
+    int cnt = 0;
+    for (Rule* const& rule: hypothesis) {
+        cnt += rule->getLength();
+    }
+    return cnt;
+}
+
+int SimpleCompressedKb::totalSupplementaryConstants() const {
+    return supplementaryConstants.size();
+}
+
+const char* SimpleCompressedKb::getName() const {
+    return name;
+}
+
+const std::vector<int>& SimpleCompressedKb::getSupplementaryConstants() const {
+    return supplementaryConstants;
 }
 

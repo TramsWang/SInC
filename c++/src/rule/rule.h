@@ -2,7 +2,6 @@
 
 #include <unordered_set>
 #include "components.h"
-#include "../kb/simpleKb.h"
 
 /** The index of the head predicate */
 #define HEAD_PRED_IDX 0
@@ -10,6 +9,7 @@
 #define FIRST_BODY_PRED_IDX 1
 /** Minimum rule length */
 #define MIN_LENGTH 0
+#define DEFAULT_MIN_FACT_COVERAGE 0.05
 
 namespace sinc {
     /**
@@ -182,9 +182,9 @@ namespace sinc {
         /**
          * Convert the rule to a string under the following structure: (<Eval>)<Structure>.
          *
-         * @param kb The KB that translate the numbers to names.
+         * @param names An array of names where the indices are the relation indices.
          */
-        std::string toString(const SimpleKb& kb) const;
+        std::string toString(const char* const names[]) const;
 
         /**
          * Convert the rule to a string under the following structure: (<Eval>)<Structure>.
@@ -195,9 +195,9 @@ namespace sinc {
         /**
          * Convert only the rule structure to a string.
          *
-         * @param kb The KB that translate the numbers to names.
+         * @param names An array of names where the indices are the relation indices.
          */
-        std::string toDumpString(const SimpleKb& kb) const;
+        std::string toDumpString(const char* const names[]) const;
 
         /**
          * Convert only the rule structure to a string. Without a numeration map, the integers will not be translated.

@@ -5,6 +5,9 @@
 #include <unordered_map>
 #include "intTable.h"
 #include <filesystem>
+#include <unordered_set>
+#include "../util/common.h"
+#include "../rule/rule.h"
 
 #define BITS_PER_INT (sizeof(int) * 8)
 #define REL_INFO_FILE_NAME "Relations.tsv"
@@ -13,11 +16,12 @@
 #define MAX_MAP_ENTRIES 1000000
 #define MAP_FILE_PREFIX "map"
 #define MAP_FILE_SUFFIX ".tsv"
+#define COUNTEREXAMPLE_FILE_SUFFIX ".ceg"
 #define HYPOTHESIS_FILE_NAME "rules.hyp"
 #define SUPPLEMENTARY_CONSTANTS_FILE_NAME "supplementary.cst"
 #define DEFAULT_MIN_CONSTANT_COVERAGE 0.25
 
-#define NUM_FLAG_INTS(NUM_RECORDS) (NUM_RECORDS / BITS_PER_INT + ((0 == totalRows % BITS_PER_INT) ? 0 : 1))
+#define NUM_FLAG_INTS(NUM_RECORDS) (NUM_RECORDS / BITS_PER_INT + ((0 == NUM_RECORDS % BITS_PER_INT) ? 0 : 1))
 
 using std::filesystem::path;
 
@@ -380,34 +384,109 @@ namespace sinc {
         void releasePromisingConstants();
     };
 
-    // /**
-    //  * This class is for the compressed KB. It extends the numerated KB in four perspectives:
-    //  *   1. The compressed KB contains counterexample relations:
-    //  *      - The counterexamples are stored into '.ceg' files. The file format is the same as '.rel' files. The names of the
-    //  *        files are '<relation ID>.ceg'.
-    //  *      - If there is no counterexample in a relation, the counterexample relation file will not be created.
-    //  *   2. The compressed KB contains a hypothesis set:
-    //  *      - The hypothesis set is stored into a 'rules.hyp' file. The rules are written in the form of plain text, one per
-    //  *        line.
-    //  *      - If there is no rule in the hypothesis set, the file will not be created.
-    //  *   3. The compressed KB contains a supplementary constant set:
-    //  *      - The supplementary constant set is stored into a 'supplementary.cst' file. Constant numerations in the mapping
-    //  *        are stored in the file.
-    //  *        Note: The numeration mapping in a compressed KB contains all mappings as the original KB does.
-    //  *      - If there is no element in the supplementary set, the file will not be created.
-    //  *   4. The relation info file is extended by a new column, referring to the number of corresponding counterexamples.
-    //  * The necessary facts are stored as is in the original KB.
-    //  *
-    //  * @since 2.1
-    //  */
-    // class SimpleCompressedKb {
-    // public:
-    //     static const char* getCounterexampleFileName(int const relId);
-    // protected:
-    //     const char* const name;
-    //     SimpleKb* const origianlKb;
-    //     std::vector<Rule*> hypothesis;
+    /**
+     * This class is for the compressed KB. It extends the numerated KB in four perspectives:
+     *   1. The compressed KB contains counterexample relations:
+     *      - The counterexamples are stored into '.ceg' files. The file format is the same as '.rel' files. The names of the
+     *        files are '<relation ID>.ceg'.
+     *      - If there is no counterexample in a relation, the counterexample relation file will not be created.
+     *   2. The compressed KB contains a hypothesis set:
+     *      - The hypothesis set is stored into a 'rules.hyp' file. The rules are written in the form of plain text, one per
+     *        line.
+     *      - If there is no rule in the hypothesis set, the file will not be created.
+     *   3. The compressed KB contains a supplementary constant set:
+     *      - The supplementary constant set is stored into a 'supplementary.cst' file. Constant numerations in the mapping
+     *        are stored in the file.
+     *        Note: The numeration mapping in a compressed KB contains all mappings as the original KB does.
+     *      - If there is no element in the supplementary set, the file will not be created.
+     *   4. The relation info file is extended by a new column, referring to the number of corresponding counterexamples.
+     * The necessary facts are stored as is in the original KB.
+     * 
+     * NOTE: Pointers to rules in `hypothesis` and pointers to arguments of records in `counterexampleSets` SHOULD be maintained by
+     * the `SimpleCompressedKb` object.
+     * 
+     * NOTE: Pointers to `int` arrays in `fvsRecords` are from existing records in the original KB, thus are NOT maintained by
+     * `SimpleCompressedKb` object.
+     *
+     * @since 2.1
+     */
+    class SimpleCompressedKb {
+    public:
+        static path getCounterexampleFilePath(int const relId, const char* const kbName, const path& basePath);
 
-    //     ;
-    // }
+        /**
+         * Construct an empty compressed KB.
+         *
+         * @param name       The name of the compressed KB
+         * @param originalKb The original KB
+         */
+        SimpleCompressedKb(const std::string& name, SimpleKb* const originalKb);
+
+        ~SimpleCompressedKb();
+
+        /**
+         * Add a single record identified by FVS solver to `fvsRecords`.
+         * 
+         * NOTE: The pointer `record` SHOULD be maintained by USER.
+         */
+        void addFvsRecord(int const relId, int* const record);
+
+        /**
+         * Add some counterexamples to the KB.
+         * 
+         * NOTE: Pointers to arguments of records in `records` ARE now maintained by the `SimpleCompressedKb` object and should NOT
+         * released by USER.
+         *
+         * @param relId   The id of the corresponding relation
+         * @param records The counterexamples
+         */
+        void addCounterexamples(int const relId, const std::unordered_set<Record>& records);
+
+        void addHypothesisRules(const std::vector<Rule*>& rules);
+
+        /**
+         * Update the supplementary constant set.
+         */
+        void updateSupplementaryConstants();
+
+        /**
+         * NOTE: This function will call `updateSupplementaryConstants()`
+         */
+        void dump(const path& basePath);
+
+        const std::vector<Rule*>& getHypothesis() const;
+
+        int totalNecessaryRecords() const;
+
+        int totalFvsRecords() const;
+
+        int totalCounterexamples() const;
+
+        int totalHypothesisSize() const;
+
+        /** NOTE: `updateSupplementaryConstants()` should be called before calling this function */
+        int totalSupplementaryConstants() const;
+
+        const char* getName() const;
+
+        const std::vector<int>& getSupplementaryConstants() const;
+
+    protected:
+        /** The name of the compressed KB */
+        const char* const name;
+        /** The reference to the original KB. The original KB is used for determining the necessary records and the missing
+         *  constants. */
+        SimpleKb* const originalKb;
+        /** The hypothesis set, i.e., a list of rules.
+         * 
+         *  NOTE: The pointers in the list SHOULD be maintained by the object.
+         */
+        std::vector<Rule*> hypothesis;
+        /** The records included by FVS in each corresponding relation */
+        std::vector<int*>* fvsRecords;
+        /** The counterexample sets. The ith set is correspondent to the ith relation in the original KB. */
+        std::unordered_set<Record>* counterexampleSets;
+        /** The constants marked in a supplementary set. Otherwise, they are lost due to removal of facts. */
+        std::vector<int> supplementaryConstants;
+    };
 }

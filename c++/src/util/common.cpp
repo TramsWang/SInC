@@ -35,6 +35,12 @@ int Record::getArity() const {
     return arity;
 }
 
+Record& Record::operator=(Record&& another) {
+    args = another.args;
+    arity = another.arity;
+    return *this;
+}
+
 bool Record::operator==(const Record& another) const {
     if (this->arity != another.arity) {
         return false;
@@ -172,9 +178,9 @@ std::string Predicate::toString() const {
     return os.str();
 }
 
-std::string Predicate::toString(const SimpleKb& kb) const {
+std::string Predicate::toString(const char* const names[]) const {
     std::ostringstream os;
-    os << kb.getRelation(predSymbol)->name << '(';
+    os << names[predSymbol] << '(';
     if (0 < arity) {
         if (ARG_IS_EMPTY(args[0])) {
             os << '?';

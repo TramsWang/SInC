@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "../../src/rule/rule.h"
+#include "../../src/kb/simpleKb.h"
 #include <vector>
 
 using namespace sinc;
@@ -584,45 +585,46 @@ TEST(RuleTest, TestToString) {
     SimpleKb kb("test", rows, names, arities, totalRows, 4);
 
     /* h(X, Y, c) <- p(X), q(?, Y), q(c, X) */
+    const char* name_strs[4] {"o", "h", "p", "q"};
     Rule::fingerprintCacheType cache;
     Rule::tabuMapType tabuMap;
     Rule* r = new BareRule(1, 3, cache, tabuMap);
-    ASSERT_STREQ(r->toDumpString(kb).c_str(), "h(?,?,?):-");
+    ASSERT_STREQ(r->toDumpString(name_strs).c_str(), "h(?,?,?):-");
     ASSERT_EQ(r->getLength(), MIN_LENGTH);
     ASSERT_EQ(r->numPredicates(), 1);
     ASSERT_EQ(r->usedLimitedVars(), 0);
     ASSERT_EQ(cache.size(), 1);
 
     ASSERT_EQ(UpdateStatus::Normal, r->specializeCase4(2, 1, 0, 0, 0));
-    ASSERT_STREQ(r->toDumpString(kb).c_str(), "h(X0,?,?):-p(X0)");
+    ASSERT_STREQ(r->toDumpString(name_strs).c_str(), "h(X0,?,?):-p(X0)");
     ASSERT_EQ(r->getLength(), 1);
     ASSERT_EQ(r->numPredicates(), 2);
     ASSERT_EQ(r->usedLimitedVars(), 1);
     ASSERT_EQ(cache.size(), 2);
 
     ASSERT_EQ(UpdateStatus::Normal, r->specializeCase4(3, 2, 1, 0, 1));
-    ASSERT_STREQ(r->toDumpString(kb).c_str(), "h(X0,X1,?):-p(X0),q(?,X1)");
+    ASSERT_STREQ(r->toDumpString(name_strs).c_str(), "h(X0,X1,?):-p(X0),q(?,X1)");
     ASSERT_EQ(r->getLength(), 2);
     ASSERT_EQ(r->numPredicates(), 3);
     ASSERT_EQ(r->usedLimitedVars(), 2);
     ASSERT_EQ(cache.size(), 3);
 
     ASSERT_EQ(UpdateStatus::Normal, r->specializeCase2(3, 2, 1, 0));
-    ASSERT_STREQ(r->toDumpString(kb).c_str(), "h(X0,X1,?):-p(X0),q(?,X1),q(?,X0)");
+    ASSERT_STREQ(r->toDumpString(name_strs).c_str(), "h(X0,X1,?):-p(X0),q(?,X1),q(?,X0)");
     ASSERT_EQ(r->getLength(), 3);
     ASSERT_EQ(r->numPredicates(), 4);
     ASSERT_EQ(r->usedLimitedVars(), 2);
     ASSERT_EQ(cache.size(), 4);
 
     ASSERT_EQ(UpdateStatus::Normal, r->specializeCase5(3, 0, 3));
-    ASSERT_STREQ(r->toDumpString(kb).c_str(), "h(X0,X1,?):-p(X0),q(?,X1),q(3,X0)");
+    ASSERT_STREQ(r->toDumpString(name_strs).c_str(), "h(X0,X1,?):-p(X0),q(?,X1),q(3,X0)");
     ASSERT_EQ(r->getLength(), 4);
     ASSERT_EQ(r->numPredicates(), 4);
     ASSERT_EQ(r->usedLimitedVars(), 2);
     ASSERT_EQ(cache.size(), 5);
 
     ASSERT_EQ(UpdateStatus::Normal, r->specializeCase5(0, 2, 3));
-    ASSERT_STREQ(r->toDumpString(kb).c_str(), "h(X0,X1,3):-p(X0),q(?,X1),q(3,X0)");
+    ASSERT_STREQ(r->toDumpString(name_strs).c_str(), "h(X0,X1,3):-p(X0),q(?,X1),q(3,X0)");
     ASSERT_EQ(r->getLength(), 5);
     ASSERT_EQ(r->numPredicates(), 4);
     ASSERT_EQ(r->usedLimitedVars(), 2);

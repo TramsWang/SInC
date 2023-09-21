@@ -10,7 +10,7 @@ using sinc::Rule;
 using sinc::ParsedPred;
 using sinc::ParsedArg;
 
-double Rule::MinFactCoverage = 0.05;
+double Rule::MinFactCoverage = DEFAULT_MIN_FACT_COVERAGE;
 
 std::vector<ParsedPred*>* Rule::parseStructure(const std::string& ruleStr) {
     std::vector<ParsedPred*>* const structure = new std::vector<ParsedPred*>();
@@ -395,14 +395,14 @@ Fingerprint const& Rule::getFingerprint() const {
     return *fingerprint;
 }
 
-std::string Rule::toString(const SimpleKb& kb) const {
+std::string Rule::toString(const char* const names[]) const {
     std::ostringstream os;
     os << '(' << eval.toString() << ')';
-    os << getHead().toString(kb) << ":-";
+    os << getHead().toString(names) << ":-";
     if (1 < numPredicates()) {
-        os << structure[1].toString(kb);
+        os << structure[1].toString(names);
         for (int pred_idx = 2; pred_idx < numPredicates(); pred_idx++) {
-            os << ',' << structure[pred_idx].toString(kb);
+            os << ',' << structure[pred_idx].toString(names);
         }
     }
     return os.str();
@@ -421,13 +421,13 @@ std::string Rule::toString() const {
     return os.str();
 }
 
-std::string Rule::toDumpString(const SimpleKb& kb) const {
+std::string Rule::toDumpString(const char* const names[]) const {
     std::ostringstream os;
-    os << getHead().toString(kb) << ":-";
+    os << getHead().toString(names) << ":-";
     if (1 < numPredicates()) {
-        os << structure[1].toString(kb);
+        os << structure[1].toString(names);
         for (int pred_idx = 2; pred_idx < numPredicates(); pred_idx++) {
-            os << ',' << structure[pred_idx].toString(kb);
+            os << ',' << structure[pred_idx].toString(names);
         }
     }
     return os.str();

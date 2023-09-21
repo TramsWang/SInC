@@ -21,8 +21,17 @@ TestKbManager::~TestKbManager() {
     free((void*)kbName);    // as `strdup()` uses `malloc()`
 }
 
+const fs::path& TestKbManager::createTmpDir() {
+    int id[4] {rand(), rand(), rand(), rand()};
+    fs::path dir_name(std::to_string(id[0]) + std::to_string(id[1]) + std::to_string(id[2]) + std::to_string(id[3]));
+    return tmpPaths.emplace_back(MEM_DIR_PATH / dir_name);
+}
+
 void TestKbManager::cleanUpKb() {
     removeDir(kbPath);
+    for (fs::path const& p: tmpPaths) {
+        removeDir(p);
+    }
 }
 
 const char* TestKbManager::getKbName() const {
@@ -117,5 +126,5 @@ void TestKbManager::createTestRelationFiles() {
 }
 
 void TestKbManager::removeDir(const fs::path& dir) {
-    ASSERT_NE(fs::remove_all(dir), 0);
+    ASSERT_NE(fs::remove_all(dir), 0) << dir;
 }

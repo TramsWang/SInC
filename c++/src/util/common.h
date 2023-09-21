@@ -118,6 +118,7 @@ namespace sinc {
         int* getArgs() const;
         int getArity() const;
 
+        Record& operator=(Record&& another);
         bool operator==(const Record &another) const;
         size_t hash() const;
     protected:
@@ -157,11 +158,12 @@ namespace sinc {
      *
      * @since 1.0
      */
-    class SimpleKb;
     class Predicate {
     public:
         /**
          * Initialize by the predicate symbol and the arguments specifically.
+         * 
+         * NOTE: The array `args` WILL be maintained by the predicate object
          */
         Predicate(int const predSymbol, int* const args, int const arity);
 
@@ -186,7 +188,7 @@ namespace sinc {
         size_t hash() const;
 
         std::string toString() const;
-        std::string toString(const SimpleKb& kb) const;
+        std::string toString(const char* const names[]) const;
         //Todo: std::string toString(const NumerationMap& map) const;
     protected:
         int predSymbol;

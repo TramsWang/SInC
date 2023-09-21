@@ -551,3 +551,145 @@ TEST_F(TestSimpleKb, TestDump) {
     releaseRows(rel2, 4);
     EXPECT_NE(std::filesystem::remove_all(TestKbManager::MEM_DIR_PATH / path("testSimpleKbDump")), 0);
 }
+
+using sinc::SimpleCompressedKb;
+class TestSimpleCompressedKb : public testing::Test {
+protected:
+    static TestKbManager* testKb;
+
+    static void SetUpTestSuite() {
+        testKb = new TestKbManager();
+        std::cout << "Create Test KB: " << testKb->getKbPath() << std::endl;
+    }
+
+    static void TearDownTestSuite() {
+        std::cout << "Remove Test KB: " << testKb->getKbPath() << std::endl;
+        testKb->cleanUpKb();
+        delete testKb;
+        testKb = nullptr;
+    }
+
+    void releaseRows(int** rows, int length) {
+        for (int i =0; i < length; i++) {
+            delete[] rows[i];
+        }
+        delete[] rows;
+    };
+};
+
+TestKbManager* TestSimpleCompressedKb::testKb = nullptr;
+
+TEST_F(TestSimpleCompressedKb, TestConstructAndDump) {
+    SimpleKb kb(testKb->getKbName(), testKb->MEM_DIR_PATH);
+    int family_ent_recs[3][3] {
+        {4, 5, 6},
+        {7, 8, 9},
+        {10, 11, 12},
+    };
+    int father_ent_recs[3][2] {
+        {5, 6},
+        {8, 9},
+        {11, 12},
+    };
+    int mother_ent_recs[3][3] {
+        {4, 6},
+        {7, 9},
+        {10, 12},
+    };
+    std::string rel_name_family("family");
+    std::string rel_name_father("father");
+    std::string rel_name_mother("mother");
+    const char* names[3];
+    kb.setAsEntailed(rel_name_family, family_ent_recs[0]);
+    kb.setAsEntailed(rel_name_family, family_ent_recs[1]);
+    kb.setAsEntailed(rel_name_family, family_ent_recs[2]);
+    kb.setAsEntailed(rel_name_father, father_ent_recs[0]);
+    kb.setAsEntailed(rel_name_father, father_ent_recs[1]);
+    kb.setAsEntailed(rel_name_father, father_ent_recs[2]);
+    kb.setAsEntailed(rel_name_mother, mother_ent_recs[0]);
+    kb.setAsEntailed(rel_name_mother, mother_ent_recs[1]);
+    kb.setAsEntailed(rel_name_mother, mother_ent_recs[2]);
+    SimpleRelation* rel_family = kb.getRelation(rel_name_family);
+    SimpleRelation* rel_father = kb.getRelation(rel_name_father);
+    SimpleRelation* rel_mother = kb.getRelation(rel_name_mother);
+    names[rel_family->id] = rel_family->name;
+    names[rel_father->id] = rel_father->name;
+    names[rel_mother->id] = rel_mother->name;
+
+    const fs::path& ckb_path = testKb->createTmpDir();
+    SimpleCompressedKb ckb(ckb_path.filename().string(), &kb);
+    int fvs_record[3] {10, 11, 12};
+    ckb.addFvsRecord(rel_family->id, fvs_record);
+
+    Rule::fingerprintCacheType cache;
+    Rule::tabuMapType tabuMap;
+    BareRule* rule_father = new BareRule(rel_father->id, 2, cache, tabuMap);
+    EXPECT_EQ(rule_father->specializeCase4(rel_family->id, 3, 1, 0, 0), UpdateStatus::Normal);
+    EXPECT_EQ(rule_father->specializeCase3(1, 2, 0, 1), UpdateStatus::Normal);
+    EXPECT_STREQ(rule_father->toDumpString(names).c_str(), "father(X0,X1):-family(?,X0,X1)");
+    BareRule* rule_mother = new BareRule(rel_mother->id, 2, cache, tabuMap);
+    EXPECT_EQ(rule_mother->specializeCase4(rel_family->id, 3, 0, 0, 0), UpdateStatus::Normal);
+    EXPECT_EQ(rule_mother->specializeCase5(0, 1, 6), UpdateStatus::Normal);
+    EXPECT_EQ(rule_mother->specializeCase5(1, 2, 6), UpdateStatus::Normal);
+    EXPECT_STREQ(rule_mother->toDumpString(names).c_str(), "mother(X0,6):-family(X0,?,6)");
+    std::vector<Rule*> rules;
+    rules.push_back(rule_father);
+    rules.push_back(rule_mother);
+    ckb.addHypothesisRules(rules);
+
+    int** counterexamples_mother = new int*[1] {
+        new int[2] {5, 5}
+    };
+    int** counterexamples_father = new int*[2] {
+        new int[2] {16, 17},
+        new int[2] {14, 15}
+    };
+    std::unordered_set<Record> ceg_set_mother;
+    std::unordered_set<Record> ceg_set_father;
+    ceg_set_mother.emplace(counterexamples_mother[0], 2);
+    ceg_set_father.emplace(counterexamples_father[0], 2);
+    ceg_set_father.emplace(counterexamples_father[1], 2);
+    ckb.addCounterexamples(rel_mother->id, ceg_set_mother);
+    ckb.addCounterexamples(rel_father->id, ceg_set_father);
+    ckb.updateSupplementaryConstants();
+
+    EXPECT_STREQ(ckb.getName(), ckb_path.filename().c_str());
+    EXPECT_EQ(ckb.totalNecessaryRecords(), 4);
+    EXPECT_EQ(ckb.totalFvsRecords(), 1);
+    EXPECT_EQ(ckb.totalCounterexamples(), 3);
+    EXPECT_EQ(ckb.totalHypothesisSize(), 5);
+    EXPECT_EQ(ckb.totalSupplementaryConstants(), 7);    // In this test, numbers 1, 2, and 3 should be taken into consideration
+    int exp_supp_consts[7] {1, 2, 3, 4, 7, 8, 9};
+    for (int i = 0; i < 7; i++) {
+        EXPECT_EQ(ckb.getSupplementaryConstants()[i], exp_supp_consts[i]);
+    }
+
+    /* Dump */
+    ckb.dump(testKb->MEM_DIR_PATH);
+    SimpleKb kb2(ckb.getName(), testKb->MEM_DIR_PATH);
+    EXPECT_EQ(kb2.totalRecords(), 4);
+    int family_necessary_recs[2][3] {
+        {10, 11, 12},
+        {13, 14, 15}
+    };
+    int father_necessary_recs[1][2] {
+        {16, 17}
+    };
+    int mother_necessary_recs[1][2] {
+        {13, 15}
+    };
+    EXPECT_TRUE(kb2.hasRecord("family", family_necessary_recs[0]));
+    EXPECT_TRUE(kb2.hasRecord("family", family_necessary_recs[1]));
+    EXPECT_TRUE(kb2.hasRecord("father", father_necessary_recs[0]));
+    EXPECT_TRUE(kb2.hasRecord("mother", mother_necessary_recs[0]));
+
+    delete[] counterexamples_mother;
+    delete[] counterexamples_father;
+    for (Fingerprint* const& fp: cache) {
+        delete fp;
+    }
+    for (std::pair<sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabuMap) {
+        delete kv.first;
+        delete kv.second;
+    }
+}

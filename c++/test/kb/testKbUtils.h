@@ -12,8 +12,8 @@ namespace sinc {
 
             TestKbManager();
             ~TestKbManager();
-            void appendTmpFile(const fs::path& tmpFilePath);
-            void createTmpDir();
+            // void appendTmpFile(const fs::path& tmpFilePath);
+            const fs::path& createTmpDir();
             void cleanUpKb();
             const char* getKbName() const;
             const fs::path& getKbPath() const;
@@ -23,6 +23,7 @@ namespace sinc {
         protected:
             const char* kbName;
             fs::path kbPath;
+            std::vector<fs::path> tmpPaths;
             // const char* const ckbName;
             // fs::path ckbPath;
 
