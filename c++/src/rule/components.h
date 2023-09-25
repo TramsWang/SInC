@@ -78,6 +78,8 @@ namespace sinc {
          */
         Eval(double const posEtls, double const allEtls, int const ruleLength);
 
+        Eval(const Eval& another);
+
         /**
          * Get the score value of certain metric type.
          *
@@ -98,6 +100,7 @@ namespace sinc {
         std::string toString() const;
 
         Eval& operator=(const Eval& another);
+        Eval& operator=(const Eval&& another);
 
     protected:
         /** The number of positive entailments (double type to be the same as 'negEtls') */
@@ -124,6 +127,8 @@ namespace sinc {
      *  Ev2     rec21   rec22   ...     rec2n
      *  ...
      *  Evk     reck1   reck2   ...     reckn
+     * 
+     * NOTE: Each `int*` in each grounding SHOULD be maintained by USER.
      *
      * @since 2.0
      */
@@ -133,6 +138,8 @@ namespace sinc {
         int const numPredicates;
         /** The relation of each predicate in the rule */
         int* const predicateSymbolsInRule;
+        /** The arity of each predicate in the rule */
+        int* const aritiesInRule;
         /** The list of evidence. Each list is a piece of evidence */
         std::vector<int**> const evidenceList;
 

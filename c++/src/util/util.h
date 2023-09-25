@@ -252,4 +252,15 @@ namespace sinc {
      * A timing function that returns current time in nano seconds
      */
     uint64_t currentTimeInNano();
+
+    class StreamFormatter {
+    public:
+        StreamFormatter(std::ostream& os);
+
+        void printf(const char* format, ...);
+
+    protected:
+        char buf[1024];
+        std::ostream& os;
+    };
 }

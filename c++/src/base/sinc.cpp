@@ -1,0 +1,450 @@
+#include "sinc.h"
+
+#include <cstring>
+#include <stdarg.h>
+#include "../util/util.h"
+
+/**
+ * SincConfig
+ */
+using sinc::SincConfig;
+SincConfig::SincConfig(
+    const char* _basePath, const char* _kbName, const char* _dumpPath, const char* _dumpName,
+    int const _threads, bool const _validation, int const _beamwidth, EvalMetric::Value _evalMetric,
+    double const _minFactCoverage, double const _minConstantCoverage, double const _stopCompressionRatio,
+    double const _observationRatio, const char* _negKbBasePath, const char* _negKbName, double const _budgetFactor, bool const _weightedNegSamples
+) : basePath(_basePath), kbName(strdup(_kbName)), dumpPath(_dumpPath), dumpName(strdup(_dumpName)),
+    threads(_threads), validation(_validation), beamwidth(_beamwidth), evalMetric(_evalMetric),
+    minFactCoverage(_minFactCoverage), minConstantCoverage(_minConstantCoverage), stopCompressionRatio(_stopCompressionRatio),
+    observationRatio(_observationRatio), negKbBasePath(_negKbBasePath), negKbName(strdup(_negKbName)), budgetFactor(_budgetFactor), weightedNegSamples(_weightedNegSamples)
+{}
+
+SincConfig::~SincConfig() {
+    free((void*)kbName);
+    free((void*)dumpName);
+    free((void*)negKbName);
+}
+
+/**
+ * Performance Monitor
+ */
+using sinc::PerformanceMonitor;
+void PerformanceMonitor::show(std::ostream& os) {
+    os << "\n### Monitored Performance Info ###\n\n";
+    os << "--- Time Cost ---\n";
+    printf(os, "(ms) %10s %10s %10s %10s %10s %10s %10s\n", "Load", "Hypo", "Dep", "Dump", "Validate", "Neo4j", "Total");
+    printf(
+        os, "     %10d %10d %10d %10d %10d %10d %10d\n\n",
+        NANO_TO_MILL(kbLoadTime), NANO_TO_MILL(hypothesisMiningTime), NANO_TO_MILL(dependencyAnalysisTime), NANO_TO_MILL(dumpTime),
+        NANO_TO_MILL(validationTime), NANO_TO_MILL(neo4jTime), NANO_TO_MILL(totalTime)
+    );
+
+    os << "--- Basic Rule Mining Cost ---\n";
+    printf(os, "(ms) %10s %10s %10s %10s %10s\n", "Fp", "Prune", "Eval", "KB Upd", "Total");
+    printf(
+        os, "     %10d %10d %10d %10d %10d\n\n",
+        NANO_TO_MILL(fingerprintCreationTime), NANO_TO_MILL(pruningTime), NANO_TO_MILL(evalTime), NANO_TO_MILL(kbUpdateTime),
+        NANO_TO_MILL(fingerprintCreationTime + pruningTime + evalTime + kbUpdateTime)
+    );
+
+    os << "--- Statistics ---\n";
+    printf(
+        os, "# %10s %10s %10s %10s %10s %10s %10s %10s %10s %10s %10s %10s %10s %10s\n",
+        "|P|", "|Σ|", "|B|", "|H|", "||H||", "|N|", "|A|", "|ΔΣ|", "#SCC", "|SCC|", "|FVS|", "Comp(%)", "#SQL", "#SQL/|H|"
+    );
+    printf(
+        os, "  %10d %10d %10d %10d %10d %10d %10d %10d %10d %10d %10d %10.2f %10d %10.2f\n\n",
+        kbFunctors, kbConstants, kbSize, hypothesisRuleNumber, hypothesisSize, necessaryFacts, counterexamples, supplementaryConstants,
+        sccNumber, sccVertices, fvsVertices, (necessaryFacts + counterexamples + hypothesisSize) * 100.0 / kbSize,
+        evaluatedSqls, evaluatedSqls * 1.0 / hypothesisRuleNumber
+    );
+}
+
+std::ostream& PerformanceMonitor::printf(std::ostream& os, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    vsprintf(buf, format, args);
+    return os << buf;
+}
+
+/**
+ * RelationMiner
+ */
+using sinc::RelationMiner;
+
+RelationMiner::nodeType RelationMiner::AxiomNode(new sinc::Predicate(-1, 1));
+
+RelationMiner::RelationMiner(
+    SimpleKb& _kb, int const _targetRelation, EvalMetric::Value _evalMetric, int const _beamwidth, double const _stopCompressionRatio,
+    nodeMapType& _predicate2NodeMap, depGraphType& _dependencyGraph, std::vector<Rule*>& _hypothesis,
+    std::unordered_set<Record>& _counterexamples, std::ostream& _logger
+) : kb(_kb), targetRelation(_targetRelation), evalMetric(_evalMetric), beamwidth(_beamwidth), stopCompressionRatio(_stopCompressionRatio),
+    predicate2NodeMap(_predicate2NodeMap), dependencyGraph(_dependencyGraph), hypothesis(_hypothesis), counterexamples(_counterexamples),
+    logger(_logger), logFormatter(_logger) {}
+
+RelationMiner::~RelationMiner() {
+    /* Release TabuMap */
+    for (std::pair<const sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabuMap) {
+        delete kv.first;
+        delete kv.second;
+    }
+}
+
+void RelationMiner::run() {
+    Rule* rule;
+    int covered_facts = 0;
+    int const total_facts = kb.getRelation(targetRelation)->getTotalRows();
+    while (shouldContinue && (covered_facts < total_facts) && (nullptr != (rule = findRule()))) {
+        hypothesis.push_back(rule);
+        covered_facts += updateKbAndDependencyGraph(*rule);
+        rule->releaseMemory();
+        logFormatter.printf(
+                "Found (Coverage: %.2f%%, %d/%d): %s\n", covered_facts * 100.0 / total_facts, covered_facts, total_facts,
+                rule->toDumpString(kb.getRelationNames())
+        );
+        logger.flush();
+    }
+    logger << "Done" << std::endl;
+}
+
+void RelationMiner::discontinue() {
+    shouldContinue = false;
+}
+
+using sinc::Record;
+std::unordered_set<Record>& RelationMiner::getCounterexamples() const {
+    return counterexamples;
+}
+
+using sinc::Rule;
+std::vector<Rule*>& RelationMiner::getHypothesis() const {
+    return hypothesis;
+}
+
+Rule* RelationMiner::findRule() {
+    /* Create the beams */
+    Rule** beams = new Rule*[beamwidth]{};
+    beams[0] = getStartRule();
+    Rule* best_local_optimum = nullptr;
+
+    /* Find a local optimum (there is certainly a local optimum in the search routine) */
+    while (true) {
+        /* Find the candidates in the next round according to current beams */
+        Rule** top_candidates = new Rule*[beamwidth]{};
+        for (int i = 0; i < beamwidth && nullptr != beams[i]; i++) {
+            Rule* const r = beams[i];
+            selectAsBeam(*r);
+            #if DEBUG_LEVEL >= DEBUG_VERBOSE
+                logFormatter.printf("Extend: %s\n", r.toString(kb.getRelationNames()));
+                logger.flush();
+            #endif
+
+            /* Find the specializations and generalizations of rule 'r' */
+            int specializations_cnt = findSpecializations(*r, top_candidates);
+            int generalizations_cnt = findGeneralizations(*r, top_candidates);
+            if (0 == specializations_cnt && 0 == generalizations_cnt) {
+                /* If no better specialized and generalized rules, 'r' is a local optimum */
+                /* Keep track of only the best local optimum */
+                if (nullptr == best_local_optimum ||
+                        best_local_optimum->getEval().value(evalMetric) < r->getEval().value(evalMetric)) {
+                    best_local_optimum = r;
+                }
+            }
+        }
+        if (!shouldContinue) {
+            /* Stop the finding procedure at the current stage and return the best rule */
+            Rule* best_rule = beams[0];
+            for (int i = 1; i < beamwidth && nullptr != beams[i]; i++) {
+                if (best_rule->getEval().value(evalMetric) < beams[i]->getEval().value(evalMetric)) {
+                    delete best_rule;
+                    best_rule = beams[i];
+                } else {
+                    delete beams[i];
+                }
+            }
+            for (int i = 0; i < beamwidth && nullptr != top_candidates[i]; i++) {
+                if (best_rule->getEval().value(evalMetric) < top_candidates[i]->getEval().value(evalMetric)) {
+                    delete best_rule;
+                    best_rule = top_candidates[i];
+                } else {
+                    delete top_candidates[i];
+                }
+            }
+            if (nullptr != best_rule) {
+                if (!best_rule->getEval().useful()) {
+                    delete best_rule;
+                    best_rule = nullptr;
+                }
+            }
+            return best_rule;
+        }
+
+        /* Find the best candidate */
+        Rule* best_candidate = nullptr;
+        if (nullptr != top_candidates[0]) {
+            best_candidate = top_candidates[0];
+            for (int i = 1; i < beamwidth && nullptr != top_candidates[i]; i++) {
+                if (best_candidate->getEval().value(evalMetric) < top_candidates[i]->getEval().value(evalMetric)) {
+                    best_candidate = top_candidates[i];
+                }
+            }
+        }
+
+        /* If there is a local optimum and it is the best among all, return the rule */
+        if (nullptr != best_local_optimum &&
+                (nullptr == best_candidate ||
+                        best_local_optimum->getEval().value(evalMetric) > best_candidate->getEval().value(evalMetric))
+        ) {
+            /* If the best is not useful, return NULL */
+            Rule* const ret = best_local_optimum->getEval().useful() ? best_local_optimum : nullptr;
+            for (int i = 0; i < beamwidth && nullptr != beams[i]; i++) {
+                if (ret != beams[i]) {
+                    delete beams[i];
+                }
+            }
+            delete[] beams;
+            for (int i = 0; i < beamwidth && nullptr != top_candidates[i]; i++) {
+                if (ret != top_candidates[i]) {
+                    delete top_candidates[i];
+                }
+            }
+            delete[] top_candidates;
+            return ret;
+        }
+
+        /* If the best rule reaches the stopping threshold, return the rule */
+        /* The "best_candidate" is certainly not NULL if the workflow goes here */
+        /* Assumption: the stopping threshold is no less than the threshold of usefulness */
+        const Eval& best_eval = best_candidate->getEval();
+        if (stopCompressionRatio <= best_eval.value(EvalMetric::Value::CompressionRatio) || 0 == best_eval.getNegEtls()) {
+            Rule* const ret = best_eval.useful() ? best_candidate : nullptr;
+            for (int i = 0; i < beamwidth && nullptr != beams[i]; i++) {
+                if (ret != beams[i]) {
+                    delete beams[i];
+                }
+            }
+            delete[] beams;
+            for (int i = 0; i < beamwidth && nullptr != top_candidates[i]; i++) {
+                if (ret != top_candidates[i]) {
+                    delete top_candidates[i];
+                }
+            }
+            delete[] top_candidates;
+            return ret;
+        }
+
+        /* Update the beams */
+        for (int i = 0; i < beamwidth && nullptr != beams[i]; i++) {
+            delete beams[i];
+        }
+        delete[] beams;
+        beams = top_candidates;
+    }
+}
+
+int RelationMiner::findSpecializations(Rule& rule, Rule** const candidates) {
+    int added_candidate_cnt = 0;
+
+    /* Find all empty arguments */
+    std::vector<ArgLocation> empty_args;
+    for (int pred_idx = HEAD_PRED_IDX; pred_idx < rule.numPredicates(); pred_idx++) {
+        const Predicate& predicate = rule.getPredicate(pred_idx);
+        for (int arg_idx = 0; arg_idx < predicate.getArity(); arg_idx++) {
+            if (ARG_IS_EMPTY(predicate.getArg(arg_idx))) {
+                empty_args.emplace_back(pred_idx, arg_idx);
+            }
+        }
+    }
+
+    /* Add existing LVs (case 1 and 2) */
+    std::vector<SimpleRelation*>* const relations = kb.getRelations();
+    for (int var_id = 0; var_id < rule.usedLimitedVars(); var_id++) {
+        /* Case 1 */
+        for (ArgLocation const& vacant: empty_args) {
+            Rule* const new_rule = rule.clone();
+            UpdateStatus const update_status = new_rule->specializeCase1(vacant.predIdx, vacant.argIdx, var_id);
+            added_candidate_cnt += checkThenAddRule(update_status, new_rule, rule, candidates);
+        }
+
+        /* Case 2 */
+        for (SimpleRelation* const& relation: *relations) {
+            for (int arg_idx = 0; arg_idx < relation->getTotalCols(); arg_idx++) {
+                Rule* const new_rule = rule.clone();
+                UpdateStatus const update_status = new_rule->specializeCase2(
+                        relation->id, relation->getTotalCols(), arg_idx, var_id
+                );
+                added_candidate_cnt += checkThenAddRule(update_status, new_rule, rule, candidates);
+            }
+        }
+    }
+
+    /* Case 3, 4, and 5 */
+    for (int i = 0; i < empty_args.size(); i++) {
+        /* Find the first empty argument */
+        ArgLocation const& empty_arg_loc_1 = empty_args[i];
+        Predicate const& predicate1 = rule.getPredicate(empty_arg_loc_1.predIdx);
+
+        /* Case 5 */
+        std::vector<int>* const_list = kb.getPromisingConstants(predicate1.getPredSymbol())[empty_arg_loc_1.argIdx];
+        for (int const& constant: *const_list) {
+            Rule* const new_rule = rule.clone();
+            UpdateStatus const update_status = new_rule->specializeCase5(
+                    empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx, constant
+            );
+            added_candidate_cnt += checkThenAddRule(update_status, new_rule, rule, candidates);
+        }
+
+        /* Case 3 */
+        for (int j = i + 1; j < empty_args.size(); j++) {
+            /* Find another empty argument */
+            ArgLocation const& empty_arg_loc_2 = empty_args[j];
+            Rule* const new_rule = rule.clone();
+            UpdateStatus update_status = new_rule->specializeCase3(
+                    empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx, empty_arg_loc_2.predIdx, empty_arg_loc_2.argIdx
+            );
+            added_candidate_cnt += checkThenAddRule(update_status, new_rule, rule, candidates);
+        }
+
+        /* Case 4 */
+        for (SimpleRelation* const& relation: *relations) {
+            for (int arg_idx = 0; arg_idx < relation->getTotalCols(); arg_idx++) {
+                Rule* const new_rule = rule.clone();
+                UpdateStatus const update_status = new_rule->specializeCase4(
+                        relation->id, relation->getTotalCols(), arg_idx, empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx
+                );
+                added_candidate_cnt += checkThenAddRule(update_status, new_rule, rule, candidates);
+            }
+        }
+    }
+    return added_candidate_cnt;
+}
+
+int RelationMiner::findGeneralizations(Rule& rule, Rule** const candidates) {
+    int added_candidate_cnt = 0;
+    for (int pred_idx = HEAD_PRED_IDX; pred_idx < rule.numPredicates(); pred_idx++) {
+        /* Independent fragment may appear in a generalized rule, but this will be found by checking rule validness */
+        Predicate const& predicate = rule.getPredicate(pred_idx);
+        for (int arg_idx = 0; arg_idx < predicate.getArity(); arg_idx++) {
+            if (ARG_IS_NON_EMPTY(predicate.getArg(arg_idx))) {
+                Rule* const new_rule = rule.clone();
+                UpdateStatus const update_status = new_rule->generalize(pred_idx, arg_idx);
+                added_candidate_cnt += checkThenAddRule(update_status, new_rule, rule, candidates);
+            }
+        }
+    }
+    return added_candidate_cnt;
+}
+
+int RelationMiner::checkThenAddRule(UpdateStatus updateStatus, Rule* const updatedRule, Rule& originalRule, Rule** candidates) {
+    fingerprintCreationTime += updatedRule->getFingerprintCreationTime();
+    pruningTime += updatedRule->getPruningTime();
+
+    bool updated_is_better = false;
+    switch (updateStatus) {
+        case Normal:
+            #if DEBUG_LEVEL >= DEBUG_DEBUG
+                logFormatter.printf("Spec. %s\n", updatedRule->toString(kb.getRelationNames()));
+                logger.flush();
+            #endif
+            if (updatedRule->getEval().value(evalMetric) > originalRule.getEval().value(evalMetric)) {
+                updated_is_better = true;
+                int replace_idx = -1;
+                double replaced_score = updatedRule->getEval().value(evalMetric);
+                for (int i = 0; i < beamwidth; i++) {
+                    if (nullptr == candidates[i]) {
+                        replace_idx = i;
+                        break;
+                    }
+                    double candidate_socre = candidates[i]->getEval().value(evalMetric);
+                    if (replaced_score > candidate_socre) {
+                        replace_idx = i;
+                        replaced_score = candidate_socre;
+                    }
+                }
+                if (0 <= replace_idx) {
+                    candidates[replace_idx] = updatedRule;
+                }
+            }
+            evalTime += updatedRule->getEvalTime();
+            evaluatedSqls += 2;
+            break;
+        case Invalid:
+        case Duplicated:
+        case InsufficientCoverage:
+            break;
+        case TabuPruned:
+            #if DEBUG_LEVEL >= DEBUG_DEBUG
+                logger.printf("TABU: %s\n", updatedRule->toString(kb.getRelationNames()));
+                logger.flush();
+            #endif
+            evaluatedSqls++;
+            break;
+        default:
+            std::ostringstream os;
+            os << "Unknown Update Status of Rule: " << updateStatus;
+            throw SincException(os.str());
+    }
+    if (updated_is_better) {
+        return 1;
+    } else {
+        delete updatedRule;
+        return 0;
+    }
+}
+
+int RelationMiner::updateKbAndDependencyGraph(Rule& rule) {
+    uint64_t time_start = currentTimeInNano();
+    std::unordered_set<Record>* counterexample_by_rule = rule.getCounterexamples();
+    for (Record const& r: *counterexample_by_rule) {
+        counterexamples.emplace(r.getArgs(), r.getArity());
+    }
+    EvidenceBatch* evidence_batch = rule.getEvidenceAndMarkEntailment();
+    for (int** const& grounding: evidence_batch->evidenceList) {
+        Predicate const& head_pred = rule.getHead();
+        Predicate* head_ground = new Predicate(
+                evidence_batch->predicateSymbolsInRule[HEAD_PRED_IDX], grounding[HEAD_PRED_IDX], evidence_batch->aritiesInRule[HEAD_PRED_IDX]
+        );
+        head_ground->maintainArgs();
+
+        nodeType* head_node = new nodeType(head_ground);
+        std::pair<nodeMapType::iterator, bool> ret = predicate2NodeMap.emplace(head_ground, head_node);
+        if (!ret.second) {
+            delete head_ground;
+            delete head_node;
+            head_ground = ret.first->first;
+            head_node = ret.first->second;
+        }
+
+        depGraphType::iterator itr = dependencyGraph.find(head_node);
+        std::unordered_set<nodeType*>* dependencies;
+        if (dependencyGraph.end() == itr) {
+            dependencies = new std::unordered_set<nodeType*>();
+            dependencyGraph.emplace(head_node, dependencies);
+        } else {
+            dependencies = itr->second;
+        }
+        if (1 >= rule.numPredicates()) {
+            /* dependency is the "⊥" node */
+            dependencies->insert(&RelationMiner::AxiomNode);
+        } else {
+            for (int pred_idx = FIRST_BODY_PRED_IDX; pred_idx < rule.numPredicates(); pred_idx++) {
+                Predicate* body_ground = new Predicate(
+                        evidence_batch->predicateSymbolsInRule[pred_idx], grounding[pred_idx], evidence_batch->aritiesInRule[pred_idx]
+                );
+                nodeType* body_node = new nodeType(body_ground);
+                ret = predicate2NodeMap.emplace(body_ground, body_node);
+                if (!ret.second) {
+                    delete body_ground;
+                    delete body_node;
+                    body_ground = ret.first->first;
+                    body_node = ret.first->second;
+                }
+                dependencies->insert(body_node);
+            }
+        }
+    }
+    kbUpdateTime += currentTimeInNano() - time_start;
+    int num_entailed = evidence_batch->evidenceList.size();
+    delete evidence_batch;
+    return num_entailed;
+}

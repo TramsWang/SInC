@@ -163,12 +163,14 @@ namespace sinc {
         /**
          * Initialize by the predicate symbol and the arguments specifically.
          * 
-         * NOTE: The array `args` WILL be maintained by the predicate object
+         * NOTE: The array `args` WILL be maintained by USER
          */
         Predicate(int const predSymbol, int* const args, int const arity);
 
         /**
          * Initialize by the functor and empty arguments (indicated by the arity).
+         * 
+         * NOTE: The array `args` WILL be maintained by the `Predicate` object
          *
          * @param arity The arity of the predicate
          */
@@ -176,6 +178,11 @@ namespace sinc {
 
         Predicate(const Predicate& another);
         ~Predicate();
+
+        /**
+         * This method transports the maintainence of the `args` pointer to the predicate object.
+         */
+        void maintainArgs();
 
         int getPredSymbol() const;
         int* getArgs() const;
@@ -194,6 +201,7 @@ namespace sinc {
         int predSymbol;
         int* args;
         int arity;
+        bool releaseArg;
     };
 }
 

@@ -1,7 +1,6 @@
 #include "common.h"
 #include <cstring>
 #include <sstream>
-#include "../kb/simpleKb.h"
 
 /* 
  * Container Helpers
@@ -77,9 +76,9 @@ bool std::equal_to<Record*>::operator()(const Record *r1, const Record *r2) cons
  * Predicate
  */
 using sinc::Predicate;
-Predicate::Predicate(int const p, int* const g, int const a): predSymbol(p), args(g), arity(a) {}
+Predicate::Predicate(int const p, int* const g, int const a): predSymbol(p), args(g), arity(a), releaseArg(false) {}
 
-Predicate::Predicate(int const p, int const a): predSymbol(p), args(new int[a]{0}), arity(a) {}
+Predicate::Predicate(int const p, int const a): predSymbol(p), args(new int[a]{0}), arity(a), releaseArg(true) {}
 
 int* copyIntArray(int* const arr,int  const length) {
     int* _arr = new int[length];
@@ -89,10 +88,18 @@ int* copyIntArray(int* const arr,int  const length) {
     return _arr;
 }
 
-Predicate::Predicate(const Predicate& another): predSymbol(another.predSymbol), args(copyIntArray(another.args, another.arity)), arity(another.arity) {}
+Predicate::Predicate(const Predicate& another): predSymbol(another.predSymbol), arity(another.arity) {
+    if (another.releaseArg) {
+        args = copyIntArray(another.args, another.arity);
+        releaseArg = true;
+    } else {
+        args = another.args;
+        releaseArg = false;
+    }
+}
 
 Predicate::~Predicate() {
-    if (nullptr != args) {
+    if (releaseArg) {
         delete[] args;
     }
 }
@@ -117,22 +124,28 @@ int Predicate::getArity() const {
     return arity;
 }
 
+void Predicate::maintainArgs() {
+    releaseArg = true;
+}
+
 Predicate& Predicate::operator=(Predicate&& another) noexcept {
     if (this == &another) {
         return *this;
     }
-    if (nullptr != args) {
+    if (releaseArg) {
         delete[] args;
     }
     predSymbol = another.predSymbol;
     args = another.args;
     arity = another.arity;
+    releaseArg = another.releaseArg;
     another.args = nullptr;
+    another.releaseArg = false;
     return *this;
 }
 
 bool Predicate::operator==(const Predicate &another) const {
-    if (this->predSymbol != another.predSymbol) {
+    if (this->predSymbol != another.predSymbol || this->arity != another.arity) {
         return false;
     }
     for (int i = 0; i < this->arity; i++) {

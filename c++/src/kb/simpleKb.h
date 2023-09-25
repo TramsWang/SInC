@@ -363,11 +363,14 @@ namespace sinc {
 
         int totalConstants() const;
 
+        const char* const * getRelationNames() const;
+
     protected:
         /** The name of the KB */
         const char* const name;
         /** The list of relation pointers. The ID of each relation is its index in the list */
         std::vector<SimpleRelation*>* const relations;
+        const char** relationNames;
         /** The map from relation names to IDs */
         std::unordered_map<std::string, SimpleRelation*>* const relationNameMap;
         /** 

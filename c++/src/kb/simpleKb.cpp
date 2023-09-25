@@ -302,6 +302,12 @@ SimpleKb::SimpleKb(const std::string& _name, const path& _basePath) : name(strdu
             }   // If no file found, the relation is empty, and thus should not be included in the SimpleKb
         }
         rel_info_file.close();
+
+        /* Collect relation names */
+        relationNames = new const char*[relations->size()];
+        for (int rel_id = 0; rel_id < relations->size(); rel_id++) {
+            relationNames[rel_id] = (*relations)[rel_id]->name;
+        }
     } else {
         std::cerr << "Failed to load a SimpleKb: " << "Failed to open file: " << rel_info_file_path << std::endl;
     }
@@ -309,7 +315,7 @@ SimpleKb::SimpleKb(const std::string& _name, const path& _basePath) : name(strdu
 
 SimpleKb::SimpleKb(
     const std::string& _name, int*** const _relations, std::string* const _relNames, int* const _arities, int* const _totalRows,
-    int const _numReltaions) : name(strdup(_name.c_str())), promisingConstants(nullptr),
+    int const _numReltaions) : name(strdup(_name.c_str())), promisingConstants(nullptr), relationNames(new const char*[_numReltaions]),
     relations(new std::vector<SimpleRelation*>()), relationNameMap(new std::unordered_map<std::string, SimpleRelation*>())
 {
     constants = 0;
@@ -318,11 +324,12 @@ SimpleKb::SimpleKb(
         relations->push_back(relation);
         relationNameMap->emplace(_relNames[i], relation);
         constants = std::max(constants, relation->maxValue());
+        relationNames[i] = relation->name;
     }
 }
 
 SimpleKb::SimpleKb(const SimpleKb& another) : name(strdup(another.name)),
-    relations(new std::vector<SimpleRelation*>(*(another.relations))),
+    relations(new std::vector<SimpleRelation*>(*(another.relations))), relationNames(new const char*[another.relations->size()]),
     relationNameMap(new std::unordered_map<std::string, SimpleRelation*>(*(another.relationNameMap)))
 {
     if (nullptr == another.promisingConstants) {
@@ -335,18 +342,20 @@ SimpleKb::SimpleKb(const SimpleKb& another) : name(strdup(another.name)),
             for (int col = 0; col < relation->getTotalCols(); col++) {
                 promisingConstants[rel_id][col] = new std::vector<int>(*(another.promisingConstants[rel_id][col]));
             }
+            relationNames[rel_id] = (*relations)[rel_id]->name;
         }
     }
 }
 
 SimpleKb::~SimpleKb() {
     free((void*)name);  // as `strdup()` uses `malloc()`
+    releasePromisingConstants();
     for (SimpleRelation* const& r: *relations) {
         delete r;
     }
     delete relations;
     delete relationNameMap;
-    releasePromisingConstants();
+    delete[] relationNames;
 }
 
 void SimpleKb::releasePromisingConstants() {
@@ -479,6 +488,10 @@ int SimpleKb::totalRecords() const {
 
 int SimpleKb::totalConstants() const {
     return constants;
+}
+
+const char* const * SimpleKb::getRelationNames() const {
+    return relationNames;
 }
 
 /**

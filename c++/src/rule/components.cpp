@@ -63,6 +63,9 @@ Eval::Eval(double const _posEtls, double const _allEtls, int const _ruleLength) 
     infoGain = (0 == posEtls || 0 == compRatio) ? (-1.0/0.0) : posEtls * std::log(1+compRatio);
 }
 
+Eval::Eval(const Eval& another) : posEtls(another.posEtls), negEtls(another.negEtls), allEtls(another.negEtls),
+    ruleLength(another.ruleLength), compRatio(another.compRatio), compCapacity(another.compCapacity), infoGain(another.infoGain) {}
+
 double Eval::value(EvalMetric::Value type) const {
     switch (type) {
         case EvalMetric::CompressionCapacity:
@@ -113,14 +116,30 @@ Eval& Eval::operator=(const Eval& another) {
     return *this;
 }
 
+Eval& Eval::operator=(const Eval&& another) {
+    allEtls = another.allEtls;
+    posEtls = another.posEtls;
+    negEtls = another.negEtls;
+    ruleLength = another.ruleLength;
+    compRatio = another.compRatio;
+    compCapacity = another.compCapacity;
+    infoGain = another.infoGain;
+    return *this;
+}
+
 /**
  * EvidenceBatch
  */
 using sinc::EvidenceBatch;
-EvidenceBatch::EvidenceBatch(int const _numPredicates): numPredicates(_numPredicates), predicateSymbolsInRule(new int[_numPredicates]) {}
+EvidenceBatch::EvidenceBatch(int const _numPredicates): numPredicates(_numPredicates), predicateSymbolsInRule(new int[_numPredicates]),
+    aritiesInRule(new int[_numPredicates]) {}
 
 EvidenceBatch::~EvidenceBatch() {
+    for (int** const& grounding: evidenceList) {
+        delete[] grounding;
+    }
     delete[] predicateSymbolsInRule;
+    delete[] aritiesInRule;
 }
 
 /**

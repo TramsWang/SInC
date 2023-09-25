@@ -176,7 +176,7 @@ namespace sinc {
         int getLength() const;
         int usedLimitedVars() const;
         int numPredicates() const;
-        Eval const& getEval() const;
+        virtual Eval const& getEval() const;
         Fingerprint const& getFingerprint() const;
 
         /**
@@ -204,7 +204,7 @@ namespace sinc {
          */
         std::string toDumpString() const;
 
-        uint64_t getFingerprintCacheCreationTime() const;
+        uint64_t getFingerprintCreationTime() const;
         uint64_t getPruningTime() const;
         uint64_t getEvalTime() const;
         bool operator==(const Rule &another) const;
@@ -448,6 +448,7 @@ namespace sinc {
         EvidenceBatch* getEvidenceAndMarkEntailment() override;
         void releaseMemory() override;
         std::unordered_set<Record>* getCounterexamples() const override;
+        Eval const& getEval() const override;
 
     protected:
         double recordCoverage() override;

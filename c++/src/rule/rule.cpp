@@ -445,7 +445,7 @@ std::string Rule::toDumpString() const {
     return os.str();
 }
 
-uint64_t Rule::getFingerprintCacheCreationTime() const {
+uint64_t Rule::getFingerprintCreationTime() const {
     return fingerprintCreationTime;
 }
 
@@ -803,6 +803,10 @@ void BareRule::releaseMemory() {}
 using sinc::Record;
 std::unordered_set<Record>* BareRule::getCounterexamples() const {
     return returningCounterexamples;
+}
+
+Eval const& BareRule::getEval() const {
+    return returningEval;
 }
 
 double BareRule::recordCoverage() {

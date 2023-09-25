@@ -3,6 +3,7 @@
 #include "common.h"
 #include <fstream>
 #include <chrono>
+#include <stdarg.h>
 
 /**
  * MultiSet
@@ -303,4 +304,18 @@ uint64_t sinc::currentTimeInNano() {
     return std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::high_resolution_clock::now().time_since_epoch()
     ).count();
+}
+
+/**
+ * StreamFormatter
+ */
+using sinc::StreamFormatter;
+
+StreamFormatter::StreamFormatter(std::ostream& _os) : os(_os) {}
+
+void StreamFormatter::printf(const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    vsprintf(buf, format, args);
+    os << buf;
 }
