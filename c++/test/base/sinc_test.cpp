@@ -23,6 +23,13 @@ public:
     }
 
     ~RelationMiner4Test() {
+        for (Fingerprint* const& fp: cache) {
+            delete fp;
+        }
+        for (std::pair<const sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabuMap) {
+            delete kv.first;
+            delete kv.second;
+        }
         delete badRule;
     }
 
@@ -188,6 +195,13 @@ TEST_F(TestRelationMiner, TestFindSpecialization1) {
         delete kv.first;
         delete kv.second;
     }
+    for (int i = 0; i < beamwidth; i++) {
+        Rule* rule = spec_rules[i];
+        if (nullptr == rule) {
+            break;
+        }
+        delete rule;
+    }
 }
 
 TEST_F(TestRelationMiner, TestFindSpecialization2) {
@@ -278,6 +292,13 @@ TEST_F(TestRelationMiner, TestFindSpecialization2) {
         delete kv.first;
         delete kv.second;
     }
+    for (int i = 0; i < beamwidth; i++) {
+        Rule* rule = spec_rules[i];
+        if (nullptr == rule) {
+            break;
+        }
+        delete rule;
+    }
 }
 
 TEST_F(TestRelationMiner, TestFindGeneralization) {
@@ -336,5 +357,12 @@ TEST_F(TestRelationMiner, TestFindGeneralization) {
     for (std::pair<sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabuMap) {
         delete kv.first;
         delete kv.second;
+    }
+    for (int i = 0; i < beamwidth; i++) {
+        Rule* rule = spec_rules[i];
+        if (nullptr == rule) {
+            break;
+        }
+        delete rule;
     }
 }

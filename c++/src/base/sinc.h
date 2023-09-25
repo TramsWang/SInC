@@ -21,6 +21,9 @@
 #define DEFAULT_BUDGET_FACTOR 5
 #define DEFAULT_WEIGHTED_NEG_SAMPLES true
 #define NANO_TO_MILL(T) ((T) / 1000000)
+#define LOG_FILE_NAME "log.meta"
+#define STD_OUTPUT_FILE_NAME "std.meta"
+#define INTERRUPT_CMD "stop"
 
 namespace fs = std::filesystem;
 
@@ -138,7 +141,16 @@ namespace sinc {
         typedef std::unordered_map<Predicate*, nodeType*> nodeMapType;
         typedef std::unordered_map<nodeType*, std::unordered_set<nodeType*>*> depGraphType;
 
-        static nodeType AxiomNode;
+        /**
+         * This class is for the axiom node, which automatically releases its content pointer.
+         */
+        class AxiomNodeType : public nodeType {
+        public:
+            AxiomNodeType();
+            ~AxiomNodeType();
+        };
+
+        static AxiomNodeType AxiomNode;
 
         /**
          * Construct by passing parameters from the compressor that loads the data.
@@ -160,7 +172,7 @@ namespace sinc {
             std::unordered_set<Record>& counterexamples, std::ostream& logger
         );
 
-        ~RelationMiner();
+        virtual ~RelationMiner();
 
         /**
          * Find rules and compress the target relation.
@@ -274,4 +286,119 @@ namespace sinc {
          */
         int updateKbAndDependencyGraph(Rule& rule);
     };
+
+    // /**
+    //  * The abstract class for SInC. The overall compression procedure is implemented here.
+    //  *
+    //  * @since 1.0
+    //  */
+    // class SInC {
+    // public:
+    //     /**
+    //      * Create a SInC object with configurations.
+    //      *
+    //      * @param config The configurations
+    //      * @throws SincException Dump path creation failure
+    //      */
+    //     SInC(const SincConfig& config);
+
+    //     /**
+    //      * Create a SInC object with configurations and a KB in memory. If the KB is not NULL, the input KB will be the one
+    //      * in the memory instead of loading from file system.
+    //      *
+    //      * @param config The configurations
+    //      * @param kb     The KB object in memory
+    //      * @throws SincException Dump path creation failure
+    //      */
+    //     SInC(const SincConfig& config, SimpleKb* const kb);
+
+    //     virtual ~SInC();
+
+    //     /**
+    //      * Recover from the compressed KB to verify the correctness of the compression.
+    //      *
+    //      * @return Whether the compressed KB can be recovered to the original one.
+    //      */
+    //     bool recover() const;
+
+    //     SimpleCompressedKb& getCompressedKb() const;
+
+    //     /**
+    //      * Run the compression and an interruption daemon.
+    //      */
+    //     void run() final;
+
+    // protected:
+    //     /* Runtime configurations */
+    //     /** SInC configuration */
+    //     SincConfig config;
+    //     /** The logger */
+    //     std::ostream logger;
+
+    //     /* Compression related data */
+    //     /** The input KB */
+    //     SimpleKb* kb;
+    //     /** The compressed KB */
+    //     SimpleCompressedKb* compressedKb;
+    //     /** A mapping from predicates to the nodes in the dependency graph */
+    //     RelationMiner::nodeMapType predicate2NodeMap;
+    //     /**
+    //      * The dependency graph, in the form of an adjacent list.
+    //      * Note: In the implementation, the set of neighbours in the adjacent list refers to the in-neighbours instead of
+    //      * out-neighbours.
+    //      */
+    //     RelationMiner::depGraphType dependencyGraph;
+    //     /** The performance monitor */
+    //     PerformanceMonitor monitor;
+
+    //     /**
+    //      * Load a KB (in the format of Numerated KB)
+    //      */
+    //     virtual void loadKb();
+
+    //     /**
+    //      * The relations that will be the targets of rule mining procedures. By default, all relations are the targets.
+    //      * Results will be written into the argument references.
+    //      * 
+    //      * This function can be overridden to customize the target list.
+    //      * 
+    //      * NOTE: The pointer `targetRelationIds` SHOULD be maintained by USER
+    //      */
+    //     virtual void getTargetRelations(int* & targetRelationIds, int& length);
+
+    //     /**
+    //      * Determine the necessary set.
+    //      */
+    //     void dependencyAnalysis();
+
+    //     virtual SincRecovery createRecovery() = 0;
+
+    //     /**
+    //      * Dump the compressed KB
+    //      */
+    //     void dumpCompressedKb();
+
+    //     virtual void showMonitor() const;
+
+    //     virtual RelationMiner* createRelationMiner(int const targetRelationId);
+
+    //     void showConfig() const;
+
+    //     void showHypothesis() const;
+
+    //     /**
+    //      * The compress procedure.
+    //      */
+    //     void compress();
+
+    //     virtual void finalizeRelationMiner(RelationMiner& miner);
+
+    //     void logInfo(const char* msg);
+
+    //     void logInfo(std::string& msg);
+
+    //     void logError(const char* msg);
+
+    //     void logError(std::string& msg);
+    // };
 }

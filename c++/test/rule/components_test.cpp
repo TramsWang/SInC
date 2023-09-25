@@ -131,6 +131,11 @@ TEST_F(TestFingerprint, TestConstructor) {
     rule.push_back(body2);
     rule.push_back(body3);
     rule.push_back(body4);
+    head.maintainArgs();
+    body1.maintainArgs();
+    body2.maintainArgs();
+    body3.maintainArgs();
+    body4.maintainArgs();
     EXPECT_EQ(rule2String(rule), "1(X0,3):-2(X0,X1),3(X1,X2,5),1(X2,?),1(X0,?)");
 
     Fingerprint::equivalenceClassType* eqc_x = new Fingerprint::equivalenceClassType();
@@ -223,6 +228,12 @@ TEST_F(TestFingerprint, TestDup) {
     for (int i = 0; i < 2; i++) {
         std::vector<Predicate>& rule1 = rule_pairs[i][0];
         std::vector<Predicate>& rule2 = rule_pairs[i][1];
+        for (Predicate & p: rule1) {
+            p.maintainArgs();
+        }
+        for (Predicate & p: rule2) {
+            p.maintainArgs();
+        }
         EXPECT_EQ(rule2String(rule1), rule_pair_strs[i][0]);
         EXPECT_EQ(rule2String(rule2), rule_pair_strs[i][1]);
         Fingerprint fp1(rule1);
@@ -293,6 +304,12 @@ TEST_F(TestFingerprint, TestNotDup) {
     for (int i = 0; i < 5; i++) {
         std::vector<Predicate>& rule1 = rule_pairs[i][0];
         std::vector<Predicate>& rule2 = rule_pairs[i][1];
+        for (Predicate & p: rule1) {
+            p.maintainArgs();
+        }
+        for (Predicate & p: rule2) {
+            p.maintainArgs();
+        }
         EXPECT_EQ(rule2String(rule1), rule_pair_strs[i][0]);
         EXPECT_EQ(rule2String(rule2), rule_pair_strs[i][1]);
         Fingerprint fp1(rule1);
@@ -345,6 +362,12 @@ TEST_F(TestFingerprint, TestGeneralizationOf) {
     for (int i = 0; i < 3; i++) {
         std::vector<Predicate>& rule1 = rule_pairs[i][0];
         std::vector<Predicate>& rule2 = rule_pairs[i][1];
+        for (Predicate & p: rule1) {
+            p.maintainArgs();
+        }
+        for (Predicate & p: rule2) {
+            p.maintainArgs();
+        }
         EXPECT_EQ(rule2String(rule1), rule_pair_strs[i][0]);
         EXPECT_EQ(rule2String(rule2), rule_pair_strs[i][1]);
         Fingerprint fp1(rule1);
@@ -385,6 +408,12 @@ TEST_F(TestFingerprint, TestNotGeneralizationOf) {
     for (int i = 0; i < 3; i++) {
         std::vector<Predicate>& rule1 = rule_pairs[i][0];
         std::vector<Predicate>& rule2 = rule_pairs[i][1];
+        for (Predicate & p: rule1) {
+            p.maintainArgs();
+        }
+        for (Predicate & p: rule2) {
+            p.maintainArgs();
+        }
         EXPECT_EQ(rule2String(rule1), rule_pair_strs[i][0]);
         EXPECT_EQ(rule2String(rule2), rule_pair_strs[i][1]);
         Fingerprint fp1(rule1);

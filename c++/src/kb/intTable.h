@@ -76,7 +76,7 @@ namespace sinc {
          */
         IntTable(int** const rows, int const totalRows, int const totalCols);
 
-        ~IntTable();
+        virtual ~IntTable();
 
         /**
          * Check whether a row is in the table.

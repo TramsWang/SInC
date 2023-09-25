@@ -72,7 +72,13 @@ std::ostream& PerformanceMonitor::printf(std::ostream& os, const char* format, .
  */
 using sinc::RelationMiner;
 
-RelationMiner::nodeType RelationMiner::AxiomNode(new sinc::Predicate(-1, 1));
+RelationMiner::AxiomNodeType::AxiomNodeType() : nodeType(new sinc::Predicate(-1, 1)) {}
+
+RelationMiner::AxiomNodeType::~AxiomNodeType() {
+    delete content;
+}
+
+RelationMiner::AxiomNodeType RelationMiner::AxiomNode;
 
 RelationMiner::RelationMiner(
     SimpleKb& _kb, int const _targetRelation, EvalMetric::Value _evalMetric, int const _beamwidth, double const _stopCompressionRatio,

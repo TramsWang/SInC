@@ -97,6 +97,7 @@ TEST(TestCommon, TestPredicate) {
     EXPECT_EQ(p1.getArgs()[0], 1);
     EXPECT_EQ(p1.getArgs()[1], 2);
     EXPECT_EQ(p1.getArity(), 2);
+    p1.maintainArgs();
 
     Predicate p2(1, 2);
     EXPECT_EQ(p2.getPredSymbol(), 1);
@@ -109,6 +110,7 @@ TEST(TestCommon, TestPredicate) {
     EXPECT_EQ(p3->getArgs()[0], 1);
     EXPECT_EQ(p3->getArgs()[1], 2);
     EXPECT_EQ(p3->getArity(), 2);
+    p3->maintainArgs();
 
     Predicate *p4 = new Predicate(p1);
     EXPECT_EQ(p4->getPredSymbol(), 1);
