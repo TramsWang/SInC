@@ -410,7 +410,7 @@ int RelationMiner::updateKbAndDependencyGraph(Rule& rule) {
         Predicate* head_ground = new Predicate(
                 evidence_batch->predicateSymbolsInRule[HEAD_PRED_IDX], grounding[HEAD_PRED_IDX], evidence_batch->aritiesInRule[HEAD_PRED_IDX]
         );
-        head_ground->maintainArgs();
+        // head_ground->maintainArgs();
 
         nodeType* head_node = new nodeType(head_ground);
         std::pair<nodeMapType::iterator, bool> ret = predicate2NodeMap.emplace(head_ground, head_node);
@@ -454,3 +454,298 @@ int RelationMiner::updateKbAndDependencyGraph(Rule& rule) {
     delete evidence_batch;
     return num_entailed;
 }
+
+/**
+ * SInC
+ */
+using sinc::SInC;
+namespace fs = std::filesystem;
+
+fs::path SInC::getLogFilePath(fs::path& dumpPath, const char* dumpName) {
+    return dumpPath / dumpName / LOG_FILE_NAME;
+}
+
+fs::path SInC::getStdOutFilePath(fs::path& dumpPath, const char* dumpName) {
+    return dumpPath / dumpName / STD_OUTPUT_FILE_NAME;
+}
+
+fs::path SInC::getStdErrFilePath(fs::path& dumpPath, const char* dumpName) {
+    return dumpPath / dumpName / STD_ERROR_FILE_NAME;
+}
+
+SInC::SInC(SincConfig* const _config) : SInC(_config, nullptr) {}
+
+SInC::SInC(SincConfig* const _config, SimpleKb* const _kb) : 
+    config(_config),
+    kb(_kb),
+    compressedKb(nullptr) 
+{
+    /* Create writer objects to log and std output files */
+    fs::path dump_kb_dir = config->dumpPath / config->dumpName;
+    if (!fs::exists(dump_kb_dir) && !fs::create_directories(dump_kb_dir)) {
+        throw SincException("Dump path creation failed.");
+    }
+    try {
+        logger = new std::ofstream(getLogFilePath(config->dumpPath, config->dumpName), std::ios::out);
+        freeLogger = true;
+    } catch (const std::exception& e) {
+        std::cout << e.what() << std::endl;
+        std::cout << "Logger use `std::cout` instead" << std::endl;
+        logger = &std::cout;
+        freeLogger = false;
+    }
+
+    Rule::MinFactCoverage = config->minFactCoverage;
+    SimpleRelation::minConstantCoverage = config->minConstantCoverage;
+}
+
+SInC::~SInC() {
+    if (freeLogger) {
+        delete logger;
+    }
+    if (nullptr != newStdOut) {
+        delete newStdOut;
+    }
+    std::cout.rdbuf(coutBuf);
+    if (nullptr != newStdErr) {
+        delete newStdErr;
+    }
+    std::cerr.rdbuf(cerrBuf);
+    if (nullptr != compressedKb) {
+        delete compressedKb;
+    }
+    if (nullptr != kb) {
+        delete kb;
+    }
+    delete config;
+    for (std::pair<const Predicate*, GraphNode<Predicate>*> const& kv: predicate2NodeMap) {
+        delete kv.first;
+        delete kv.second;
+    }
+    for (std::pair<const RelationMiner::nodeType*, std::unordered_set<RelationMiner::nodeType*>*> const& kv: dependencyGraph) {
+        delete kv.second;
+    }
+}
+
+bool SInC::recover() const {
+    return false;  // Todo: Re-implement here
+}
+
+sinc::SimpleCompressedKb& SInC::getCompressedKb() const {
+    return *compressedKb;
+}
+
+void SInC::run() {
+    /* Set out/err stream to output files */
+    coutBuf = std::cout.rdbuf();
+    try {
+        newStdOut = new std::ofstream(getStdOutFilePath(config->dumpPath, config->dumpName), std::ios::out);
+        std::cout.rdbuf(newStdOut->rdbuf());
+    } catch (const std::exception& e) {
+        std::cout.rdbuf(coutBuf);
+        std::cout << "`std:out` redirection failed" << std::endl;
+    }
+
+    cerrBuf = std::cerr.rdbuf();
+    try {
+        newStdErr = new std::ofstream(getStdErrFilePath(config->dumpPath, config->dumpName), std::ios::out);
+        std::cerr.rdbuf(newStdErr->rdbuf());
+    } catch (const std::exception& e) {
+        std::cerr.rdbuf(cerrBuf);
+        std::cerr << "`std:err` redirection failed" << std::endl;
+    }
+
+    compress(); // Todo: listen to interrupt signal in another thread
+}
+
+void SInC::loadKb() {
+    if (nullptr == kb) {
+        kb = new SimpleKb(config->kbName, config->basePath);
+    }
+    kb->updatePromisingConstants();
+}
+
+void SInC::getTargetRelations(int* & targetRelationIds, int& numTargets) {
+    /* Relation IDs in SimpleKb are from 0 to n-1, where n is the number of relations */
+    numTargets = kb->totalRelations();
+    targetRelationIds = new int[numTargets];
+    for (int i = 0; i < numTargets; i++) {
+        targetRelationIds[i] = i;
+    }
+}
+
+void SInC::dependencyAnalysis() {
+    /* The KB has already been updated by the relation miners. All records that are not entailed have already been
+        * flagged in the relations. Here we only need to find the nodes in the MFVS solution */
+    /* Find all SCCs */
+    Tarjan<Predicate> tarjan(&dependencyGraph, false);
+    Tarjan<Predicate>::resultType const& sccs = tarjan.run();
+    for (Tarjan<Predicate>::nodeSetType* const& scc: sccs) {
+        /* Find a solution of MFVS and add to "necessaries" */
+        FeedbackVertexSetSolver<Predicate> fvs_solver(dependencyGraph, *scc);
+        FeedbackVertexSetSolver<Predicate>::nodeSetType* fvs = fvs_solver.run();
+        for (GraphNode<Predicate>* const& node: *fvs) {
+            compressedKb->addFvsRecord(node->content->getPredSymbol(), node->content->getArgs());
+        }
+        monitor.sccVertices += scc->size();
+        monitor.fvsVertices += fvs->size();
+    }
+    monitor.sccNumber = sccs.size();
+}
+
+void SInC::dumpCompressedKb() {
+    compressedKb->dump(config->dumpPath);
+}
+
+void SInC::showMonitor() {
+    monitor.show(*logger);
+}
+
+void SInC::showConfig() const {
+    (*logger) << "Base Path:\t" << config->basePath << '\n';
+    (*logger) << "KB Name:\t" << config->kbName << '\n';
+    (*logger) << "Dump Path:\t" << config->dumpPath << '\n';
+    (*logger) << "Dump Name:\t" << config->dumpName << '\n';
+    (*logger) << "Beamwidth:\t" << config->beamwidth << '\n';
+    (*logger) << "Threads:\t" << config->threads << '\n';
+    (*logger) << "Eval Metric:\t" << config->evalMetric << '\n';
+    (*logger) << "Min Fact Coverage:\t" << config->minFactCoverage << '\n';
+    (*logger) << "Min Constant Coverage:\t" << config->minConstantCoverage << '\n';
+    (*logger) << "Stop Compression Ratio:\t" << config->stopCompressionRatio << '\n';
+    (*logger) << "Observation Ratio:\t" << config->observationRatio << '\n';
+    (*logger) << "Validation:\t" << config->validation << "\n\n'";
+}
+
+void SInC::showHypothesis() const {
+    logInfo("\n### Hypothesis Found ###");
+    for (Rule* const& rule : compressedKb->getHypothesis()) {
+        logInfo(rule->toString(kb->getRelationNames()));
+    }
+    (*logger) << '\n';
+}
+
+void SInC::compress() {
+    showConfig();
+
+    /* Load KB */
+    uint64_t time_start = currentTimeInNano();
+    try {
+        loadKb();
+    } catch (std::exception const& e) {
+        std::cerr << e.what() << std::endl;
+        logError("KB load failed, abort.");
+        return;
+    }
+    monitor.kbSize = kb->totalRecords();
+    monitor.kbFunctors = kb->totalRelations();
+    monitor.kbConstants = kb->totalConstants();
+    compressedKb = new SimpleCompressedKb(config->dumpName, kb);
+    uint64_t time_kb_loaded = currentTimeInNano();
+    monitor.kbLoadTime = time_kb_loaded - time_start;
+
+    /* Run relation miners on each relation */
+    int* target_relations;
+    int num_targets;
+    RelationMiner* relation_miner;
+    try {
+        getTargetRelations(target_relations, num_targets);
+        for (int i = 0; i < num_targets; i++) {
+            int relation_num = target_relations[i];
+            relation_miner = createRelationMiner(relation_num);
+            relation_miner->run();  // counterexamples and hypothesis should be added to `compressedKb` in this procedure
+            // compressedKb->addCounterexamples(relation_num, relation_miner->getCounterexamples());
+            // compressedKb->addHypothesisRules(relation_miner.getHypothesis());
+            (*logger) << "Relation mining done (" << i+1 << '/' << num_targets << "): " << kb->getRelation(relation_num)->name << '\n';
+            finalizeRelationMiner(*relation_miner);
+            delete relation_miner;
+            relation_miner = nullptr;
+        }
+    } catch (std::exception const& e) {
+        std::cerr << e.what() << std::endl;
+        logError("Relation Miner failed. Interrupt");
+        if (nullptr != relation_miner) {
+            relation_miner->discontinue();
+        }
+    }
+    delete[] target_relations;
+    uint64_t time_hypothesis_found = currentTimeInNano();
+    monitor.hypothesisMiningTime = time_hypothesis_found - time_kb_loaded;
+
+    /* Dependency analysis */
+    bool abort = false;
+    try {
+        dependencyAnalysis();
+    } catch (std::exception e) {
+        std::cerr << e.what() << std::endl;
+        logError("Dependency Analysis failed. Abort.");
+        abort = true;
+    }
+
+    monitor.necessaryFacts = compressedKb->totalNecessaryRecords();
+    monitor.counterexamples = compressedKb->totalCounterexamples();
+    monitor.supplementaryConstants = compressedKb->totalSupplementaryConstants();
+    uint64_t time_dependency_resolved = currentTimeInNano();
+    monitor.dependencyAnalysisTime = time_dependency_resolved - time_hypothesis_found;
+    showHypothesis();
+
+    if (abort) {
+        monitor.totalTime = time_dependency_resolved - time_start;
+        showMonitor();
+        return;
+    }
+
+    /* Dump the compressed KB */
+    try {
+        dumpCompressedKb();
+    } catch (std::exception e) {
+        std::cerr << e.what() << std::endl;
+        logError("Compressed KB dump failed. Abort.");
+        showMonitor();
+        return;
+    }
+
+    uint64_t time_kb_dumped = currentTimeInNano();
+    monitor.dumpTime = time_kb_dumped - time_dependency_resolved;
+
+    /* 检查结果 */
+    if (config->validation) {
+        if (!recover()) {
+            logError("Validation Failed");
+        }
+    }
+    uint64_t time_validated = currentTimeInNano();
+    monitor.validationTime = time_validated - time_kb_dumped;
+
+    monitor.totalTime = time_validated - time_start;
+    showMonitor();
+}
+
+void SInC::finalizeRelationMiner(RelationMiner& miner) {
+    monitor.hypothesisSize = 0;
+    for (Rule* const& r: miner.getHypothesis()) {
+        monitor.hypothesisSize += r->getLength();
+    }
+    monitor.hypothesisRuleNumber = miner.getHypothesis().size();
+    monitor.evaluatedSqls += miner.evaluatedSqls;
+    monitor.fingerprintCreationTime += miner.fingerprintCreationTime;
+    monitor.pruningTime += miner.pruningTime;
+    monitor.evalTime += miner.evalTime;
+    monitor.kbUpdateTime += miner.kbUpdateTime;
+}
+
+void SInC::logInfo(const char* msg) const {
+    (*logger) << msg << '\n';
+}
+
+void SInC::logInfo(std::string const& msg) const {
+    (*logger) << msg << '\n';
+}
+
+void SInC::logError(const char* msg) const {
+    (*logger) << "[ERROR]" << msg << '\n';
+}
+
+void SInC::logError(std::string const& msg) const {
+    (*logger) << "[ERROR]" << msg << '\n';
+}
+

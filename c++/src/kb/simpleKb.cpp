@@ -544,7 +544,8 @@ void SimpleCompressedKb::addHypothesisRules(const std::vector<Rule*>& rules) {
 
 void SimpleCompressedKb::updateSupplementaryConstants() {
     /* Build flags for all constants */
-    int flags[NUM_FLAG_INTS(originalKb->totalConstants())]{0};
+    int num_bits = originalKb->totalConstants() + 1;    // constant numerations start form 1
+    int flags[NUM_FLAG_INTS(num_bits)]{0};
 
     /* Remove all occurred arguments*/
     for (int i = 0; i < originalKb->totalRelations(); i++) {
@@ -581,7 +582,7 @@ void SimpleCompressedKb::updateSupplementaryConstants() {
     supplementaryConstants.clear();
     int base_offset = 0;
     for (int sub_flag: flags) {
-        for (int i = 0; i < BITS_PER_INT && base_offset + i < originalKb->totalConstants(); i++) {
+        for (int i = 0; i < BITS_PER_INT && base_offset + i <= originalKb->totalConstants(); i++) {
             if (0 == (sub_flag & 1)) {
                 supplementaryConstants.push_back(base_offset + i);
             }
@@ -646,8 +647,12 @@ void SimpleCompressedKb::dump(const path& basePath) {
     }
 }
 
-const std::vector<sinc::Rule*>& SimpleCompressedKb::getHypothesis() const {
+std::vector<sinc::Rule*>& SimpleCompressedKb::getHypothesis() {
     return hypothesis;
+}
+
+std::unordered_set<sinc::Record>& SimpleCompressedKb::getCounterexampleSet(int const relId) {
+    return counterexampleSets[relId];
 }
 
 int SimpleCompressedKb::totalNecessaryRecords() const {

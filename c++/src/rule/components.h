@@ -141,7 +141,7 @@ namespace sinc {
         /** The arity of each predicate in the rule */
         int* const aritiesInRule;
         /** The list of evidence. Each list is a piece of evidence */
-        std::vector<int**> const evidenceList;
+        std::vector<int**> evidenceList;
 
         EvidenceBatch(int const numPredicates);
         ~EvidenceBatch();

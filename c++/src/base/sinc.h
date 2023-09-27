@@ -22,7 +22,8 @@
 #define DEFAULT_WEIGHTED_NEG_SAMPLES true
 #define NANO_TO_MILL(T) ((T) / 1000000)
 #define LOG_FILE_NAME "log.meta"
-#define STD_OUTPUT_FILE_NAME "std.meta"
+#define STD_OUTPUT_FILE_NAME "stdout.meta"
+#define STD_ERROR_FILE_NAME "stderr.meta"
 #define INTERRUPT_CMD "stop"
 
 namespace fs = std::filesystem;
@@ -39,11 +40,11 @@ namespace sinc {
         /** The path to the directory where the kb is located */
         fs::path basePath;
         /** The name of the KB */
-        const char* const kbName;
+        const char* kbName;
         /** The path where the compressed KB should be stored */
         fs::path dumpPath;
         /** The name of the dumped KB */
-        const char* const dumpName;
+        const char* dumpName;
 
         /* Runtime Config */
         /** The number of threads used to run SInC Todo: Implement multi-thread strategy */
@@ -70,7 +71,7 @@ namespace sinc {
          *  negative samples are from the loaded negative sample KB. */
         fs::path negKbBasePath;
         /** The name of the negative sample KB. */
-        const char* const negKbName;
+        const char* negKbName;
         /** The factor of the number of expected negative samples over the number of positive ones. If < 1, normal sampling
          *  strategy is used (depend on the strategy that generates the negative KB). otherwise, adversarial sampling is used */
         float budgetFactor;
@@ -152,6 +153,14 @@ namespace sinc {
 
         static AxiomNodeType AxiomNode;
 
+        /* Basic Rule Mining Time Statistics (measured in nanoseconds) */
+        uint64_t fingerprintCreationTime = 0;
+        uint64_t pruningTime = 0;
+        uint64_t evalTime = 0;
+        uint64_t kbUpdateTime = 0;
+        /** This member keeps track of the number of evaluated SQL queries */
+        int evaluatedSqls = 0;
+
         /**
          * Construct by passing parameters from the compressor that loads the data.
          *
@@ -217,14 +226,6 @@ namespace sinc {
         std::ostream& logger;
         StreamFormatter logFormatter;
 
-        /* Basic Rule Mining Time Statistics (measured in nanoseconds) */
-        uint64_t fingerprintCreationTime = 0;
-        uint64_t pruningTime = 0;
-        uint64_t evalTime = 0;
-        uint64_t kbUpdateTime = 0;
-        /** This member keeps track of the number of evaluated SQL queries */
-        int evaluatedSqls = 0;
-
         /**
          * Create the starting rule at the beginning of a rule mining procedure.
          */
@@ -287,118 +288,140 @@ namespace sinc {
         int updateKbAndDependencyGraph(Rule& rule);
     };
 
-    // /**
-    //  * The abstract class for SInC. The overall compression procedure is implemented here.
-    //  *
-    //  * @since 1.0
-    //  */
-    // class SInC {
-    // public:
-    //     /**
-    //      * Create a SInC object with configurations.
-    //      *
-    //      * @param config The configurations
-    //      * @throws SincException Dump path creation failure
-    //      */
-    //     SInC(const SincConfig& config);
+    /**
+     * The recovery class, retuning a compressed KB to the original version.
+     * 
+     * @since 1.0
+     */
+    class SincRecovery {
+    public:
+        /**
+         * Decompress the KB to the original form.
+         *
+         * @param decompressedName The name of the decompressed KB.
+         */
+        virtual SimpleKb* recover(SimpleCompressedKb& compressedKb, const char* decompressedName) = 0;
+    };
 
-    //     /**
-    //      * Create a SInC object with configurations and a KB in memory. If the KB is not NULL, the input KB will be the one
-    //      * in the memory instead of loading from file system.
-    //      *
-    //      * @param config The configurations
-    //      * @param kb     The KB object in memory
-    //      * @throws SincException Dump path creation failure
-    //      */
-    //     SInC(const SincConfig& config, SimpleKb* const kb);
+    /**
+     * The abstract class for SInC. The overall compression procedure is implemented here.
+     *
+     * @since 1.0
+     */
+    class SInC {
+    public:
+        static fs::path getLogFilePath(fs::path& dumpPath, const char* dumpName);
+        static fs::path getStdOutFilePath(fs::path& dumpPath, const char* dumpName);
+        static fs::path getStdErrFilePath(fs::path& dumpPath, const char* dumpName);
 
-    //     virtual ~SInC();
+        /**
+         * Create a SInC object with configurations.
+         *
+         * @param config The configurations
+         * @throws SincException Dump path creation failure
+         */
+        SInC(SincConfig* const config);
 
-    //     /**
-    //      * Recover from the compressed KB to verify the correctness of the compression.
-    //      *
-    //      * @return Whether the compressed KB can be recovered to the original one.
-    //      */
-    //     bool recover() const;
+        /**
+         * Create a SInC object with configurations and a KB in memory. If the KB is not NULL, the input KB will be the one
+         * in the memory instead of loading from file system.
+         *
+         * @param config The configurations
+         * @param kb     The KB object in memory
+         * @throws SincException Dump path creation failure
+         */
+        SInC(SincConfig* const config, SimpleKb* const kb);
 
-    //     SimpleCompressedKb& getCompressedKb() const;
+        virtual ~SInC();
 
-    //     /**
-    //      * Run the compression and an interruption daemon.
-    //      */
-    //     void run() final;
+        /**
+         * Recover from the compressed KB to verify the correctness of the compression.
+         *
+         * @return Whether the compressed KB can be recovered to the original one.
+         */
+        bool recover() const;
 
-    // protected:
-    //     /* Runtime configurations */
-    //     /** SInC configuration */
-    //     SincConfig config;
-    //     /** The logger */
-    //     std::ostream logger;
+        SimpleCompressedKb& getCompressedKb() const;
 
-    //     /* Compression related data */
-    //     /** The input KB */
-    //     SimpleKb* kb;
-    //     /** The compressed KB */
-    //     SimpleCompressedKb* compressedKb;
-    //     /** A mapping from predicates to the nodes in the dependency graph */
-    //     RelationMiner::nodeMapType predicate2NodeMap;
-    //     /**
-    //      * The dependency graph, in the form of an adjacent list.
-    //      * Note: In the implementation, the set of neighbours in the adjacent list refers to the in-neighbours instead of
-    //      * out-neighbours.
-    //      */
-    //     RelationMiner::depGraphType dependencyGraph;
-    //     /** The performance monitor */
-    //     PerformanceMonitor monitor;
+        /**
+         * Run the compression and an interruption daemon.
+         */
+        void run();
 
-    //     /**
-    //      * Load a KB (in the format of Numerated KB)
-    //      */
-    //     virtual void loadKb();
+    protected:
+        /* Runtime configurations */
+        /** SInC configuration */
+        SincConfig* config;
+        /** The logger */
+        std::ostream* logger;
+        /** Whether the pointer `logger` should be freed in destructor */
+        bool freeLogger;
+        /** A redirect stream for `std::cout` */
+        std::ofstream* newStdOut = nullptr;
+        /** A redirect stream for `std::cerr` */
+        std::ofstream* newStdErr = nullptr;
+        /** Buffer pointer of `std::cout` */
+        std::streambuf* coutBuf;
+        /** Buffer pointer of `std::cerr` */
+        std::streambuf* cerrBuf;
 
-    //     /**
-    //      * The relations that will be the targets of rule mining procedures. By default, all relations are the targets.
-    //      * Results will be written into the argument references.
-    //      * 
-    //      * This function can be overridden to customize the target list.
-    //      * 
-    //      * NOTE: The pointer `targetRelationIds` SHOULD be maintained by USER
-    //      */
-    //     virtual void getTargetRelations(int* & targetRelationIds, int& length);
+        /* Compression related data */
+        /** The input KB */
+        SimpleKb* kb;
+        /** The compressed KB */
+        SimpleCompressedKb* compressedKb;
+        /** A mapping from predicates to the nodes in the dependency graph */
+        RelationMiner::nodeMapType predicate2NodeMap;
+        /**
+         * The dependency graph, in the form of an adjacent list.
+         * Note: In the implementation, the set of neighbours in the adjacent list refers to the in-neighbours instead of
+         * out-neighbours.
+         */
+        RelationMiner::depGraphType dependencyGraph;
+        /** The performance monitor */
+        PerformanceMonitor monitor;
 
-    //     /**
-    //      * Determine the necessary set.
-    //      */
-    //     void dependencyAnalysis();
+        /**
+         * Load a KB (in the format of Numerated KB)
+         */
+        virtual void loadKb();
 
-    //     virtual SincRecovery createRecovery() = 0;
+        /**
+         * The relations that will be the targets of rule mining procedures. By default, all relations are the targets.
+         * Results will be written into the argument references.
+         * 
+         * This function can be overridden to customize the target list.
+         * 
+         * NOTE: The pointer `targetRelationIds` SHOULD be maintained by USER
+         */
+        virtual void getTargetRelations(int* & targetRelationIds, int& numTargets);
 
-    //     /**
-    //      * Dump the compressed KB
-    //      */
-    //     void dumpCompressedKb();
+        /**
+         * Determine the necessary set.
+         */
+        void dependencyAnalysis();
 
-    //     virtual void showMonitor() const;
+        virtual SincRecovery* createRecovery() = 0;
 
-    //     virtual RelationMiner* createRelationMiner(int const targetRelationId);
+        /**
+         * Dump the compressed KB
+         */
+        void dumpCompressedKb();
 
-    //     void showConfig() const;
+        virtual void showMonitor();
+        virtual RelationMiner* createRelationMiner(int const targetRelationId) = 0;
+        void showConfig() const ;
+        void showHypothesis() const;
 
-    //     void showHypothesis() const;
+        /**
+         * The compress procedure.
+         */
+        void compress();
 
-    //     /**
-    //      * The compress procedure.
-    //      */
-    //     void compress();
-
-    //     virtual void finalizeRelationMiner(RelationMiner& miner);
-
-    //     void logInfo(const char* msg);
-
-    //     void logInfo(std::string& msg);
-
-    //     void logError(const char* msg);
-
-    //     void logError(std::string& msg);
-    // };
+        virtual void finalizeRelationMiner(RelationMiner& miner);
+        void logInfo(const char* msg) const;
+        void logInfo(std::string const& msg) const;
+        void logError(const char* msg) const;
+        void logError(std::string const& msg) const;
+    };
 }

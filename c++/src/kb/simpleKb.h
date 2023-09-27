@@ -21,7 +21,7 @@
 #define SUPPLEMENTARY_CONSTANTS_FILE_NAME "supplementary.cst"
 #define DEFAULT_MIN_CONSTANT_COVERAGE 0.25
 
-#define NUM_FLAG_INTS(NUM_RECORDS) (NUM_RECORDS / BITS_PER_INT + ((0 == NUM_RECORDS % BITS_PER_INT) ? 0 : 1))
+#define NUM_FLAG_INTS(NUM) (NUM / BITS_PER_INT + ((0 == NUM % BITS_PER_INT) ? 0 : 1))
 
 using std::filesystem::path;
 
@@ -457,7 +457,9 @@ namespace sinc {
          */
         void dump(const path& basePath);
 
-        const std::vector<Rule*>& getHypothesis() const;
+        std::vector<Rule*>& getHypothesis();
+
+        std::unordered_set<Record>& getCounterexampleSet(int const relId);
 
         int totalNecessaryRecords() const;
 
