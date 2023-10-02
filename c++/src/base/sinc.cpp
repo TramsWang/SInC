@@ -28,8 +28,8 @@ SincConfig::~SincConfig() {
 /**
  * Performance Monitor
  */
-using sinc::PerformanceMonitor;
-void PerformanceMonitor::show(std::ostream& os) {
+using sinc::BaseMonitor;
+void BaseMonitor::show(std::ostream& os) {
     os << "\n### Monitored Performance Info ###\n\n";
     os << "--- Time Cost ---\n";
     printf(os, "(ms) %10s %10s %10s %10s %10s %10s %10s\n", "Load", "Hypo", "Dep", "Dump", "Validate", "Neo4j", "Total");
@@ -58,13 +58,6 @@ void PerformanceMonitor::show(std::ostream& os) {
         sccNumber, sccVertices, fvsVertices, (necessaryFacts + counterexamples + hypothesisSize) * 100.0 / kbSize,
         evaluatedSqls, evaluatedSqls * 1.0 / hypothesisRuleNumber
     );
-}
-
-std::ostream& PerformanceMonitor::printf(std::ostream& os, const char* format, ...) {
-    va_list args;
-    va_start(args, format);
-    vsprintf(buf, format, args);
-    return os << buf;
 }
 
 /**

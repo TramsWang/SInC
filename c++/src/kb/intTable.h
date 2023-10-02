@@ -112,6 +112,8 @@ namespace sinc {
          * Split the table according to values in a column. The values at the column are the same in each slice.
          * 
          * NOTE: The returned vector pointer AND the vector pointers in the vector in the vecotr SHOULD be maintained by USER.
+         * 
+         * @return Will NOT return `nullptr`
          */
         slicesType* splitSlices(int const col) const;
 
@@ -124,7 +126,7 @@ namespace sinc {
          * NOTE: The returned pointer SHOULD be maintained by USER.
          *
          * @return Two arrays of matched sub-tables. Each pair of sub-tables, subTables1[i] and subTables2[i], satisfies the
-         * above restrictions.
+         * above restrictions. Will not return `nullptr`.
          */
         static MatchedSubTables* matchSlices(const IntTable& tab1, int const col1, const IntTable& tab2, int const col2);
 
@@ -137,12 +139,14 @@ namespace sinc {
          * @param tables The n table pointers
          * @param cols   n column numbers, each of the corresponding table
          * @param numTables n
-         * @return n pointers to vectors of slices. Slices in a vector is from the same table.
+         * @return n pointers to vectors of slices. Slices in a vector is from the same table. Will not return `nullptr`.
          */
         static slicesType** matchSlices(IntTable** const tables, int* const cols, int const numTables);
 
         /**
          * Split the current table into slices, and in each slice, the arguments of the two columns are the same.
+         * 
+         * @return Will not return `nullptr`.
          */
         slicesType* matchSlices(int const col1, int const col2) const;
 
@@ -189,6 +193,8 @@ namespace sinc {
          * This is a helper function that releases pointers in slices array.
          */
         static void releaseSlicesArray(slicesType** slicesArray, int const length);
+
+        void showRows() const;
 
     protected:
         /** Total rows in the table */

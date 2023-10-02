@@ -110,6 +110,10 @@ namespace sinc {
          */
         Record(int *args, int arity);
 
+        Record(const Record& another);
+
+        Record(Record&& another);
+
         /**
          * This method copies the contents in "newArgs" to the array. It assumes the two arrays have the same length.
          */

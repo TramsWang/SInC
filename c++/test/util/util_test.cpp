@@ -358,3 +358,17 @@ TEST(TestUtil, TestComparableArray) {
         delete[] a3.arr[i].getArgs();
     }
 }
+
+TEST(TestPerformanceMonitor, TestFormatting) {
+    class Monitor4Test : public PerformanceMonitor {
+    public:
+        void show(std::ostream& os) override {
+            PerformanceMonitor::printf(os, "My name is %10s. I'm %d years old. Pi is %.6f", "Trams", 30, 3.141592653);
+        }
+    };
+
+    std::ostringstream os;
+    Monitor4Test monitor;
+    monitor.show(os);
+    EXPECT_STREQ(os.str().c_str(), "My name is      Trams. I'm 30 years old. Pi is 3.141593");
+}

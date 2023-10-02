@@ -319,3 +319,14 @@ void StreamFormatter::printf(const char* format, ...) {
     vsprintf(buf, format, args);
     os << buf;
 }
+
+/**
+ * PerformanceMonitor
+ */
+using sinc::PerformanceMonitor;
+std::ostream& PerformanceMonitor::printf(std::ostream& os, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    vsprintf(buf, format, args);
+    return os << buf;
+}

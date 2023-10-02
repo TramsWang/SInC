@@ -92,7 +92,7 @@ namespace sinc {
      *
      * @since 1.0
      */
-    class PerformanceMonitor {
+    class BaseMonitor : PerformanceMonitor {
     public:
         /* Time Monitors */
         uint64_t kbLoadTime = 0;
@@ -124,11 +124,7 @@ namespace sinc {
         /** This member keeps track of the number of evaluated SQL queries */
         int evaluatedSqls = 0;
 
-        void show(std::ostream& os);
-    protected:
-        char buf[1024];
-
-        std::ostream& printf(std::ostream& os, const char* format, ...);
+        void show(std::ostream& os) override;
     };
 
     /**
@@ -379,7 +375,7 @@ namespace sinc {
          */
         RelationMiner::depGraphType dependencyGraph;
         /** The performance monitor */
-        PerformanceMonitor monitor;
+        BaseMonitor monitor;
 
         /**
          * Load a KB (in the format of Numerated KB)

@@ -21,6 +21,10 @@ void sinc::clearSet(std::unordered_set<T*>& set) {
 using sinc::Record;
 Record::Record(int *g, int a): args(g), arity(a) {}
 
+Record::Record(const Record& another) : args(another.args), arity(another.arity) {}
+
+Record::Record(Record&& another): args(another.args), arity(another.arity) {}
+
 void Record::setArgs(int* const newArgs, int const _arity) {
     args = newArgs;
     arity = _arity;

@@ -1,6 +1,7 @@
 #include "intTable.h"
 #include <algorithm>
 #include "../util/util.h"
+#include <iostream>
 
 using sinc::IntArrayComparator;
 
@@ -335,4 +336,18 @@ void IntTable::releaseSlicesArray(slicesType** slicesArray, int const length) {
         releaseSlices(slicesArray[i]);
     }
     delete[] slicesArray;
+}
+
+void IntTable::showRows() const {
+    int** rows = sortedRowsByCols[0];
+    std::cout << '{';
+    for (int i = 0; i < totalRows; i++) {
+        std::cout << '[';
+        for (int j = 0; j < totalCols; j++) {
+            std::cout << rows[i][j] << ',';
+        }
+        std::cout << ']';
+        std::cout << std::endl;
+    }
+    std::cout << '}' << std::endl;
 }

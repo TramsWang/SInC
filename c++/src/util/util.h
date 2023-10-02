@@ -263,4 +263,26 @@ namespace sinc {
         char buf[1024];
         std::ostream& os;
     };
+
+    /**
+     * The base class of performance monitors
+     * 
+     * @since 2.3
+     */
+    class PerformanceMonitor {
+    public:
+        /**
+         * Show information of the monitor
+         */
+        virtual void show(std::ostream& os) = 0;
+
+    protected:
+        /* The buffer is used for formatting the strings */
+        char buf[1024];
+
+        /**
+         * This method help format the strings to `os` as `sprintf`
+         */
+        std::ostream& printf(std::ostream& os, const char* format, ...);
+    };
 }

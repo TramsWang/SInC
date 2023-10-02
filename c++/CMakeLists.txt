@@ -13,14 +13,16 @@ add_subdirectory(src/util)
 add_subdirectory(src/kb)
 add_subdirectory(src/rule)
 add_subdirectory(src/base)
+add_subdirectory(src/impl)
 
 # Build SInC executable
 add_executable(sinc main.cpp)
-target_link_libraries(sinc util)
-target_link_libraries(sinc kb)
-target_link_libraries(sinc rule)
-target_link_libraries(sinc base)
-target_link_libraries(sinc "stdc++fs")  # Use namespace `std::filesystem`
+target_link_libraries(sinc PRIVATE util)
+target_link_libraries(sinc PRIVATE kb)
+target_link_libraries(sinc PRIVATE rule)
+target_link_libraries(sinc PRIVATE base)
+target_link_libraries(sinc PRIVATE impl)
+target_link_libraries(sinc PRIVATE "stdc++fs")  # Use namespace `std::filesystem`
 
 # if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 #   # Use debug_new only in debug mode
@@ -47,12 +49,14 @@ add_executable(test_sinc
   test/rule/components_test.cpp
   test/rule/rule_test.cpp
   test/base/sinc_test.cpp
+  test/impl/cached_sinc_test.cpp
 )
 
 target_link_libraries(test_sinc PRIVATE util)
 target_link_libraries(test_sinc PRIVATE kb)
 target_link_libraries(test_sinc PRIVATE rule)
 target_link_libraries(test_sinc PRIVATE base)
+target_link_libraries(test_sinc PRIVATE impl)
 target_link_libraries(test_sinc PRIVATE GTest::gtest_main)
 target_link_libraries(test_sinc PRIVATE "stdc++fs")  # Use namespace `std::filesystem`
 
