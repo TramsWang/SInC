@@ -71,6 +71,11 @@ struct std::hash<sinc::GraphNode<T>> {
     size_t operator()(const sinc::GraphNode<T>& r) const;
 };
 
+template<class T>
+struct std::hash<const sinc::GraphNode<T>> {
+    size_t operator()(const sinc::GraphNode<T>& r) const;
+};
+
 /**
  * This is for hashing "GraphNode<T>*" in unordered containers.
  */
@@ -79,11 +84,21 @@ struct std::hash<sinc::GraphNode<T>*> {
     size_t operator()(const sinc::GraphNode<T> *r) const;
 };
 
+template<class T>
+struct std::hash<const sinc::GraphNode<T>*> {
+    size_t operator()(const sinc::GraphNode<T> *r) const;
+};
+
 /**
  * This is for checking equivalence "GraphNode<T>*" in unordered containers.
  */
 template<class T>
 struct std::equal_to<sinc::GraphNode<T>*> {
+    bool operator()(const sinc::GraphNode<T> *r1, const sinc::GraphNode<T> *r2) const;
+};
+
+template<class T>
+struct std::equal_to<const sinc::GraphNode<T>*> {
     bool operator()(const sinc::GraphNode<T> *r1, const sinc::GraphNode<T> *r2) const;
 };
 

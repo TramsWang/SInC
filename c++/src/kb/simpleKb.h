@@ -190,6 +190,8 @@ namespace sinc {
 
         /**
          * Split rows in the relation by whether they are flagged as entailed.
+         * 
+         * NOTE: The returned pointer SHOULD be maintained by USER.
          */
         SplitRecords* splitByEntailment() const;
 

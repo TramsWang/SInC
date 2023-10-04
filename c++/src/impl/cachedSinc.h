@@ -41,7 +41,7 @@ namespace sinc {
          */
         void buildIndices();
 
-        const int* const* getComplianceSet() const;
+        int* const* getComplianceSet() const;
         const IntTable& getIndices() const;
         int getTotalRows() const;
         int getTotalCols() const;
@@ -136,6 +136,11 @@ struct std::hash<sinc::VarInfo> {
     size_t operator()(const sinc::VarInfo& r) const;
 };
 
+template <>
+struct std::hash<const sinc::VarInfo> {
+    size_t operator()(const sinc::VarInfo& r) const;
+};
+
 /**
  * This is for hashing "VarInfo*" in unordered containers.
  */
@@ -144,11 +149,21 @@ struct std::hash<sinc::VarInfo*> {
     size_t operator()(const sinc::VarInfo *r) const;
 };
 
+template <>
+struct std::hash<const sinc::VarInfo*> {
+    size_t operator()(const sinc::VarInfo *r) const;
+};
+
 /**
  * This is for checking equivalence "VarInfo*" in unordered containers.
  */
 template <>
 struct std::equal_to<sinc::VarInfo*> {
+    bool operator()(const sinc::VarInfo *r1, const sinc::VarInfo *r2) const;
+};
+
+template <>
+struct std::equal_to<const sinc::VarInfo*> {
     bool operator()(const sinc::VarInfo *r1, const sinc::VarInfo *r2) const;
 };
 
@@ -173,7 +188,14 @@ namespace sinc {
         typedef std::vector<CompliedBlock*> entryType;
         typedef std::vector<entryType*> entriesType;
 
-        CacheFragment(IntTable* const firstRelation, int const relationSymbol);
+        CacheFragment(IntTable* const firstRelation, int const relationSymbol); // Todo: Refine `const` modifier for all parameters
+
+        // CacheFragment(std::vector<int*> const& rows, int const relationSymbol, int const arity);
+
+        /**
+         * Construct an object by an existing CB.
+        */
+        CacheFragment(CompliedBlock* const firstCb, int const relationSymbol);
 
         /**
          * This constructor is used to construct an empty fragment
@@ -390,5 +412,167 @@ namespace sinc {
         ) const;
 
         void releaseEntries();
+    };
+
+    /**
+     * This class is for mapping predicates in the rule to tables in cache fragments in the E-cache.
+     * 
+     * @since 2.3
+     */
+    class TabInfo {
+    public:
+        int fragmentIdx;
+        int tabIdx;
+
+        TabInfo(int const fragmentIdx, int const tabIdx);
+        TabInfo(const TabInfo& another);
+        bool isEmpty() const;
+        TabInfo& operator=(TabInfo&& another) noexcept;
+        TabInfo& operator=(const TabInfo& another) noexcept;
+        bool operator==(const TabInfo &another) const;
+    };
+
+    /**
+     * First-order Horn rule with the compact grounding cache (CGC). The CGC is implemented by "CacheFragment".
+     *
+     * NOTE: The caches (i.e., the lists of cache entries) shall not be modified. Any modification of the cache should follow
+     * the copy-on-write strategy, i.e., replace the lists directly with new ones.
+     *
+     * NOTE: This class is translated from `sinc2.impl.negsamp.FragmentedCachedRule`.
+     * 
+     * @since 2.3
+     */
+    class CachedRule : public Rule {
+    public:
+        /**
+         * Initialize the most general rule.
+         *
+         * @param headPredSymbol      The functor of the head predicate, i.e., the target relation.
+         * @param arity               The arity of the functor
+         * @param fingerprintCache    The cache of the used fingerprints
+         * @param category2TabuSetMap The tabu set of pruned fingerprints
+         * @param kb                  The original KB
+         */
+        CachedRule(
+            int const headPredSymbol, int const arity, fingerprintCacheType& fingerprintCache, tabuMapType& category2TabuSetMap,
+            SimpleKb& kb
+        );
+
+        CachedRule(const CachedRule& another);
+        ~CachedRule();
+        CachedRule* clone() const override;
+        void updateCacheIndices();
+        EvidenceBatch* getEvidenceAndMarkEntailment() override;
+        std::unordered_set<Record>* getCounterexamples() const override;
+        void releaseMemory() override;
+
+    protected:
+        /** The original KB */
+        SimpleKb& kb;
+        /** The cache for the positive entailments (E+-cache) (not entailed). One cache fragment is sufficient as all
+         *  predicates are linked to the head. */
+        CacheFragment* posCache;
+        /** This cache is used to monitor the already-entailed records (T-cache). One cache fragment is sufficient as all
+         *  predicates are linked to the head. */
+        CacheFragment* entCache;
+        /** The cache for all the entailments (E-cache). The cache is composed of multiple fragments, each of which maintains
+         *  a linked component of the rule body. The first relation should not be included, as the head should be removed
+         *  from E-cache */
+        std::vector<CacheFragment*>* allCache;
+        /** This list is a mapping from predicate indices in the rule structure to fragment and table indices in the E-cache.
+         *  The array indices are predicate indices. */
+        std::vector<TabInfo> predIdx2AllCacheTableInfo;
+        /** Whether the pointer `posCache` should be maintained by this object */
+        bool maintainPosCache;
+        /** Whether the pointer `entCache` should be maintained by this object */
+        bool maintainEntCache;
+        /** Whether the pointer `allCache` and pointers within the vector should be maintained by this object */
+        bool maintainAllCache;
+
+        /* Monitoring info. The time (in nanoseconds) refers to the corresponding time consumption in the last update of the rule */
+        uint64_t copyTime = 0;
+        uint64_t posCacheUpdateTime = 0;
+        uint64_t entCacheUpdateTime = 0;
+        uint64_t allCacheUpdateTime = 0;
+        uint64_t posCacheIndexingTime = 0;
+        uint64_t entCacheIndexingTime = 0;
+        uint64_t allCacheIndexingTime = 0;
+
+        /** If this object does not maintain the E+-cache, get a copy of the cache */
+        void obtainPosCache();
+
+        /** If this object does not maintain the T-cache, get a copy of the cache */
+        void obtainEntCache();
+
+        /** If this object does not maintain the E-cache, get a copy of the cache */
+        void obtainAllCache();
+
+        double recordCoverage() override;
+
+        Eval calculateEval() const override;
+        UpdateStatus specCase1HandlerPrePruning(int const predIdx, int const argIdx, int const varId) override;
+        UpdateStatus specCase1HandlerPostPruning(int const predIdx, int const argIdx, int const varId) override;
+        UpdateStatus specCase2HandlerPrePruning(int const predSymbol, int const arity, int const argIdx, int const varId) override;
+        UpdateStatus specCase2HandlerPostPruning(int const predSymbol, int const arity, int const argIdx, int const varId) override;
+        UpdateStatus specCase3HandlerPrePruning(int const predIdx1, int const argIdx1, int const predIdx2, int const argIdx2) override;
+        UpdateStatus specCase3HandlerPostPruning(int const predIdx1, int const argIdx1, int const predIdx2, int const argIdx2) override;
+        UpdateStatus specCase4HandlerPrePruning(
+            int const predSymbol, int const arity, int const argIdx1, int const predIdx2, int const argIdx2
+        ) override;
+        UpdateStatus specCase4HandlerPostPruning(
+            int const predSymbol, int const arity, int const argIdx1, int const predIdx2, int const argIdx2
+        ) override;
+        UpdateStatus specCase5HandlerPrePruning(int const predIdx, int const argIdx, int const constant) override;
+        UpdateStatus specCase5HandlerPostPruning(int const predIdx, int const argIdx, int const constant) override;
+        UpdateStatus generalizeHandlerPrePruning(int const predIdx, int const argIdx) override;
+        UpdateStatus generalizeHandlerPostPruning(int const predIdx, int const argIdx) override;
+
+        /**
+         * Update fragment indices and predicate index mappings when two fragments merge together.
+         *
+         * NOTE: This should be called BEFORE the two fragments are merged
+         * 
+         * NOTE: This method will remove the reference to the merging fragment
+         *
+         * @param baseFragmentIdx    The index of the base fragment. This fragment will not be changed.
+         * @param mergingFragmentIdx The index of the fragment that will be merged into the base. This fragment will be removed after the merge
+         */
+        void mergeFragmentIndices(int const baseFragmentIdx, int const mergingFragmentIdx);
+
+        /**
+         * Recursively add PLV bindings to the linked head arguments.
+         *
+         * NOTE: This should only be called when body is not empty
+         *
+         * @param headTemplates       The set of head templates
+         * @param bindingsInFragments The bindings of LVs grouped by cache fragment
+         * @param headArgIdxLists     The linked head argument indices for LV groups
+         * @param template            A template of the head templates
+         * @param validFragmentIndices The indices of fragments that contains LVs to be substituted
+         * @param headArity            The arity of the head predicate
+         * @param idx             The index of `validFragmentIndices`
+         */
+        void generateHeadTemplates(
+            std::unordered_set<Record>& headTempaltes, std::unordered_set<Record>** const bindingsInFragments,
+            std::vector<std::vector<int>>* const headArgIdxLists, int* const argTemplate,
+            std::vector<int> const& validFragmentIndices, int const headArity, int const fragIdx
+        ) const;
+
+        /**
+         * Recursively expand UVs in the template and add to counterexample set
+         *
+         * NOTE: This should only be called when there is at least one head-only var in the head
+         *
+         * @param targetRelation  The target relation
+         * @param counterexamples The counterexample set
+         * @param template        The template record
+         * @param idx             The index of UVs
+         * @param varLocs         The locations of UVs
+         * @param numVectors      The number of vectors in array `varLocs`
+         */
+        void expandHeadUvs4CounterExamples(
+            SimpleRelation const& targetRelation, std::unordered_set<Record>& counterexamples, int* const recTemplate,
+            std::vector<int>** varLocs, int const idx, int const numVectors
+        ) const;
     };
 }

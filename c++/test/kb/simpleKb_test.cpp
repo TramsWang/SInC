@@ -685,7 +685,7 @@ TEST_F(TestSimpleCompressedKb, TestConstructAndDump) {
 
     delete[] counterexamples_mother;
     delete[] counterexamples_father;
-    for (Fingerprint* const& fp: cache) {
+    for (const Fingerprint* const& fp: cache) {
         delete fp;
     }
     for (std::pair<sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabuMap) {

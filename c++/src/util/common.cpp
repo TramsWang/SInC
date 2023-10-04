@@ -68,11 +68,23 @@ size_t std::hash<Record>::operator()(const Record& r) const {
     return r.hash();
 }
 
+size_t std::hash<const Record>::operator()(const Record& r) const {
+    return r.hash();
+}
+
 size_t std::hash<Record*>::operator()(const Record *r) const {
     return r->hash();
 }
 
+size_t std::hash<const Record*>::operator()(const Record *r) const {
+    return r->hash();
+}
+
 bool std::equal_to<Record*>::operator()(const Record *r1, const Record *r2) const {
+    return (*r1) == (*r2);
+}
+
+bool std::equal_to<const Record*>::operator()(const Record *r1, const Record *r2) const {
     return (*r1) == (*r2);
 }
 
@@ -225,11 +237,23 @@ size_t std::hash<Predicate>::operator()(const Predicate& r) const {
     return r.hash();
 }
 
+size_t std::hash<const Predicate>::operator()(const Predicate& r) const {
+    return r.hash();
+}
+
 size_t std::hash<Predicate*>::operator()(const Predicate *r) const {
     return r->hash();
 }
 
+size_t std::hash<const Predicate*>::operator()(const Predicate *r) const {
+    return r->hash();
+}
+
 bool std::equal_to<Predicate*>::operator()(const Predicate *r1, const Predicate *r2) const {
+    return (*r1) == (*r2);
+}
+
+bool std::equal_to<const Predicate*>::operator()(const Predicate *r1, const Predicate *r2) const {
     return (*r1) == (*r2);
 }
 
@@ -354,6 +378,18 @@ size_t std::hash<ParsedArg*>::operator()(const ParsedArg *r) const {
 }
 
 bool std::equal_to<ParsedArg*>::operator()(const ParsedArg *r1, const ParsedArg *r2) const {
+    return (*r1) == (*r2);
+}
+
+size_t std::hash<const ParsedArg>::operator()(const ParsedArg& r) const {
+    return r.hash();
+}
+
+size_t std::hash<const ParsedArg*>::operator()(const ParsedArg *r) const {
+    return r->hash();
+}
+
+bool std::equal_to<const ParsedArg*>::operator()(const ParsedArg *r1, const ParsedArg *r2) const {
     return (*r1) == (*r2);
 }
 
@@ -484,6 +520,18 @@ bool std::equal_to<ParsedPred*>::operator()(const ParsedPred *r1, const ParsedPr
     return (*r1) == (*r2);
 }
 
+size_t std::hash<const ParsedPred>::operator()(const ParsedPred& r) const {
+    return r.hash();
+}
+
+size_t std::hash<const ParsedPred*>::operator()(const ParsedPred *r) const {
+    return r->hash();
+}
+
+bool std::equal_to<const ParsedPred*>::operator()(const ParsedPred *r1, const ParsedPred *r2) const {
+    return (*r1) == (*r2);
+}
+
 /**
  * ArgLocation
  */
@@ -516,6 +564,18 @@ size_t std::hash<ArgLocation*>::operator()(const ArgLocation *r) const {
 }
 
 bool std::equal_to<ArgLocation*>::operator()(const ArgLocation *r1, const ArgLocation *r2) const {
+    return (*r1) == (*r2);
+}
+
+size_t std::hash<const ArgLocation>::operator()(const ArgLocation& r) const {
+    return r.hash();
+}
+
+size_t std::hash<const ArgLocation*>::operator()(const ArgLocation *r) const {
+    return r->hash();
+}
+
+bool std::equal_to<const ArgLocation*>::operator()(const ArgLocation *r1, const ArgLocation *r2) const {
     return (*r1) == (*r2);
 }
 
@@ -566,5 +626,17 @@ size_t std::hash<ArgIndicator*>::operator()(const ArgIndicator *r) const {
 }
 
 bool std::equal_to<ArgIndicator*>::operator()(const ArgIndicator *r1, const ArgIndicator *r2) const {
+    return (*r1) == (*r2);
+}
+
+size_t std::hash<const ArgIndicator>::operator()(const ArgIndicator& r) const {
+    return r.hash();
+}
+
+size_t std::hash<const ArgIndicator*>::operator()(const ArgIndicator *r) const {
+    return r->hash();
+}
+
+bool std::equal_to<const ArgIndicator*>::operator()(const ArgIndicator *r1, const ArgIndicator *r2) const {
     return (*r1) == (*r2);
 }

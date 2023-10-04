@@ -160,7 +160,7 @@ std::string Rule::toString(const std::vector<ParsedPred*>& parsedStructure) {
 }
 
 
-Rule::Rule(int const headPredSymbol, int arity, fingerprintCacheType& _fingerprintCache, tabuMapType& _category2TabuSetMap) :
+Rule::Rule(int const headPredSymbol, int const arity, fingerprintCacheType& _fingerprintCache, tabuMapType& _category2TabuSetMap) :
     fingerprintCache(_fingerprintCache), category2TabuSetMap(_category2TabuSetMap), fingerprint(nullptr), releaseFingerprint(false),
     length(MIN_LENGTH), eval(Eval(0, 0, 0)) // initial `eval` will not be used, this is just for compilation.
 {
@@ -569,7 +569,7 @@ bool Rule::tabuHit() {
                 continue;
             }
             fingerprintCacheType* tabu_set = itr->second;
-            for (Fingerprint* const& rfp : *tabu_set) {
+            for (const Fingerprint* const& rfp : *tabu_set) {
                 if (rfp->generalizationOf(*fingerprint)) {
                     for (MultiSet<int>* const& category_subset : *category_subsets) {
                         delete category_subset;

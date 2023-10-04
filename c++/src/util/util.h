@@ -85,6 +85,11 @@ struct std::hash<sinc::MultiSet<T>> {
     size_t operator()(const sinc::MultiSet<T>& r) const;
 };
 
+template <class T>
+struct std::hash<const sinc::MultiSet<T>> {
+    size_t operator()(const sinc::MultiSet<T>& r) const;
+};
+
 /**
  * This is for hashing "MultiSet*" in unordered containers.
  */
@@ -93,11 +98,21 @@ struct std::hash<sinc::MultiSet<T>*> {
     size_t operator()(const sinc::MultiSet<T> *r) const;
 };
 
+template <class T>
+struct std::hash<const sinc::MultiSet<T>*> {
+    size_t operator()(const sinc::MultiSet<T> *r) const;
+};
+
 /**
  * This is for checking equivalence "MultiSet*" in unordered containers.
  */
 template <class T>
 struct std::equal_to<sinc::MultiSet<T>*> {
+    bool operator()(const sinc::MultiSet<T> *r1, const sinc::MultiSet<T> *r2) const;
+};
+
+template <class T>
+struct std::equal_to<const sinc::MultiSet<T>*> {
     bool operator()(const sinc::MultiSet<T> *r1, const sinc::MultiSet<T> *r2) const;
 };
 
@@ -219,11 +234,21 @@ struct std::hash<sinc::ComparableArray<T>> {
     size_t operator()(const sinc::ComparableArray<T>& r) const;
 };
 
+template <class T>
+struct std::hash<const sinc::ComparableArray<T>> {
+    size_t operator()(const sinc::ComparableArray<T>& r) const;
+};
+
 /**
  * This is for hashing "ComparableArray<T>*" in unordered containers.
  */
 template <class T>
 struct std::hash<sinc::ComparableArray<T>*> {
+    size_t operator()(const sinc::ComparableArray<T> *r) const;
+};
+
+template <class T>
+struct std::hash<const sinc::ComparableArray<T>*> {
     size_t operator()(const sinc::ComparableArray<T> *r) const;
 };
 
@@ -235,6 +260,24 @@ struct std::equal_to<sinc::ComparableArray<T>*> {
     bool operator()(const sinc::ComparableArray<T> *r1, const sinc::ComparableArray<T> *r2) const;
 };
 
+template <class T>
+struct std::equal_to<const sinc::ComparableArray<T>*> {
+    bool operator()(const sinc::ComparableArray<T> *r1, const sinc::ComparableArray<T> *r2) const;
+};
+
+/**
+ * This is used for hashing vectors
+ */
+template <class T>
+struct std::hash<std::vector<T>> {
+    size_t operator()(const std::vector<T>& r) const;
+};
+
+template <class T>
+struct std::hash<const std::vector<T>> {
+    size_t operator()(const std::vector<T>& r) const;
+};
+
 namespace sinc {
     /**
      * This method copy the data in a vector to an array.
@@ -242,7 +285,7 @@ namespace sinc {
      * NOTE: The returned pointer should be deleted by "delete[]".
      */
     template <class T>
-    T* toArray(std::vector<T> v) {
+    T* toArray(std::vector<T> const& v) {
         T* arr = new T[v.size()];
         std::copy(v.begin(), v.end(), arr);
         return arr;

@@ -23,7 +23,7 @@ namespace sinc {
      */
     class Rule {
     public:
-        typedef std::unordered_set<Fingerprint*> fingerprintCacheType;
+        typedef std::unordered_set<const Fingerprint*> fingerprintCacheType;
         typedef std::unordered_map<MultiSet<int>*, fingerprintCacheType*> tabuMapType;
 
         /** The threshold of the coverage value for pruning */
@@ -73,7 +73,7 @@ namespace sinc {
          * @param fingerprintCache The cache of the used fingerprints
          * @param category2TabuSetMap The tabu set of pruned fingerprints
          */
-        Rule(int const headPredSymbol, int arity, fingerprintCacheType& fingerprintCache, tabuMapType& category2TabuSetMap);
+        Rule(int const headPredSymbol, int const arity, fingerprintCacheType& fingerprintCache, tabuMapType& category2TabuSetMap);
 
         Rule(const Rule& another);
 

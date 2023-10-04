@@ -26,7 +26,7 @@ public:
     }
 
     ~RelationMiner4Test() {
-        for (Fingerprint* const& fp: cache) {
+        for (const Fingerprint* const& fp: cache) {
             delete fp;
         }
         for (std::pair<const sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabuMap) {
@@ -41,7 +41,7 @@ public:
 
 protected:
     Rule* getStartRule() override {
-        for (Fingerprint* const& fp: cache) {
+        for (const Fingerprint* const& fp: cache) {
             delete fp;
         }
         for (std::pair<const sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabuMap) {
@@ -191,7 +191,7 @@ TEST_F(TestRelationMiner, TestFindSpecialization1) {
     EXPECT_EQ(expected_specs.size(), actual_spec_cnt);
     EXPECT_EQ(expected_specs, actual_specs);
 
-    for (Fingerprint* const& fp: cache) {
+    for (const Fingerprint* const& fp: cache) {
         delete fp;
     }
     for (std::pair<sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabuMap) {
@@ -288,7 +288,7 @@ TEST_F(TestRelationMiner, TestFindSpecialization2) {
     EXPECT_EQ(expected_specs.size(), actual_spec_cnt);
     EXPECT_EQ(expected_specs, actual_specs);
 
-    for (Fingerprint* const& fp: cache) {
+    for (const Fingerprint* const& fp: cache) {
         delete fp;
     }
     for (std::pair<sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabuMap) {
@@ -354,7 +354,7 @@ TEST_F(TestRelationMiner, TestFindGeneralization) {
     EXPECT_EQ(expected_specs.size(), actual_spec_cnt);
     EXPECT_EQ(expected_specs, actual_specs);
 
-    for (Fingerprint* const& fp: cache) {
+    for (const Fingerprint* const& fp: cache) {
         delete fp;
     }
     for (std::pair<sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabuMap) {
@@ -547,7 +547,7 @@ protected:
         }
 
         ~RelationMiner4SincTest() {
-            for (Fingerprint* const& fp: cache) {
+            for (const Fingerprint* const& fp: cache) {
                 delete fp;
             }
             for (std::pair<const sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabuMap) {

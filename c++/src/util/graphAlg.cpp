@@ -38,6 +38,21 @@ bool std::equal_to<GraphNode<T>*>::operator()(const GraphNode<T> *r1, const Grap
     return (*r1) == (*r2);
 }
 
+template<class T>
+size_t std::hash<const GraphNode<T>>::operator()(const GraphNode<T>& r) const {
+    return r.hash();
+}
+
+template<class T>
+size_t std::hash<const GraphNode<T>*>::operator()(const GraphNode<T> *r) const {
+    return r->hash();
+}
+
+template<class T>
+bool std::equal_to<const GraphNode<T>*>::operator()(const GraphNode<T> *r1, const GraphNode<T> *r2) const {
+    return (*r1) == (*r2);
+}
+
 /* Instantiate GraphNode<T> by the following types, so the linker would not be confused: */
 template class GraphNode<int>;
 template class std::hash<GraphNode<int>>;

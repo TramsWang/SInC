@@ -1,6 +1,7 @@
 #include "components.h"
 #include <cmath>
 #include <sstream>
+#include <iostream>
 
 /**
  * EvalMetric
@@ -105,6 +106,10 @@ std::string Eval::toString() const {
     return os.str();
 }
 
+bool Eval::operator==(const Eval& another) const {
+    return posEtls == another.posEtls && allEtls == another.allEtls && ruleLength == another.ruleLength;
+}
+
 Eval& Eval::operator=(const Eval& another) {
     allEtls = another.allEtls;
     posEtls = another.posEtls;
@@ -140,6 +145,37 @@ EvidenceBatch::~EvidenceBatch() {
     }
     delete[] predicateSymbolsInRule;
     delete[] aritiesInRule;
+}
+
+void EvidenceBatch::showGroundings() const {
+    std::cout << "Groundings:\n";
+    for (int** const& grounding: evidenceList) {
+        std::cout << '{';
+        for (int i = 0; i < numPredicates; i++) {
+            int* record = grounding[i];
+            std::cout << '[';
+            for (int j = 0; j < aritiesInRule[i]; j++) {
+                std::cout << record[j] << ',';
+            }
+            std::cout << ']';
+        }
+        std::cout << "}\n";
+    }
+}
+
+void EvidenceBatch::showGroundings(std::unordered_set<std::vector<Record>> const& groundings) {
+    std::cout << "Groundings:\n";
+    for (std::vector<Record> const& grounding: groundings) {
+        std::cout << '{';
+        for (Record const& r: grounding) {
+            std::cout << '[';
+            for (int j = 0; j < r.getArity(); j++) {
+                std::cout << r.getArgs()[j] << ',';
+            }
+            std::cout << ']';
+        }
+        std::cout << "}\n";
+    }
 }
 
 /**
@@ -183,6 +219,18 @@ size_t std::hash<PredicateWithClass*>::operator()(const PredicateWithClass *r) c
 }
 
 bool std::equal_to<PredicateWithClass*>::operator()(const PredicateWithClass *r1, const PredicateWithClass *r2) const {
+    return (*r1) == (*r2);
+}
+
+size_t std::hash<const PredicateWithClass>::operator()(const PredicateWithClass& r) const {
+    return r.hash();
+}
+
+size_t std::hash<const PredicateWithClass*>::operator()(const PredicateWithClass *r) const {
+    return r->hash();
+}
+
+bool std::equal_to<const PredicateWithClass*>::operator()(const PredicateWithClass *r1, const PredicateWithClass *r2) const {
     return (*r1) == (*r2);
 }
 
@@ -335,6 +383,18 @@ size_t std::hash<Fingerprint*>::operator()(const Fingerprint *r) const {
 }
 
 bool std::equal_to<Fingerprint*>::operator()(const Fingerprint *r1, const Fingerprint *r2) const {
+    return (*r1) == (*r2);
+}
+
+size_t std::hash<const Fingerprint>::operator()(const Fingerprint& r) const {
+    return r.hash();
+}
+
+size_t std::hash<const Fingerprint*>::operator()(const Fingerprint *r) const {
+    return r->hash();
+}
+
+bool std::equal_to<const Fingerprint*>::operator()(const Fingerprint *r1, const Fingerprint *r2) const {
     return (*r1) == (*r2);
 }
 

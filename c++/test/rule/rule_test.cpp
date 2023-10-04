@@ -121,7 +121,7 @@ TEST(RuleTest, TestConstructor) {
     ASSERT_EQ(predicate_body3, r->getPredicate(3));
 
     delete r;
-    for (Fingerprint* const& fp: cache) {
+    for (const Fingerprint* const& fp: cache) {
         delete fp;
     }
     for (std::pair<const sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabuMap) {
@@ -162,7 +162,7 @@ TEST(RuleTest, TestCopyConstructor) {
 
     delete r1;
     delete r2;
-    for (Fingerprint* const& fp: cache) {
+    for (const Fingerprint* const& fp: cache) {
         delete fp;
     }
     for (std::pair<sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabu_set) {
@@ -205,7 +205,7 @@ TEST(RuleTest, TestSpecCase1) {
     ASSERT_EQ(cache.size(), 4);
 
     delete r;
-    for (Fingerprint* const& fp: cache) {
+    for (const Fingerprint* const& fp: cache) {
         delete fp;
     }
     for (std::pair<sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabuMap) {
@@ -255,7 +255,7 @@ TEST(RuleTest, TestSpecCase2) {
     ASSERT_EQ(cache.size(), 5);
 
     delete r;
-    for (Fingerprint* const& fp: cache) {
+    for (const Fingerprint* const& fp: cache) {
         delete fp;
     }
     for (std::pair<sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabuMap) {
@@ -319,7 +319,7 @@ TEST(RuleTest, TestSpecCase3) {
     ASSERT_EQ(cache.size(), 7);
 
     delete r;
-    for (Fingerprint* const& fp: cache) {
+    for (const Fingerprint* const& fp: cache) {
         delete fp;
     }
     for (std::pair<sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabuMap) {
@@ -369,7 +369,7 @@ TEST(RuleTest, TestSpecCase4) {
     ASSERT_EQ(cache.size(), 5);
 
     delete r;
-    for (Fingerprint* const& fp: cache) {
+    for (const Fingerprint* const& fp: cache) {
         delete fp;
     }
     for (std::pair<sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabuMap) {
@@ -440,7 +440,7 @@ TEST(RuleTest, TestSpecCase5) {
     ASSERT_EQ(cache.size(), 8);
 
     delete r;
-    for (Fingerprint* const& fp: cache) {
+    for (const Fingerprint* const& fp: cache) {
         delete fp;
     }
     for (std::pair<sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabuMap) {
@@ -466,7 +466,7 @@ TEST(RuleTest, TestGeneralize1) {
     ASSERT_EQ(2, r->usedLimitedVars());
     ASSERT_EQ(6, cache.size());
 
-    for (Fingerprint* const& fp: cache) {
+    for (const Fingerprint* const& fp: cache) {
         delete fp;
     }
     cache.clear();
@@ -508,7 +508,7 @@ TEST(RuleTest, TestGeneralize1) {
     ASSERT_EQ(head, r->getHead());
 
     delete r;
-    for (Fingerprint* const& fp: cache) {
+    for (const Fingerprint* const& fp: cache) {
         delete fp;
     }
     for (std::pair<sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabu_set) {
@@ -534,7 +534,7 @@ TEST(RuleTest, TestGeneralize2) {
     ASSERT_EQ(3, r->usedLimitedVars());
     ASSERT_EQ(6, cache.size());
 
-    for (Fingerprint* const& fp: cache) {
+    for (const Fingerprint* const& fp: cache) {
         delete fp;
     }
     cache.clear();
@@ -562,7 +562,7 @@ TEST(RuleTest, TestGeneralize2) {
     ASSERT_EQ(UpdateStatus::Invalid, r->generalize(0, 2));
 
     delete r;
-    for (Fingerprint* const& fp: cache) {
+    for (const Fingerprint* const& fp: cache) {
         delete fp;
     }
     for (std::pair<sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabu_set) {
@@ -654,7 +654,7 @@ TEST(RuleTest, TestToString) {
     }
     delete[] rows;
     delete r;
-    for (Fingerprint* const& fp: cache) {
+    for (const Fingerprint* const& fp: cache) {
         delete fp;
     }
     for (std::pair<sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabuMap) {
@@ -677,7 +677,7 @@ TEST(RuleTest, TestInvalid) {
     ASSERT_STREQ(r2->toDumpString().c_str(), "1(?,?,?):-2(?,X0),3(?,X0,?)");
 
     Rule* r3 = r->clone();
-    for (Fingerprint* const& fp: cache) {
+    for (const Fingerprint* const& fp: cache) {
         delete fp;
     }
     cache.clear();
@@ -700,7 +700,7 @@ TEST(RuleTest, TestInvalid) {
     delete r3;
     delete r4;
     delete r5;
-    for (Fingerprint* const& fp: cache) {
+    for (const Fingerprint* const& fp: cache) {
         delete fp;
     }
     for (std::pair<sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabuMap) {
@@ -740,7 +740,7 @@ TEST(RuleTest, TestCacheHit) {
     delete r2;
     delete r3;
     delete r4;
-    for (Fingerprint* const& fp: cache) {
+    for (const Fingerprint* const& fp: cache) {
         delete fp;
     }
     for (std::pair<sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabuMap) {
@@ -768,7 +768,7 @@ TEST(RuleTest, TestInsufficientCoverageAndTabuHit) {
 
     delete r;
     delete r2;
-    for (Fingerprint* const& fp: cache) {
+    for (const Fingerprint* const& fp: cache) {
         delete fp;
     }
     for (std::pair<sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabuMap) {

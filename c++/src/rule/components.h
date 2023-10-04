@@ -99,6 +99,7 @@ namespace sinc {
         double getRuleLength() const;
         std::string toString() const;
 
+        bool operator==(const Eval& another) const;
         Eval& operator=(const Eval& another);
         Eval& operator=(const Eval&& another);
 
@@ -145,6 +146,8 @@ namespace sinc {
 
         EvidenceBatch(int const numPredicates);
         ~EvidenceBatch();
+        void showGroundings() const;
+        static void showGroundings(std::unordered_set<std::vector<Record>> const& groundings);
     };
 
     /**
@@ -178,6 +181,11 @@ struct std::hash<sinc::PredicateWithClass> {
     size_t operator()(const sinc::PredicateWithClass& r) const;
 };
 
+template <>
+struct std::hash<const sinc::PredicateWithClass> {
+    size_t operator()(const sinc::PredicateWithClass& r) const;
+};
+
 /**
  * This is for hashing "PredicateWithClass*" in unordered containers.
  */
@@ -186,11 +194,21 @@ struct std::hash<sinc::PredicateWithClass*> {
     size_t operator()(const sinc::PredicateWithClass *r) const;
 };
 
+template <>
+struct std::hash<const sinc::PredicateWithClass*> {
+    size_t operator()(const sinc::PredicateWithClass *r) const;
+};
+
 /**
  * This is for checking equivalence "PredicateWithClass*" in unordered containers.
  */
 template <>
 struct std::equal_to<sinc::PredicateWithClass*> {
+    bool operator()(const sinc::PredicateWithClass *r1, const sinc::PredicateWithClass *r2) const;
+};
+
+template <>
+struct std::equal_to<const sinc::PredicateWithClass*> {
     bool operator()(const sinc::PredicateWithClass *r1, const sinc::PredicateWithClass *r2) const;
 };
 
@@ -277,6 +295,30 @@ struct std::hash<sinc::Fingerprint*> {
  */
 template <>
 struct std::equal_to<sinc::Fingerprint*> {
+    bool operator()(const sinc::Fingerprint *r1, const sinc::Fingerprint *r2) const;
+};
+
+/**
+ * This is for hashing "Fingerprint" in unordered containers.
+ */
+template <>
+struct std::hash<const sinc::Fingerprint> {
+    size_t operator()(const sinc::Fingerprint& r) const;
+};
+
+/**
+ * This is for hashing "Fingerprint*" in unordered containers.
+ */
+template <>
+struct std::hash<const sinc::Fingerprint*> {
+    size_t operator()(const sinc::Fingerprint *r) const;
+};
+
+/**
+ * This is for checking equivalence "Fingerprint*" in unordered containers.
+ */
+template <>
+struct std::equal_to<const sinc::Fingerprint*> {
     bool operator()(const sinc::Fingerprint *r1, const sinc::Fingerprint *r2) const;
 };
 

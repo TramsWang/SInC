@@ -150,6 +150,21 @@ bool std::equal_to<MultiSet<T>*>::operator()(const MultiSet<T> *r1, const MultiS
     return (*r1) == (*r2);
 }
 
+template<class T>
+size_t std::hash<const MultiSet<T>>::operator()(const MultiSet<T>& r) const {
+    return r.hash();
+}
+
+template<class T>
+size_t std::hash<const MultiSet<T>*>::operator()(const MultiSet<T> *r) const {
+    return r->hash();
+}
+
+template<class T>
+bool std::equal_to<const MultiSet<T>*>::operator()(const MultiSet<T> *r1, const MultiSet<T> *r2) const {
+    return (*r1) == (*r2);
+}
+
 /* Instantiate MultiSet<T> by the following types, so the linker would not be confused: */
 template class MultiSet<int>;
 template class std::hash<MultiSet<int>>;
@@ -293,11 +308,47 @@ bool std::equal_to<ComparableArray<T>*>::operator()(const ComparableArray<T> *r1
     return (*r1) == (*r2);
 }
 
+template<class T>
+size_t std::hash<const ComparableArray<T>>::operator()(const ComparableArray<T>& r) const {
+    return r.hash();
+}
+
+template<class T>
+size_t std::hash<const ComparableArray<T>*>::operator()(const ComparableArray<T> *r) const {
+    return r->hash();
+}
+
+template<class T>
+bool std::equal_to<const ComparableArray<T>*>::operator()(const ComparableArray<T> *r1, const ComparableArray<T> *r2) const {
+    return (*r1) == (*r2);
+}
+
+template<class T>
+size_t std::hash<std::vector<T>>::operator()(const std::vector<T>& r) const {
+    size_t h = r.size();
+    std::hash<T> hasher;
+    for (int i = 0; i < r.size(); i++) {
+        h = h * 31 + hasher(r[i]);
+    }
+    return h;
+}
+
+template<class T>
+size_t std::hash<const std::vector<T>>::operator()(const std::vector<T>& r) const {
+    size_t h = r.size();
+    std::hash<T> hasher;
+    for (int i = 0; i < r.size(); i++) {
+        h = h * 31 + hasher(r[i]);
+    }
+    return h;
+}
+
 /* Instantiate ComparableArray<T> by the following types, so the linker would not be confused: */
 template class ComparableArray<sinc::Record>;
 template class std::hash<ComparableArray<sinc::Record>>;
 template class std::hash<ComparableArray<sinc::Record>*>;
 template class std::equal_to<ComparableArray<sinc::Record>*>;
+template class std::hash<std::vector<sinc::Record>>;
 
 /** The timing function */
 uint64_t sinc::currentTimeInNano() {
