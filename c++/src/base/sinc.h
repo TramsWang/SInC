@@ -273,7 +273,7 @@ namespace sinc {
          * Select rule r as one of the beams in the next iteration of rule mining. Shared operations for beams may be added
          * in this method, e.g., updating the cache indices.
          */
-        virtual void selectAsBeam(Rule& r) = 0;
+        virtual void selectAsBeam(Rule* r) = 0;
 
         /**
          * Find the positive and negative entailments of the rule. Label the positive entailments and add the negative ones
@@ -321,6 +321,8 @@ namespace sinc {
         /**
          * Create a SInC object with configurations and a KB in memory. If the KB is not NULL, the input KB will be the one
          * in the memory instead of loading from file system.
+         * 
+         * NOTE: The kb WILL be released by the `SInC` object
          *
          * @param config The configurations
          * @param kb     The KB object in memory
@@ -408,13 +410,14 @@ namespace sinc {
         virtual RelationMiner* createRelationMiner(int const targetRelationId) = 0;
         void showConfig() const ;
         void showHypothesis() const;
+        virtual void finish() = 0;
 
         /**
          * The compress procedure.
          */
         void compress();
 
-        virtual void finalizeRelationMiner(RelationMiner& miner);
+        virtual void finalizeRelationMiner(RelationMiner* miner);
         void logInfo(const char* msg) const;
         void logInfo(std::string const& msg) const;
         void logError(const char* msg) const;

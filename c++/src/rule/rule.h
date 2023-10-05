@@ -232,9 +232,9 @@ namespace sinc {
         Eval eval;
 
         /* Performance monitoring members (measured in nanoseconds) */
-        uint64_t fingerprintCreationTime;
-        uint64_t pruningTime;
-        uint64_t evalTime;
+        uint64_t fingerprintCreationTime = 0;
+        uint64_t pruningTime = 0;
+        uint64_t evalTime = 0;
 
         void updateFingerprint();
 

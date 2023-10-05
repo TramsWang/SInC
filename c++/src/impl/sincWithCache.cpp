@@ -1,6 +1,7 @@
-#include "cachedSinc.h"
+#include "sincWithCache.h"
 #include <stdarg.h>
 #include <cmath>
+#include <algorithm>
 
 /**
  * CompliedBlock
@@ -189,7 +190,6 @@ using sinc::CacheFragment;
 
 CacheFragment::CacheFragment(IntTable* const firstRelation, int const relationSymbol) {
     entries = new entriesType();
-    maintainEntries = true;
 
     partAssignedRule.emplace_back(relationSymbol, firstRelation->getTotalCols());
     entryType* first_entry = new entryType();
@@ -202,7 +202,6 @@ CacheFragment::CacheFragment(IntTable* const firstRelation, int const relationSy
 
 CacheFragment::CacheFragment(CompliedBlock* const firstCb, int const relationSymbol) {
     entries = new entriesType();
-    maintainEntries = true;
 
     partAssignedRule.emplace_back(relationSymbol, firstCb->getTotalCols());
     entryType* first_entry = new entryType();
@@ -212,13 +211,17 @@ CacheFragment::CacheFragment(CompliedBlock* const firstCb, int const relationSym
 
 CacheFragment::CacheFragment(int const relationSymbol, int const arity) {
     entries = new entriesType();
-    maintainEntries = true;
     partAssignedRule.emplace_back(relationSymbol, arity);
 }
 
 CacheFragment::CacheFragment(const CacheFragment& another) : partAssignedRule(another.partAssignedRule),
-    entries(another.entries),   // The caches can be simply copied, as the list should not be modified, but directly replaced (Copy-on-write)
-    maintainEntries(false), varInfoList(another.varInfoList) {}
+    entries(new entriesType()), varInfoList(another.varInfoList) 
+{
+    entries->reserve(another.entries->size());
+    for (entryType* const& entry: *(another.entries)) {
+        entries->push_back(new entryType(*entry));
+    }
+}
 
 CacheFragment::~CacheFragment() {
     releaseEntries();
@@ -582,9 +585,10 @@ bool CacheFragment::isEmpty() const {
 }
 
 void CacheFragment::clear() {
-    releaseEntries();
-    entries = new entriesType();
-    maintainEntries = true;
+    for (entryType* entry: *entries) {
+        delete entry;
+    }
+    entries->clear();
 }
 
 const CacheFragment::entriesType& CacheFragment::getEntries() const {
@@ -676,7 +680,6 @@ void CacheFragment::splitCacheEntries(int const tabIdx1, int const colIdx1, int 
     }
     releaseEntries();
     entries = new_entries;
-    maintainEntries = true;
 }
 
 void CacheFragment::splitCacheEntries(int const tabIdx1, int const colIdx1, IntTable* const newRelation, int const colIdx2) {
@@ -702,7 +705,6 @@ void CacheFragment::splitCacheEntries(int const tabIdx1, int const colIdx1, IntT
     }
     releaseEntries();
     entries = new_entries;
-    maintainEntries = true;
 }
 
 void CacheFragment::matchCacheEntries(
@@ -743,7 +745,6 @@ void CacheFragment::matchCacheEntries(
     }
     releaseEntries();
     entries = new_entries;
-    maintainEntries = true;
 }
 
 void CacheFragment::matchCacheEntries(
@@ -764,7 +765,6 @@ void CacheFragment::matchCacheEntries(
     }
     releaseEntries();
     entries = new_entries;
-    maintainEntries = true;
 }
 
 void CacheFragment::assignCacheEntries(int const tabIdx, int const colIdx, int const constant) {
@@ -784,7 +784,6 @@ void CacheFragment::assignCacheEntries(int const tabIdx, int const colIdx, int c
     }
     releaseEntries();
     entries = new_entries;
-    maintainEntries = true;
 }
 
 void CacheFragment::addVarInfo(int const vid, int const tabIdx, int const colIdx, bool const isPlv) {
@@ -846,7 +845,6 @@ void CacheFragment::mergeFragmentEntries(
     }
     releaseEntries();
     entries = new_entries;
-    maintainEntries = true;
 }
 
 void CacheFragment::mergeFragmentEntries(
@@ -867,7 +865,6 @@ void CacheFragment::mergeFragmentEntries(
     }
     releaseEntries();
     entries = new_entries;
-    maintainEntries = true;
 }
 
 void CacheFragment::releaseConst2EntryMap(const2EntriesMapType* map) {
@@ -953,12 +950,10 @@ void CacheFragment::addPlvBindings2Templates(
 }
 
 void CacheFragment::releaseEntries() {
-    if (maintainEntries) {
-        for (entryType* entry: *entries) {
-            delete entry;
-        }
-        delete entries;
+    for (entryType* entry: *entries) {
+        delete entry;
     }
+    delete entries;
     entries = nullptr;
 }
 
@@ -1269,6 +1264,46 @@ void CachedRule::releaseMemory() {
     }
 }
 
+uint64_t CachedRule::getCopyTime() const {
+    return copyTime;
+}
+
+uint64_t CachedRule::getPosCacheUpdateTime() const {
+    return posCacheUpdateTime;
+}
+
+uint64_t CachedRule::getEntCacheUpdateTime() const {
+    return entCacheUpdateTime;
+}
+
+uint64_t CachedRule::getAllCacheUpdateTime() const {
+    return allCacheUpdateTime;
+}
+
+uint64_t CachedRule::getPosCacheIndexingTime() const {
+    return posCacheIndexingTime;
+}
+
+uint64_t CachedRule::getEntCacheIndexingTime() const {
+    return entCacheIndexingTime;
+}
+
+uint64_t CachedRule::getAllCacheIndexingTime() const {
+    return allCacheIndexingTime;
+}
+
+const CacheFragment& CachedRule::getPosCache() const {
+    return *posCache;
+}
+
+const CacheFragment& CachedRule::getEntCache() const {
+    return *entCache;
+}
+
+const std::vector<CacheFragment*>& CachedRule::getAllCache() const {
+    return *allCache;
+}
+
 void CachedRule::obtainPosCache() {
     if (!maintainPosCache) {
         posCache = new CacheFragment(*posCache);
@@ -1364,8 +1399,8 @@ sinc::UpdateStatus CachedRule::specCase1HandlerPostPruning(int const predIdx, in
     entCache->updateCase1a(predIdx, argIdx, varId);
     uint64_t time_ent_done = currentTimeInNano();
 
+    obtainAllCache();
     if (HEAD_PRED_IDX != predIdx) { // No need to update the E-cache if the update is in the head
-        obtainAllCache();
         TabInfo const& tab_info = predIdx2AllCacheTableInfo[predIdx];
         CacheFragment* fragment = (*allCache)[tab_info.fragmentIdx];
         bool cache_empty = false;
@@ -1472,6 +1507,7 @@ sinc::UpdateStatus CachedRule::specCase3HandlerPostPruning(int const predIdx1, i
     entCache->updateCase2a(predIdx1, argIdx1, predIdx2, argIdx2, new_vid);
     uint64_t time_ent_done = currentTimeInNano();
 
+    obtainAllCache();
     TabInfo const& tab_info1 = predIdx2AllCacheTableInfo[predIdx1];
     TabInfo const& tab_info2 = predIdx2AllCacheTableInfo[predIdx2];
     CacheFragment* fragment1 = nullptr;
@@ -1479,12 +1515,10 @@ sinc::UpdateStatus CachedRule::specCase3HandlerPostPruning(int const predIdx1, i
     if (HEAD_PRED_IDX == predIdx1) {
         if (HEAD_PRED_IDX != predIdx2) {
             /* Update the fragment of predIdx2 only */
-            obtainAllCache();
             fragment2 = (*allCache)[tab_info2.fragmentIdx];
             fragment2->updateCase1a(tab_info2.tabIdx, argIdx2, new_vid);
         }   //  Otherwise, update is in the head only, no need to change E-cache
     } else {
-        obtainAllCache();
         fragment1 = (*allCache)[tab_info1.fragmentIdx];
         if (HEAD_PRED_IDX != predIdx2) {
             /* Update two predicates together */
@@ -1578,8 +1612,8 @@ sinc::UpdateStatus CachedRule::specCase5HandlerPostPruning(int const predIdx, in
     entCache->updateCase3(predIdx, argIdx, constant);
     uint64_t time_ent_done = currentTimeInNano();
 
+    obtainAllCache();
     if (HEAD_PRED_IDX != predIdx) { // No need to update the E-cache if the update is in the head
-        obtainAllCache();
         TabInfo const& tab_info = predIdx2AllCacheTableInfo[predIdx];
         CacheFragment& fragment = *(*allCache)[tab_info.fragmentIdx];
         fragment.updateCase3(tab_info.tabIdx, argIdx, constant);
@@ -1692,4 +1726,120 @@ void CachedRule::expandHeadUvs4CounterExamples(
             }
         }
     }
+}
+
+/**
+ * RelationMinerWithCachedRule
+ */
+using sinc::RelationMinerWithCachedRule;
+
+RelationMinerWithCachedRule::RelationMinerWithCachedRule(
+    SimpleKb& kb, int const targetRelation, EvalMetric::Value evalMetric, int const beamwidth, double const stopCompressionRatio,
+    nodeMapType& predicate2NodeMap, depGraphType& dependencyGraph, std::vector<Rule*>& hypothesis,
+    std::unordered_set<Record>& counterexamples, std::ostream& logger
+) : RelationMiner(
+        kb, targetRelation, evalMetric, beamwidth, stopCompressionRatio, predicate2NodeMap, dependencyGraph, hypothesis,
+        counterexamples, logger
+) {}
+
+RelationMinerWithCachedRule::~RelationMinerWithCachedRule() {
+    for (Rule::fingerprintCacheType* const& cache: fingerprintCaches) {
+        for (const Fingerprint* const& fp: *cache) {
+            delete fp;
+        }
+        delete cache;
+    }
+}
+
+sinc::Rule* RelationMinerWithCachedRule::getStartRule() {
+    Rule::fingerprintCacheType* cache = new Rule::fingerprintCacheType();
+    fingerprintCaches.push_back(cache);
+    return new CachedRule(targetRelation, kb.getRelation(targetRelation)->getTotalCols(), *cache, tabuMap, kb);
+}
+
+void RelationMinerWithCachedRule::selectAsBeam(Rule* r) {
+    CachedRule* rule = (CachedRule*) r;
+    rule->updateCacheIndices();
+    monitor.posCacheIndexingTime += rule->getPosCacheIndexingTime();
+    monitor.entCacheIndexingTime += rule->getEntCacheIndexingTime();
+    monitor.allCacheIndexingTime += rule->getAllCacheIndexingTime();
+}
+
+int RelationMinerWithCachedRule::checkThenAddRule(
+    UpdateStatus updateStatus, Rule* const updatedRule, Rule& originalRule, Rule** candidates
+) {
+    CachedRule* rule = (CachedRule*) updatedRule;
+    if (UpdateStatus::Normal == updateStatus) {
+        monitor.posCacheEntriesTotal += rule->getPosCache().getEntries().size();
+        monitor.entCacheEntriesTotal += rule->getEntCache().getEntries().size();
+        int all_cache_entries = 0;
+        if (!rule->getAllCache().empty()) {
+            for (CacheFragment* const& fragment : rule->getAllCache()) {
+                all_cache_entries += fragment->getEntries().size();
+            }
+            all_cache_entries /= rule->getAllCache().size();
+        }
+        monitor.allCacheEntriesTotal += all_cache_entries;
+        monitor.posCacheEntriesMax = std::max(monitor.posCacheEntriesMax, (int)rule->getPosCache().getEntries().size());
+        monitor.entCacheEntriesMax = std::max(monitor.entCacheEntriesMax, (int)rule->getEntCache().getEntries().size());
+        monitor.allCacheEntriesMax = std::max(monitor.allCacheEntriesMax, all_cache_entries);
+        monitor.totalGeneratedRules++;
+        monitor.posCacheUpdateTime += rule->getPosCacheUpdateTime();
+        monitor.entCacheUpdateTime += rule->getEntCacheUpdateTime();
+        monitor.allCacheUpdateTime += rule->getAllCacheUpdateTime();
+    } else {
+        monitor.prunedPosCacheUpdateTime += rule->getPosCacheUpdateTime();
+    }
+    monitor.copyTime += rule->getCopyTime();
+
+    return RelationMiner::checkThenAddRule(updateStatus, updatedRule, originalRule, candidates);
+}
+
+/**
+ * SincWithCache
+ */
+using sinc::SincWithCache;
+
+SincWithCache::SincWithCache(SincConfig* const config) : SInC(config) {}
+
+SincWithCache::SincWithCache(SincConfig* const config, SimpleKb* const kb) : SInC(config, kb) {}
+
+sinc::SincRecovery* SincWithCache::createRecovery() {
+    return nullptr; // Todo: Implement here
+}
+
+sinc::RelationMiner* SincWithCache::createRelationMiner(int const targetRelationNum) {
+    return new RelationMinerWithCachedRule(
+        *kb, targetRelationNum, config->evalMetric, config->beamwidth, config->stopCompressionRatio, predicate2NodeMap,
+        dependencyGraph, compressedKb->getHypothesis(), compressedKb->getCounterexampleSet(targetRelationNum), *logger
+    );
+}
+
+void SincWithCache::finalizeRelationMiner(RelationMiner* miner) {
+    SInC::finalizeRelationMiner(miner);
+    RelationMinerWithCachedRule* rel_miner = (RelationMinerWithCachedRule*) miner;
+    monitor.posCacheUpdateTime += rel_miner->monitor.posCacheUpdateTime;
+    monitor.prunedPosCacheUpdateTime += rel_miner->monitor.prunedPosCacheUpdateTime;
+    monitor.entCacheUpdateTime += rel_miner->monitor.entCacheUpdateTime;
+    monitor.allCacheUpdateTime += rel_miner->monitor.allCacheUpdateTime;
+    monitor.posCacheIndexingTime += rel_miner->monitor.posCacheIndexingTime;
+    monitor.entCacheIndexingTime += rel_miner->monitor.entCacheIndexingTime;
+    monitor.allCacheIndexingTime += rel_miner->monitor.allCacheIndexingTime;
+    monitor.posCacheEntriesTotal += rel_miner->monitor.posCacheEntriesTotal;
+    monitor.entCacheEntriesTotal += rel_miner->monitor.entCacheEntriesTotal;
+    monitor.allCacheEntriesTotal += rel_miner->monitor.allCacheEntriesTotal;
+    monitor.posCacheEntriesMax = std::max(monitor.posCacheEntriesMax, rel_miner->monitor.posCacheEntriesMax);
+    monitor.entCacheEntriesMax = std::max(monitor.entCacheEntriesMax, rel_miner->monitor.entCacheEntriesMax);
+    monitor.allCacheEntriesMax = std::max(monitor.allCacheEntriesMax, rel_miner->monitor.allCacheEntriesMax);
+    monitor.totalGeneratedRules += rel_miner->monitor.totalGeneratedRules;
+    monitor.copyTime += rel_miner->monitor.copyTime;
+}
+
+void SincWithCache::showMonitor() {
+    SInC::showMonitor();
+    monitor.show(*logger);
+}
+
+void SincWithCache::finish() {
+    CompliedBlock::clearPool();
 }

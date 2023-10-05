@@ -162,7 +162,7 @@ std::string Rule::toString(const std::vector<ParsedPred*>& parsedStructure) {
 
 Rule::Rule(int const headPredSymbol, int const arity, fingerprintCacheType& _fingerprintCache, tabuMapType& _category2TabuSetMap) :
     fingerprintCache(_fingerprintCache), category2TabuSetMap(_category2TabuSetMap), fingerprint(nullptr), releaseFingerprint(false),
-    length(MIN_LENGTH), eval(Eval(0, 0, 0)) // initial `eval` will not be used, this is just for compilation.
+    length(MIN_LENGTH), eval(0, 0, 0) // initial `eval` will not be used, this is just for compilation.
 {
     structure.emplace_back(headPredSymbol, arity);
     updateFingerprint();
@@ -171,8 +171,8 @@ Rule::Rule(int const headPredSymbol, int const arity, fingerprintCacheType& _fin
 }
 
 Rule::Rule(const Rule& another) : fingerprintCache(another.fingerprintCache), category2TabuSetMap(another.category2TabuSetMap),
-    fingerprint(another.fingerprint), releaseFingerprint(false), length(another.length), eval(Eval(another.eval)),
-    structure(std::vector<Predicate>(another.structure)), limitedVarArgs(std::vector<std::vector<ArgLocation>*>())
+    fingerprint(another.fingerprint), releaseFingerprint(false), length(another.length), eval(another.eval),
+    structure(another.structure)
 {
     limitedVarArgs.reserve(another.limitedVarArgs.size());
     for (std::vector<ArgLocation>* const& vp: another.limitedVarArgs) {
@@ -645,6 +645,7 @@ void Rule::add2TabuMap() {
     } else {
         /* Add to existing category */
         itr->second->insert(fingerprint);
+        delete functor_mset;
     }
 }
 

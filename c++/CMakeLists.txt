@@ -49,7 +49,7 @@ add_executable(test_sinc
   test/rule/components_test.cpp
   test/rule/rule_test.cpp
   test/base/sinc_test.cpp
-  test/impl/cached_sinc_test.cpp
+  test/impl/sincWithCache_test.cpp
 )
 
 target_link_libraries(test_sinc PRIVATE util)

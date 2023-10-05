@@ -105,19 +105,19 @@ namespace sinc {
 
     protected:
         /** The number of positive entailments (double type to be the same as 'negEtls') */
-        double posEtls;
+        double posEtls = 0;
         /** The number of negative entailments (double type because values may be extremely large) */
-        double negEtls;
+        double negEtls = 0;
         /** The number of total entailments (double type because values may be extremely large) */
-        double allEtls;
+        double allEtls = 0;
         /** The length of a rule */
-        int ruleLength;
+        int ruleLength = 0;
         /** The score of compression ratio */
-        double compRatio;
+        double compRatio = 0;
         /** The score of compression capacity */
-        double compCapacity;
+        double compCapacity = 0;
         /** The score of information gain */
-        double infoGain;
+        double infoGain = 0;
     };
 
     /**
@@ -266,7 +266,7 @@ namespace sinc {
         /** In this rule structure, each argument is the corresponding equivalence class */
         std::vector<PredicateWithClass> classedStructure;
         /** The rule that generates the fingerprint */
-        const std::vector<Predicate>& rule;
+        const std::vector<Predicate> rule;
         /** Fingerprint object are not modifiable. Thus hashCode can be calculated during construction and stored. */
         size_t hashCode;
 

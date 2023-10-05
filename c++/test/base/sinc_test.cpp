@@ -57,7 +57,7 @@ protected:
         return RelationMiner::checkThenAddRule(updateStatus, updatedRule, *badRule, candidates);
     }
 
-    void selectAsBeam(Rule& r) override {}
+    void selectAsBeam(Rule* r) override {}
 };
 
 class TestRelationMiner : public testing::Test {
@@ -414,6 +414,8 @@ protected:
         return nullptr;
     }
 
+    void finish() override {}
+
     class RelationMiner4SincTest : public RelationMiner {
     public:
         Rule::fingerprintCacheType cache;
@@ -564,22 +566,22 @@ protected:
             if (rel_family->id != targetRelation) {
                 delete[] counterexampleLists[rel_family->id][0];
             }
-            delete rule_mother1->returningCounterexamples;
-            delete rule_mother2->returningCounterexamples;
-            delete rule_father->returningCounterexamples;
-            delete rule_family->returningCounterexamples;
             if (rel_mother->id != targetRelation) {
                 delete rule_mother1->returningEvidence;
                 delete rule_mother2->returningEvidence;
+                delete rule_mother1->returningCounterexamples;
+                delete rule_mother2->returningCounterexamples;
                 delete rule_mother1;
                 delete rule_mother2;
             }
             if (rel_father->id != targetRelation) {
                 delete rule_father->returningEvidence;
+                delete rule_father->returningCounterexamples;
                 delete rule_father;
             }
             if (rel_family->id != targetRelation) {
                 delete rule_family->returningEvidence;
+                delete rule_family->returningCounterexamples;
                 delete rule_family;
             }
             // delete counterexampleLists[rel_family->id][0];   // records in the counterexample set will be released by `compressedKb`
@@ -618,7 +620,7 @@ protected:
             return 1;
         }
 
-        void selectAsBeam(Rule& r) override {}
+        void selectAsBeam(Rule* r) override {}
     };
 
     RelationMiner* createRelationMiner(int const targetRelationId) override {

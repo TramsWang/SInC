@@ -82,7 +82,7 @@ RelationMiner::RelationMiner(
     logger(_logger), logFormatter(_logger) {}
 
 RelationMiner::~RelationMiner() {
-    /* Release TabuMap */
+    /* Release resources in tabu map */
     for (std::pair<const sinc::MultiSet<int> *, sinc::Rule::fingerprintCacheType*> const& kv: tabuMap) {
         delete kv.first;
         delete kv.second;
@@ -132,7 +132,7 @@ Rule* RelationMiner::findRule() {
         Rule** top_candidates = new Rule*[beamwidth]{};
         for (int i = 0; i < beamwidth && nullptr != beams[i]; i++) {
             Rule* const r = beams[i];
-            selectAsBeam(*r);
+            selectAsBeam(r);
             #if DEBUG_LEVEL >= DEBUG_VERBOSE
                 logFormatter.printf("Extend: %s\n", r.toString(kb.getRelationNames()));
                 logger.flush();
@@ -203,9 +203,7 @@ Rule* RelationMiner::findRule() {
             }
             delete[] beams;
             for (int i = 0; i < beamwidth && nullptr != top_candidates[i]; i++) {
-                if (ret != top_candidates[i]) {
-                    delete top_candidates[i];
-                }
+                delete top_candidates[i];
             }
             delete[] top_candidates;
             return ret;
@@ -218,9 +216,7 @@ Rule* RelationMiner::findRule() {
         if (stopCompressionRatio <= best_eval.value(EvalMetric::Value::CompressionRatio) || 0 == best_eval.getNegEtls()) {
             Rule* const ret = best_eval.useful() ? best_candidate : nullptr;
             for (int i = 0; i < beamwidth && nullptr != beams[i]; i++) {
-                if (ret != beams[i]) {
-                    delete beams[i];
-                }
+                delete beams[i];
             }
             delete[] beams;
             for (int i = 0; i < beamwidth && nullptr != top_candidates[i]; i++) {
@@ -237,6 +233,7 @@ Rule* RelationMiner::findRule() {
             delete beams[i];
         }
         delete[] beams;
+        best_local_optimum = nullptr;
         beams = top_candidates;
     }
 }
@@ -345,6 +342,8 @@ int RelationMiner::checkThenAddRule(UpdateStatus updateStatus, Rule* const updat
                 logFormatter.printf("Spec. %s\n", updatedRule->toString(kb.getRelationNames()));
                 logger.flush();
             #endif
+            evalTime += updatedRule->getEvalTime();
+            evaluatedSqls += 2;
             if (updatedRule->getEval().value(evalMetric) > originalRule.getEval().value(evalMetric)) {
                 updated_is_better = true;
                 int replace_idx = -1;
@@ -361,15 +360,21 @@ int RelationMiner::checkThenAddRule(UpdateStatus updateStatus, Rule* const updat
                     }
                 }
                 if (0 <= replace_idx) {
+                    if (nullptr != candidates[replace_idx]) {
+                        delete candidates[replace_idx];
+                    }
                     candidates[replace_idx] = updatedRule;
+                } else {
+                    delete updatedRule;
                 }
+            // } else {
+            //     delete updatedRule;
             }
-            evalTime += updatedRule->getEvalTime();
-            evaluatedSqls += 2;
             break;
         case Invalid:
         case Duplicated:
         case InsufficientCoverage:
+            // delete updatedRule;
             break;
         case TabuPruned:
             #if DEBUG_LEVEL >= DEBUG_DEBUG
@@ -377,8 +382,10 @@ int RelationMiner::checkThenAddRule(UpdateStatus updateStatus, Rule* const updat
                 logger.flush();
             #endif
             evaluatedSqls++;
+            // delete updatedRule;
             break;
         default:
+            // delete updatedRule;
             std::ostringstream os;
             os << "Unknown Update Status of Rule: " << updateStatus;
             throw SincException(os.str());
@@ -389,6 +396,7 @@ int RelationMiner::checkThenAddRule(UpdateStatus updateStatus, Rule* const updat
         delete updatedRule;
         return 0;
     }
+    // return updated_is_better ? 1 : 0;
 }
 
 int RelationMiner::updateKbAndDependencyGraph(Rule& rule) {
@@ -397,6 +405,7 @@ int RelationMiner::updateKbAndDependencyGraph(Rule& rule) {
     for (Record const& r: *counterexample_by_rule) {
         counterexamples.emplace(r.getArgs(), r.getArity());
     }
+    delete counterexample_by_rule;
     EvidenceBatch* evidence_batch = rule.getEvidenceAndMarkEntailment();
     for (int** const& grounding: evidence_batch->evidenceList) {
         Predicate const& head_pred = rule.getHead();
@@ -582,6 +591,7 @@ void SInC::dependencyAnalysis() {
         }
         monitor.sccVertices += scc->size();
         monitor.fvsVertices += fvs->size();
+        delete fvs;
     }
     monitor.sccNumber = sccs.size();
 }
@@ -627,6 +637,7 @@ void SInC::compress() {
     } catch (std::exception const& e) {
         std::cerr << e.what() << std::endl;
         logError("KB load failed, abort.");
+        finish();
         return;
     }
     monitor.kbSize = kb->totalRecords();
@@ -649,7 +660,7 @@ void SInC::compress() {
             // compressedKb->addCounterexamples(relation_num, relation_miner->getCounterexamples());
             // compressedKb->addHypothesisRules(relation_miner.getHypothesis());
             (*logger) << "Relation mining done (" << i+1 << '/' << num_targets << "): " << kb->getRelation(relation_num)->name << '\n';
-            finalizeRelationMiner(*relation_miner);
+            finalizeRelationMiner(relation_miner);
             delete relation_miner;
             relation_miner = nullptr;
         }
@@ -684,6 +695,7 @@ void SInC::compress() {
     if (abort) {
         monitor.totalTime = time_dependency_resolved - time_start;
         showMonitor();
+        finish();
         return;
     }
 
@@ -694,6 +706,7 @@ void SInC::compress() {
         std::cerr << e.what() << std::endl;
         logError("Compressed KB dump failed. Abort.");
         showMonitor();
+        finish();
         return;
     }
 
@@ -711,19 +724,20 @@ void SInC::compress() {
 
     monitor.totalTime = time_validated - time_start;
     showMonitor();
+    finish();
 }
 
-void SInC::finalizeRelationMiner(RelationMiner& miner) {
+void SInC::finalizeRelationMiner(RelationMiner* miner) {
     monitor.hypothesisSize = 0;
-    for (Rule* const& r: miner.getHypothesis()) {
+    for (Rule* const& r: miner->getHypothesis()) {
         monitor.hypothesisSize += r->getLength();
     }
-    monitor.hypothesisRuleNumber = miner.getHypothesis().size();
-    monitor.evaluatedSqls += miner.evaluatedSqls;
-    monitor.fingerprintCreationTime += miner.fingerprintCreationTime;
-    monitor.pruningTime += miner.pruningTime;
-    monitor.evalTime += miner.evalTime;
-    monitor.kbUpdateTime += miner.kbUpdateTime;
+    monitor.hypothesisRuleNumber = miner->getHypothesis().size();
+    monitor.evaluatedSqls += miner->evaluatedSqls;
+    monitor.fingerprintCreationTime += miner->fingerprintCreationTime;
+    monitor.pruningTime += miner->pruningTime;
+    monitor.evalTime += miner->evalTime;
+    monitor.kbUpdateTime += miner->kbUpdateTime;
 }
 
 void SInC::logInfo(const char* msg) const {

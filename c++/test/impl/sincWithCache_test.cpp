@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "../../src/impl/cachedSinc.h"
+#include "../../src/impl/sincWithCache.h"
 #include <filesystem>
 
 #define MEM_DIR "/dev/shm"
@@ -3113,4 +3113,114 @@ TEST_F(TestCachedRule, TestAnyRule4) {
     delete[] relations[0];
     delete[] relations;
     releaseCacheAndTabuMap();
+}
+
+class TestSincWithCache : public testing::Test {
+protected:
+    void checkInducedRules(
+        std::unordered_set<std::string> const& actualRuleStrings, std::string* expectedRuleStrings, int const numCandidates,
+        int const expectHits
+    ) {
+        int hit = 0;
+        for (int i = 0; i < numCandidates; i++) {
+            if (actualRuleStrings.find(expectedRuleStrings[i]) != actualRuleStrings.end()) {
+                hit++;
+            }
+        }
+        EXPECT_EQ(expectHits, hit);
+    }
+};
+
+TEST_F(TestSincWithCache, TestCompression1) {
+    /*
+     * KB:
+     * 
+     * p:
+     * 1, 2
+     * 3, 4
+     * ...
+     * 109, 110
+     * 
+     * q:
+     * 2, 1
+     * 4, 3
+     * ..
+     * 100, 99
+     */
+    int* relation_p[55]{};
+    int* relation_q[50]{};
+    for (int i = 0; i < 50; i++) {
+        int a1 = i * 2 + 1;
+        int a2 = i * 2 + 2;
+        relation_p[i] = new int[2] {a1, a2};
+        relation_q[i] = new int[2] {a2, a1};
+    }
+    for (int i = 50; i < 55; i++) {
+        relation_p[i] = new int[2] {i * 2 + 1, i * 2 + 2};
+    }
+    int** relations[2] {relation_p, relation_q};
+    std::string rel_names[2] {"p", "q"};
+    int arities[2] {2, 2};
+    int total_rows[2] {55, 50};
+    SimpleKb* kb = new SimpleKb("TestSincWithCache", relations, rel_names, arities, total_rows, 2);
+
+    SincWithCache sinc(new SincConfig(
+        "", "", MEM_DIR, "TestSincWithCacheComp", 1, false, 5, EvalMetric::Value::CompressionCapacity, 0.05, 0.25, 1.0, 0,
+        "", "", 0, true
+    ), kb);
+    sinc.run();
+    SimpleCompressedKb& ckb = sinc.getCompressedKb();
+    std::vector<Rule*>& hypothesis = ckb.getHypothesis();
+    std::unordered_set<Record>& counterexample_p = ckb.getCounterexampleSet(0);
+    std::unordered_set<Record>& counterexample_q = ckb.getCounterexampleSet(1);
+    std::vector<int> const& supplementary_constants = ckb.getSupplementaryConstants();
+
+    EXPECT_EQ(2, hypothesis.size());
+    std::unordered_set<std::string> actual_rule_strs;
+    actual_rule_strs.reserve(2);
+    actual_rule_strs.emplace(hypothesis[0]->toDumpString(kb->getRelationNames()).c_str());
+    actual_rule_strs.emplace(hypothesis[1]->toDumpString(kb->getRelationNames()).c_str());
+    std::string rules_p[2]{"p(X0,X1):-q(X1,X0)", "p(X1,X0):-q(X0,X1)"};
+    std::string rules_q[2]{"q(X0,X1):-p(X1,X0)", "p(X1,X0):-q(X0,X1)"};
+    checkInducedRules(actual_rule_strs, rules_p, 2, 1);
+    checkInducedRules(actual_rule_strs, rules_q, 2, 1);
+    for (Rule* const& rule: hypothesis) {
+        int head_pred_symbol = rule->getHead().getPredSymbol();
+        Eval const& actual_eval = rule->getEval();
+        switch (head_pred_symbol) {
+            case 0: {   // p
+                Eval eval(50, 50, 2);
+                if (!(eval == actual_eval)) {
+                    FAIL();
+                }
+                // EXPECT_EQ(eval, actual_eval);
+                break;
+            }
+            case 1: {   // q
+                Eval eval(50, 55, 2);
+                EXPECT_EQ(eval, actual_eval);
+                break;
+            }
+            default:
+                FAIL() << "Unknown predicate symbol: " << head_pred_symbol;
+        }
+    }
+
+    EXPECT_TRUE(counterexample_p.empty());
+    EXPECT_EQ(5, counterexample_q.size());
+    for (int i = 50; i < 55; i++) {
+        int row[2] {i * 2 + 1, i * 2 + 2};
+        Record r(row, 2);
+        EXPECT_NE(counterexample_q.end(), counterexample_q.find(r));
+    }
+
+    EXPECT_TRUE(supplementary_constants.empty());
+
+    for (int i = 0; i < 50; i++) {
+        delete[] relation_p[i];
+        delete[] relation_q[i];
+    }
+    for (int i = 50; i < 55; i++) {
+        delete[] relation_p[i];
+    }
 }

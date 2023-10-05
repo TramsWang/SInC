@@ -181,6 +181,9 @@ namespace sinc {
      *   2c: Merge two fragments by converting two UVs to a new LV (one UV in one fragment, the other UV in the other fragment)
      *   3: Convert a UV to a constant
      * 
+     * NOTE: It is hard to manage "copy-on-write" on the level of `CacheFragment`. Therefore, `CacheFragment`s are simply copied
+     * in the copy constructor.
+     * 
      * @since 2.2
      */
     class CacheFragment {
@@ -310,8 +313,6 @@ namespace sinc {
         entriesType* entries; // Todo: If CB can be fully copy-on-write, that is, no two CBs in the memory contains the same compliance set, the specialization and counting can be faster
         /** A list of LV info. Each index is the ID of an LV */
         std::vector<VarInfo> varInfoList;
-        /* Whether cache entries are maintained by this object */
-        bool maintainEntries;
 
         /**
          * Split cache entries according to two columns in the fragment.
@@ -466,6 +467,17 @@ namespace sinc {
         std::unordered_set<Record>* getCounterexamples() const override;
         void releaseMemory() override;
 
+        uint64_t getCopyTime() const;
+        uint64_t getPosCacheUpdateTime() const;
+        uint64_t getEntCacheUpdateTime() const;
+        uint64_t getAllCacheUpdateTime() const;
+        uint64_t getPosCacheIndexingTime() const;
+        uint64_t getEntCacheIndexingTime() const;
+        uint64_t getAllCacheIndexingTime() const;
+        const CacheFragment& getPosCache() const;
+        const CacheFragment& getEntCache() const;
+        const std::vector<CacheFragment*>& getAllCache() const;
+
     protected:
         /** The original KB */
         SimpleKb& kb;
@@ -574,5 +586,73 @@ namespace sinc {
             SimpleRelation const& targetRelation, std::unordered_set<Record>& counterexamples, int* const recTemplate,
             std::vector<int>** varLocs, int const idx, int const numVectors
         ) const;
+    };
+
+    /**
+     * The relation miner class that uses "CachedRule".
+     *
+     * @since 2.3
+     */
+    class RelationMinerWithCachedRule : public RelationMiner {
+    public:
+        CachedSincPerfMonitor monitor;
+
+        /**
+         * Construct by passing parameters from the compressor that loads the data.
+         *
+         * @param kb                   The input KB
+         * @param targetRelation       The target relation in the KB
+         * @param evalMetric           The rule evaluation metric
+         * @param beamwidth            The beamwidth used in the rule mining procedure
+         * @param stopCompressionRatio The stopping compression ratio for inducing a single rule
+         * @param predicate2NodeMap    The mapping from predicates to the nodes in the dependency graph
+         * @param dependencyGraph      The dependency graph
+         * @param logger               A logger
+         */
+        RelationMinerWithCachedRule(
+            SimpleKb& kb, int const targetRelation, EvalMetric::Value evalMetric, int const beamwidth, double const stopCompressionRatio,
+            nodeMapType& predicate2NodeMap, depGraphType& dependencyGraph, std::vector<Rule*>& hypothesis,
+            std::unordered_set<Record>& counterexamples, std::ostream& logger
+        );
+
+        ~RelationMinerWithCachedRule();
+
+    protected:
+        std::vector<Rule::fingerprintCacheType*> fingerprintCaches;
+
+        /**
+         * Create a rule with compact caching and tabu set.
+         */
+        Rule* getStartRule() override;
+
+        /**
+         * When a rule r is selected as beam, update its cache indices. The rule r here is a "CachedRule".
+         */
+        void selectAsBeam(Rule* r) override;
+
+        /**
+         * Record monitoring information compared to the super implementation
+         */
+        int checkThenAddRule(UpdateStatus updateStatus, Rule* const updatedRule, Rule& originalRule, Rule** candidates) override;
+    };
+
+    /**
+     * A basic implementation of SInC. Rule mining are with compact caching and tabu pruning.
+     *
+     * @since 2.0
+     */
+    class SincWithCache : public SInC {
+    public:
+        SincWithCache(SincConfig* const config);
+        SincWithCache(SincConfig* const config, SimpleKb* const kb);
+
+    protected:
+        CachedSincPerfMonitor monitor;
+
+        SincRecovery* createRecovery() override;
+        RelationMiner* createRelationMiner(int const targetRelationNum) override;
+        void finalizeRelationMiner(RelationMiner* miner) override;
+        void showMonitor() override;
+        void finish() override;
     };
 }
