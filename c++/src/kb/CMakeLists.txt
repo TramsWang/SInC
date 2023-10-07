@@ -2,6 +2,7 @@
 add_library(kb intTable.cpp simpleKb.cpp)
 
 target_link_libraries(kb PRIVATE util)
+target_link_libraries(kb PRIVATE gflags::gflags)
 
 # target_include_directories(
 #     kb

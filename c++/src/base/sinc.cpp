@@ -755,4 +755,3 @@ void SInC::logError(const char* msg) const {
 void SInC::logError(std::string const& msg) const {
     (*logger) << "[ERROR]" << msg << '\n';
 }
-

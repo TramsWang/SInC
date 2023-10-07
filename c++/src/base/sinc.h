@@ -10,6 +10,14 @@
 #include "../util/graphAlg.h"
 #include "../rule/rule.h"
 
+#define NANO_TO_MILL(T) ((T) / 1000000)
+#define LOG_FILE_NAME "log.meta"
+#define STD_OUTPUT_FILE_NAME "stdout.meta"
+#define STD_ERROR_FILE_NAME "stderr.meta"
+#define INTERRUPT_CMD "stop"
+
+/* Followings are macros for parsing command line options and arguments */
+#define DEFAULT_PATH "."
 #define DEFAULT_THREADS 1
 #define DEFAULT_VALIDATION false
 #define DEFAULT_BEAMWIDTH 5
@@ -17,14 +25,9 @@
 #define DEFAULT_MIN_FACT_COVERAGE 0.05
 #define DEFAULT_MIN_COSTANT_COVERAGE 0.25
 #define DEFAULT_STOP_COMPRESSION_RATIO 1.0
-#define DEFAULT_OBSERVATION_RATIO 2
+#define DEFAULT_OBSERVATION_RATIO 2.0
 #define DEFAULT_BUDGET_FACTOR 5
 #define DEFAULT_WEIGHTED_NEG_SAMPLES true
-#define NANO_TO_MILL(T) ((T) / 1000000)
-#define LOG_FILE_NAME "log.meta"
-#define STD_OUTPUT_FILE_NAME "stdout.meta"
-#define STD_ERROR_FILE_NAME "stderr.meta"
-#define INTERRUPT_CMD "stop"
 
 namespace fs = std::filesystem;
 
@@ -45,6 +48,7 @@ namespace sinc {
         fs::path dumpPath;
         /** The name of the dumped KB */
         const char* dumpName;
+        /** The path where the compressed KB should be stored */
 
         /* Runtime Config */
         /** The number of threads used to run SInC Todo: Implement multi-thread strategy */
@@ -74,7 +78,7 @@ namespace sinc {
         const char* negKbName;
         /** The factor of the number of expected negative samples over the number of positive ones. If < 1, normal sampling
          *  strategy is used (depend on the strategy that generates the negative KB). otherwise, adversarial sampling is used */
-        float budgetFactor;
+        double budgetFactor;
         /** Whether negative samples are weighted differently */
         bool weightedNegSamples;
 

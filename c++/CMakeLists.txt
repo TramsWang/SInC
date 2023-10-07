@@ -5,8 +5,13 @@ project(Sinc VERSION 3.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# # Add option to c++17, using `std::filesystem` namespace
-# add_compile_options(-lstdc++fs)
+# Use `gflags` for parsing command line options and arguments
+include(FetchContent)
+FetchContent_Declare(
+  gflags
+  URL https://github.com/gflags/gflags/archive/refs/tags/v2.2.2.zip
+)
+FetchContent_MakeAvailable(gflags)
 
 # Add all sub-directories
 add_subdirectory(src/util)
@@ -22,6 +27,7 @@ target_link_libraries(sinc PRIVATE kb)
 target_link_libraries(sinc PRIVATE rule)
 target_link_libraries(sinc PRIVATE base)
 target_link_libraries(sinc PRIVATE impl)
+target_link_libraries(sinc PRIVATE gflags::gflags)
 target_link_libraries(sinc PRIVATE "stdc++fs")  # Use namespace `std::filesystem`
 
 # if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -30,7 +36,6 @@ target_link_libraries(sinc PRIVATE "stdc++fs")  # Use namespace `std::filesystem
 # endif()
 
 # Use GoogleTest for testing
-include(FetchContent)
 FetchContent_Declare(
   googletest
   URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
@@ -50,6 +55,7 @@ add_executable(test_sinc
   test/rule/rule_test.cpp
   test/base/sinc_test.cpp
   test/impl/sincWithCache_test.cpp
+  test/impl/app_test.cpp
 )
 
 target_link_libraries(test_sinc PRIVATE util)
@@ -58,6 +64,7 @@ target_link_libraries(test_sinc PRIVATE rule)
 target_link_libraries(test_sinc PRIVATE base)
 target_link_libraries(test_sinc PRIVATE impl)
 target_link_libraries(test_sinc PRIVATE GTest::gtest_main)
+# target_link_libraries(test_sinc PRIVATE gflags::gflags)
 target_link_libraries(test_sinc PRIVATE "stdc++fs")  # Use namespace `std::filesystem`
 
 # if(CMAKE_BUILD_TYPE STREQUAL "Debug")
