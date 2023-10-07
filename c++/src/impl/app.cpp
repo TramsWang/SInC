@@ -41,11 +41,11 @@ static bool validateEvalMetric(const char* flagName, std::string const& value) {
 }
 
 static bool validateInputPath(const char* flagName, std::string const& value) {
-    int idx = value.find(';');
+    int idx = value.find(',');
     if (std::string::npos != idx && 0 != idx && value.length() - 1 != idx) {
         return true;
     }
-    std::cout << "Invalid value for -" << flagName << ": " << value << " (should be separated by ';' into two parts)\n";
+    std::cout << "Invalid value for -" << flagName << ": " << value << " (should be separated by ',' into two parts)\n";
     return false;
 }
 
@@ -53,11 +53,11 @@ static bool validateOutputPath(const char* flagName, std::string const& value) {
     if (value.empty()) {
         return true;
     }
-    int idx = value.find(';');
+    int idx = value.find(',');
     if (std::string::npos != idx && 0 != idx) {
         return true;
     }
-    std::cout << "Invalid value for -" << flagName << ": " << value << " (should be empty or be separated by ';' into two parts, the second could be empty)\n";
+    std::cout << "Invalid value for -" << flagName << ": " << value << " (should be empty or be separated by ',' into two parts, the second could be empty)\n";
     return false;
 }
 
@@ -65,17 +65,17 @@ static bool validateNegKbPath(const char* flagName, std::string const& value) {
     if (value.empty()) {
         return true;
     }
-    int idx = value.find(';');
+    int idx = value.find(',');
     if (std::string::npos != idx && 0 != idx) {
         return true;
     }
-    std::cout << "Invalid value for -" << flagName << ": " << value << " (should be empty or be separated by ';' into two parts, the second could be empty)\n";
+    std::cout << "Invalid value for -" << flagName << ": " << value << " (should be empty or be separated by ',' into two parts, the second could be empty)\n";
     return false;
 }
 
-DEFINE_string(I, ".;.", "The path to the input KB and the name of the KB (separated by ';')");
-DEFINE_string(O, "", "The path to where the output/compressed KB is stored and the name of the output KB (separated by ';'). If not specified, '.' will be used and a default name will be assigned.");
-DEFINE_string(N, "", "The path to the negative KB and the name of the KB (separated by ';'). If the path is specified and non-empty, negative sampling is turned on. If the negative KB name is non-empty, the negative samples are used; Otherwise, the 'adversarial' sampling model is adopted.");
+DEFINE_string(I, ".,.", "The path to the input KB and the name of the KB (separated by ',')");
+DEFINE_string(O, "", "The path to where the output/compressed KB is stored and the name of the output KB (separated by ','). If not specified, '.' will be used and a default name will be assigned.");
+DEFINE_string(N, "", "The path to the negative KB and the name of the KB (separated by ','). If the path is specified and non-empty, negative sampling is turned on. If the negative KB name is non-empty, the negative samples are used; Otherwise, the 'adversarial' sampling model is adopted.");
 DEFINE_double(g, 2.0, "The budget factor of negative sampling. (default 2.0)");
 DEFINE_bool(w, false, "Whether negative samples have different weight. This is only affective when negative sampling is turned on. (default true)");
 DEFINE_int32(t, 1, "The number of threads (default 1)");
@@ -103,29 +103,32 @@ SincConfig* Main::parseConfig(int argc, char** argv) {
     gflags::ParseCommandLineFlags(&argc, &argv, false);
 
     /* Input path & name */
-    int idx = FLAGS_I.find(';');
+    int idx = FLAGS_I.find(',');
     std::string input_path = FLAGS_I.substr(0, idx);
     std::string input_name = FLAGS_I.substr(idx + 1);
-    std::cout << "Input set to: " << input_path << '/' << input_name << std::endl;
+    std::cout << "Input set to: " << input_path << ',' << input_name << std::endl;
 
     /* Output path & name */
     std::string output_path;
     std::string output_name;
     if (!FLAGS_O.empty()) {
-        idx = FLAGS_O.find(';');
+        idx = FLAGS_O.find(',');
         output_path = FLAGS_O.substr(0, idx);
         output_name = (FLAGS_O.length() - 1 == idx) ? (input_name + "_comp") : FLAGS_O.substr(idx + 1);
-        std::cout << "Output set to: " << output_path << '/' << output_name << std::endl;
+        std::cout << "Output set to: " << output_path << ',' << output_name << std::endl;
+    } else {
+        output_path = ".";
+        output_name = input_name + "_comp";
     }
 
     /* Negative sampling parameters */
     std::string negkb_path;
     std::string negkb_name;
     if (!FLAGS_N.empty()) {
-        idx = FLAGS_N.find(';');
+        idx = FLAGS_N.find(',');
         negkb_path = FLAGS_N.substr(0, idx);
         negkb_name = FLAGS_N.substr(idx + 1);
-        std::cout << "Negative KB set to: " << negkb_path << '/' << negkb_name << std::endl;
+        std::cout << "Negative KB set to: " << negkb_path << ',' << negkb_name << std::endl;
 
         if (2.0 != FLAGS_g) {
             std::cout << "\tBudget factor set to: " << FLAGS_g << std::endl;

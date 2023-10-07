@@ -35,7 +35,7 @@ IntTable::IntTable(int** rows, int const _totalRows, int const _totalCols) :
 {
     for (int col = totalCols - 1; col >= 0; col--) {
         /* Sort by values in the column */
-        std::sort(rows, rows + totalRows, [col](int* const& a, int* const& b) -> bool {return a[col] < b[col];});
+        std::stable_sort(rows, rows + totalRows, [col](int* const& a, int* const& b) -> bool {return a[col] < b[col];});
         int** sorted_rows = new int*[totalRows];
         std::copy(rows, rows + totalRows, sorted_rows);
         std::vector<int> values;

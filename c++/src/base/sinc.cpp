@@ -99,7 +99,7 @@ void RelationMiner::run() {
         rule->releaseMemory();
         logFormatter.printf(
                 "Found (Coverage: %.2f%%, %d/%d): %s\n", covered_facts * 100.0 / total_facts, covered_facts, total_facts,
-                rule->toDumpString(kb.getRelationNames())
+                rule->toDumpString(kb.getRelationNames()).c_str()
         );
         logger.flush();
     }
