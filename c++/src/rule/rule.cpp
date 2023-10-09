@@ -474,6 +474,7 @@ void Rule::updateFingerprint() {
     fingerprintCreationTime += sinc::currentTimeInNano() - time_start;
 }
 
+/* The following version prevent partial duplication with the head */
 bool Rule::isInvalid() {
     /* Check independent fragment (may happen when looking for generalizations) */
     /* Use the disjoint set: join limited variables if they are in the same predicate */
@@ -485,17 +486,13 @@ bool Rule::isInvalid() {
     /* Check Head */
     const Predicate& head_pred = getHead();
     std::vector<int> lv_ids;
+    lv_ids.reserve(usedLimitedVars());
     bool args_complete = true;
     for (int arg_idx = 0; arg_idx < head_pred.getArity(); arg_idx++) {
         int argument = head_pred.getArg(arg_idx);
-        if (ARG_IS_EMPTY(argument)) {
-            args_complete = false;
-        } else if (ARG_IS_VARIABLE(argument)) {
+        if (ARG_IS_VARIABLE(argument)) {
             lv_ids.push_back(ARG_DECODE(argument));
         }
-    }
-    if (args_complete) {
-        predicate_set.insert(&head_pred);
     }
     if (lv_ids.empty()) {
         if (structure.size() >= 2) {
@@ -514,6 +511,18 @@ bool Rule::isInvalid() {
     /* Check body */
     for (int pred_idx = FIRST_BODY_PRED_IDX; pred_idx < structure.size(); pred_idx++) {
         const Predicate& body_pred = structure[pred_idx];
+
+        /* Check for partial duplication with head */
+        if (head_pred.getPredSymbol() == body_pred.getPredSymbol()) {
+            for (int arg_idx = 0; arg_idx < head_pred.getArity(); arg_idx++) {
+                int head_arg = head_pred.getArg(arg_idx);
+                int body_arg = body_pred.getArg(arg_idx);
+                if (ARG_IS_NON_EMPTY(head_arg) && head_arg == body_arg) {
+                    pruningTime += sinc::currentTimeInNano() - time_start;
+                    return true;
+                }
+            }
+        }
 
         args_complete = true;
         lv_ids.clear();
@@ -551,6 +560,86 @@ bool Rule::isInvalid() {
     pruningTime += sinc::currentTimeInNano() - time_start;
     return 2 <= disjoint_set.totalSets();
 }
+
+// /* The following version does not prevent partial duplication with the head */
+// bool Rule::isInvalid() {
+//     /* Check independent fragment (may happen when looking for generalizations) */
+//     /* Use the disjoint set: join limited variables if they are in the same predicate */
+//     /* Assumption: no body predicate contains only empty or constant argument */
+//     uint64_t time_start = sinc::currentTimeInNano();
+//     DisjointSet disjoint_set(usedLimitedVars());
+//     std::unordered_set<const Predicate*> predicate_set;
+
+//     /* Check Head */
+//     const Predicate& head_pred = getHead();
+//     std::vector<int> lv_ids;
+//     lv_ids.reserve(usedLimitedVars());
+//     bool args_complete = true;
+//     for (int arg_idx = 0; arg_idx < head_pred.getArity(); arg_idx++) {
+//         int argument = head_pred.getArg(arg_idx);
+//         if (ARG_IS_EMPTY(argument)) {
+//             args_complete = false;
+//         } else if (ARG_IS_VARIABLE(argument)) {
+//             lv_ids.push_back(ARG_DECODE(argument));
+//         }
+//     }
+//     if (args_complete) {
+//         predicate_set.insert(&head_pred);
+//     }
+//     if (lv_ids.empty()) {
+//         if (structure.size() >= 2) {
+//             /* The body is an independent fragment if the head contains no LV while body is not empty */
+//             pruningTime += sinc::currentTimeInNano() - time_start;
+//             return true;
+//         }
+//     } else {
+//         /* Must check here because there may be no LV in the head */
+//         int first_id = lv_ids[0];
+//         for (int i = 1; i < lv_ids.size(); i++) {
+//             disjoint_set.unionSets(first_id, lv_ids[i]);
+//         }
+//     }
+
+//     /* Check body */
+//     for (int pred_idx = FIRST_BODY_PRED_IDX; pred_idx < structure.size(); pred_idx++) {
+//         const Predicate& body_pred = structure[pred_idx];
+
+//         args_complete = true;
+//         lv_ids.clear();
+//         for (int arg_idx = 0; arg_idx < body_pred.getArity(); arg_idx++) {
+//             int argument = body_pred.getArg(arg_idx);
+//             if (ARG_IS_EMPTY(argument)) {
+//                 args_complete = false;
+//             } else if (ARG_IS_VARIABLE(argument)) {
+//                 lv_ids.push_back(ARG_DECODE(argument));
+//             }
+//         }
+
+//         if (args_complete) {
+//             if (!predicate_set.insert(&body_pred).second) {
+//                 /* Predicate duplicated */
+//                 pruningTime += sinc::currentTimeInNano() - time_start;
+//                 return true;
+//             }
+//         }
+
+//         /* Join the LVs in the same predicate */
+//         if (lv_ids.empty()) {
+//             /* If no LV in body predicate, the predicate is certainly part of the fragment */
+//             pruningTime += sinc::currentTimeInNano() - time_start;
+//             return true;
+//         } else {
+//             int first_id = lv_ids[0];
+//             for (int i = 1; i < lv_ids.size(); i++) {
+//                 disjoint_set.unionSets(first_id, lv_ids[i]);
+//             }
+//         }
+//     }
+
+//     /* Check for independent fragment */
+//     pruningTime += sinc::currentTimeInNano() - time_start;
+//     return 2 <= disjoint_set.totalSets();
+// }
 
 bool Rule::cacheHit() {
     uint64_t time_start = sinc::currentTimeInNano();

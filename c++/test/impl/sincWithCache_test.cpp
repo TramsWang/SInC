@@ -2794,10 +2794,11 @@ TEST_F(TestCachedRule, TestValidity1) {
     EXPECT_EQ(UpdateStatus::Normal, rule1.specializeCase3(0, 1, 1, 0));
     EXPECT_STREQ("father(X0,X1):-father(X1,X0)", rule1.toDumpString(kb->getRelationNames()).c_str());
 
-    /* #2: father(X,?) :- father(X,?) [now should NOT be invalid] */
+    /* #2: father(X,?) :- father(X,?) [now should be invalid] */
     CachedRule rule2(rule);
     rule2.updateCacheIndices();
-    EXPECT_EQ(UpdateStatus::Normal, rule2.specializeCase4(NUM_FATHER, 2, 0, 0, 0));
+    // EXPECT_EQ(UpdateStatus::Normal, rule2.specializeCase4(NUM_FATHER, 2, 0, 0, 0));
+    EXPECT_EQ(UpdateStatus::Invalid, rule2.specializeCase4(NUM_FATHER, 2, 0, 0, 0));
 
     delete kb;
     releaseCacheAndTabuMap();
@@ -3181,7 +3182,7 @@ TEST_F(TestSincWithCache, TestCompression1) {
     actual_rule_strs.emplace(hypothesis[0]->toDumpString(kb->getRelationNames()).c_str());
     actual_rule_strs.emplace(hypothesis[1]->toDumpString(kb->getRelationNames()).c_str());
     std::string rules_p[2]{"p(X0,X1):-q(X1,X0)", "p(X1,X0):-q(X0,X1)"};
-    std::string rules_q[2]{"q(X0,X1):-p(X1,X0)", "p(X1,X0):-q(X0,X1)"};
+    std::string rules_q[2]{"q(X0,X1):-p(X1,X0)", "q(X1,X0):-p(X0,X1)"};
     checkInducedRules(actual_rule_strs, rules_p, 2, 1);
     checkInducedRules(actual_rule_strs, rules_q, 2, 1);
     for (Rule* const& rule: hypothesis) {
@@ -3209,7 +3210,7 @@ TEST_F(TestSincWithCache, TestCompression1) {
     EXPECT_TRUE(counterexample_p.empty());
     EXPECT_EQ(5, counterexample_q.size());
     for (int i = 50; i < 55; i++) {
-        int row[2] {i * 2 + 1, i * 2 + 2};
+        int row[2] {i * 2 + 2, i * 2 + 1};
         Record r(row, 2);
         EXPECT_NE(counterexample_q.end(), counterexample_q.find(r));
     }
