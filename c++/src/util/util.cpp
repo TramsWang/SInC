@@ -381,3 +381,17 @@ std::ostream& PerformanceMonitor::printf(std::ostream& os, const char* format, .
     vsprintf(buf, format, args);
     return os << buf;
 }
+
+std::string PerformanceMonitor::formatMemorySize(double sizeKb) {
+    char units[2] {'K', 'M'};
+    for (int i = 0; i < 2; i++) {
+        if (1024.0 <= sizeKb) {
+            sizeKb /= 1024.0;
+        } else {
+            sprintf(buf, "%.2f%c", sizeKb, units[i]);
+            return std::string(buf);
+        }
+    }
+    sprintf(buf, "%.2fG", sizeKb);
+    return std::string(buf);
+}

@@ -34,6 +34,16 @@ namespace sinc {
          */
         static void clearPool();
 
+        /**
+         * Count the total number of CBs in the pool
+         */
+        static size_t totalNumCbs();
+
+        /**
+         * Count the total size of CBs in the pool
+         */
+        static size_t totalCbMemoryCost();
+
         ~CompliedBlock();
 
         /**
@@ -45,6 +55,7 @@ namespace sinc {
         const IntTable& getIndices() const;
         int getTotalRows() const;
         int getTotalCols() const;
+        size_t memoryCost() const;
 
         void showComplianceSet() const;
 

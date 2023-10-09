@@ -2,6 +2,7 @@
 #include <stdarg.h>
 #include <cmath>
 #include <algorithm>
+#include <sys/resource.h>
 
 /**
  * CompliedBlock
@@ -37,20 +38,32 @@ void CompliedBlock::clearPool() {
     pool.clear();
 }
 
+size_t CompliedBlock::totalNumCbs() {
+    return pool.size();
+}
+
+size_t CompliedBlock::totalCbMemoryCost() {
+    size_t size = sizeof(pool);
+    for (CompliedBlock* const& cb: pool) {
+        size += cb->memoryCost();
+    }
+    return size;
+}
+
 CompliedBlock::CompliedBlock(int** _complianceSet, int const _totalRows, int const _totalCols, bool _maintainComplianceSet): 
     complianceSet(_complianceSet), totalRows(_totalRows), totalCols(_totalCols), indices(nullptr),
-    mainTainComplianceSet(_maintainComplianceSet), maintainIndices(true) {}
+    mainTainComplianceSet(_maintainComplianceSet), maintainIndices(false) {}
 
 CompliedBlock::CompliedBlock(int** _complianceSet, int const _totalRows, int const _totalCols, IntTable* _indices,
     bool _maintainComplianceSet, bool _maintainIndices
 ) : complianceSet(_complianceSet), totalRows(_totalRows), totalCols(_totalCols), indices(_indices),
-    mainTainComplianceSet(_maintainComplianceSet), maintainIndices(_maintainIndices) {}
+    mainTainComplianceSet(_maintainComplianceSet), maintainIndices(_maintainIndices && nullptr != _indices) {}
 
 CompliedBlock::~CompliedBlock() {
     if (mainTainComplianceSet) {
         delete[] complianceSet;
     }
-    if (maintainIndices && nullptr != indices) {
+    if (maintainIndices) {
         delete indices;
     }
 }
@@ -58,6 +71,7 @@ CompliedBlock::~CompliedBlock() {
 void CompliedBlock::buildIndices() {
     if (nullptr == indices) {
         indices = new IntTable(complianceSet, totalRows, totalCols);
+        maintainIndices = true;
     }
 }
 
@@ -75,6 +89,17 @@ int CompliedBlock::getTotalRows() const {
 
 int CompliedBlock::getTotalCols() const {
     return totalCols;
+}
+
+size_t CompliedBlock::memoryCost() const {
+    size_t size = sizeof(CompliedBlock);
+    if (mainTainComplianceSet) {
+        size += sizeof(int*) * totalRows;
+    }
+    if (maintainIndices) {
+        size += indices->memoryCost();
+    }
+    return size;
 }
 
 void CompliedBlock::showComplianceSet() const {
@@ -105,6 +130,19 @@ void CachedSincPerfMonitor::show(std::ostream& os) {
         NANO_TO_MILL(posCacheIndexingTime), NANO_TO_MILL(entCacheIndexingTime), NANO_TO_MILL(allCacheIndexingTime),
         NANO_TO_MILL(copyTime + posCacheUpdateTime + prunedPosCacheUpdateTime + entCacheUpdateTime + allCacheUpdateTime + 
             posCacheIndexingTime + entCacheIndexingTime + allCacheIndexingTime)
+    );
+
+    os << "--- Memory Cost ---\n";
+    printf(os, "%10s %10s %10s\n", "#CB", "CB", "CB(%)");
+    rusage usage;
+    if (0 != getrusage(RUSAGE_SELF, &usage)) {
+        std::cerr << "Failed to get `rusage`" << std::endl;
+        usage.ru_maxrss = 0;
+    }
+    size_t cb_mem_cost = CompliedBlock::totalCbMemoryCost() / 1024;
+    printf(
+        os, "%10d %10s %10.2f\n\n",
+        CompliedBlock::totalNumCbs(), formatMemorySize(cb_mem_cost).c_str(), ((double) cb_mem_cost) / usage.ru_maxrss * 100.0
     );
 
     os << "--- Statistics ---\n";

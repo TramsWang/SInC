@@ -194,6 +194,11 @@ namespace sinc {
          */
         static void releaseSlicesArray(slicesType** slicesArray, int const length);
 
+        /**
+         * Return the memory occupation of this object
+         */
+        size_t memoryCost() const;
+
         void showRows() const;
 
     protected:

@@ -327,5 +327,12 @@ namespace sinc {
          * This method help format the strings to `os` as `sprintf`
          */
         std::ostream& printf(std::ostream& os, const char* format, ...);
+
+        /**
+         * This method format and output the size of memory usage.
+         * 
+         * @param size  Memory size in KB
+         */
+        std::string formatMemorySize(double sizeKb);
     };
 }

@@ -1,6 +1,6 @@
 #include "app.h"
 #include "sincWithCache.h"
-#include <gflags/gflags.h>
+#include <gflags/gflags.h>  // Todo: gflags may not release all resource it used. Replace by parsing it manually
 
 /**
  * Main

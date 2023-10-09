@@ -338,6 +338,21 @@ void IntTable::releaseSlicesArray(slicesType** slicesArray, int const length) {
     delete[] slicesArray;
 }
 
+size_t IntTable::memoryCost() const {
+    size_t size = sizeof(IntTable);
+    size += (
+        sizeof(int**) + sizeof(int*) * totalRows +  // `sortedRowsByCols`
+        sizeof(int) // `valuesByColsLength
+    ) * totalCols; 
+    for (int i = 0; i < totalCols; i++) {
+        int length = valuesByColsLengths[i];
+        size += (
+            sizeof(int*) + sizeof(int) * length // `valuesByCols`
+        ) * 2 + sizeof(int);    // `startOffsetsByCOls``
+    }
+    return size;
+}
+
 void IntTable::showRows() const {
     int** rows = sortedRowsByCols[0];
     std::cout << '{';

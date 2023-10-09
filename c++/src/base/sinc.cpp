@@ -3,6 +3,7 @@
 #include <cstring>
 #include <stdarg.h>
 #include "../util/util.h"
+#include <sys/resource.h>
 
 /**
  * SincConfig
@@ -46,6 +47,14 @@ void BaseMonitor::show(std::ostream& os) {
         NANO_TO_MILL(fingerprintCreationTime), NANO_TO_MILL(pruningTime), NANO_TO_MILL(evalTime), NANO_TO_MILL(kbUpdateTime),
         NANO_TO_MILL(fingerprintCreationTime + pruningTime + evalTime + kbUpdateTime)
     );
+
+    rusage usage;
+    if (0 != getrusage(RUSAGE_SELF, &usage)) {
+        std::cerr << "Failed to get `rusage`" << std::endl;
+    } else {
+        os << "--- Basic Memory Cost ---\n";
+        os << "Peak RAM: " << formatMemorySize(usage.ru_maxrss) << '(' << usage.ru_maxrss << "K)\n\n";
+    }
 
     os << "--- Statistics ---\n";
     printf(
@@ -339,7 +348,7 @@ int RelationMiner::checkThenAddRule(UpdateStatus updateStatus, Rule* const updat
     switch (updateStatus) {
         case Normal:
             #if DEBUG_LEVEL >= DEBUG_DEBUG
-                logFormatter.printf("Spec. %s\n", updatedRule->toString(kb.getRelationNames()));
+                logFormatter.printf("Spec. %s\n", updatedRule->toString(kb.getRelationNames()).c_str());
                 logger.flush();
             #endif
             evalTime += updatedRule->getEvalTime();
