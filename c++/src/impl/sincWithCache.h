@@ -743,13 +743,13 @@ namespace sinc {
 
         uint64_t getCopyTime() const;
         uint64_t getPosCacheUpdateTime() const;
-        uint64_t getEntCacheUpdateTime() const;
+        // uint64_t getEntCacheUpdateTime() const;
         uint64_t getAllCacheUpdateTime() const;
         uint64_t getPosCacheIndexingTime() const;
-        uint64_t getEntCacheIndexingTime() const;
+        // uint64_t getEntCacheIndexingTime() const;
         uint64_t getAllCacheIndexingTime() const;
         const CacheFragment& getPosCache() const;
-        const CacheFragment& getEntCache() const;
+        // const CacheFragment& getEntCache() const;
         const std::vector<CacheFragment*>& getAllCache() const;
 
     protected:
@@ -758,9 +758,9 @@ namespace sinc {
         /** The cache for the positive entailments (E+-cache) (not entailed). One cache fragment is sufficient as all
          *  predicates are linked to the head. */
         CacheFragment* posCache;
-        /** This cache is used to monitor the already-entailed records (T-cache). One cache fragment is sufficient as all
-         *  predicates are linked to the head. */
-        CacheFragment* entCache;
+        // /** This cache is used to monitor the already-entailed records (T-cache). One cache fragment is sufficient as all
+        //  *  predicates are linked to the head. */
+        // CacheFragment* entCache;
         /** The cache for all the entailments (E-cache). The cache is composed of multiple fragments, each of which maintains
          *  a linked component of the rule body. The first relation should not be included, as the head should be removed
          *  from E-cache */
@@ -770,25 +770,25 @@ namespace sinc {
         std::vector<TabInfo> predIdx2AllCacheTableInfo;
         /** Whether the pointer `posCache` should be maintained by this object */
         bool maintainPosCache;
-        /** Whether the pointer `entCache` should be maintained by this object */
-        bool maintainEntCache;
+        // /** Whether the pointer `entCache` should be maintained by this object */
+        // bool maintainEntCache;
         /** Whether the pointer `allCache` and pointers within the vector should be maintained by this object */
         bool maintainAllCache;
 
         /* Monitoring info. The time (in nanoseconds) refers to the corresponding time consumption in the last update of the rule */
         uint64_t copyTime = 0;
         uint64_t posCacheUpdateTime = 0;
-        uint64_t entCacheUpdateTime = 0;
+        // uint64_t entCacheUpdateTime = 0;
         uint64_t allCacheUpdateTime = 0;
         uint64_t posCacheIndexingTime = 0;
-        uint64_t entCacheIndexingTime = 0;
+        // uint64_t entCacheIndexingTime = 0;
         uint64_t allCacheIndexingTime = 0;
 
         /** If this object does not maintain the E+-cache, get a copy of the cache */
         void obtainPosCache();
 
-        /** If this object does not maintain the T-cache, get a copy of the cache */
-        void obtainEntCache();
+        // /** If this object does not maintain the T-cache, get a copy of the cache */
+        // void obtainEntCache();
 
         /** If this object does not maintain the E-cache, get a copy of the cache */
         void obtainAllCache();

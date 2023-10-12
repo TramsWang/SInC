@@ -572,7 +572,7 @@ void CachedSincPerfMonitor::show(std::ostream& os) {
     size_t total_opr = CompliedBlock::getNumCreation() + CompliedBlock::getNumGetSlice() + CompliedBlock::getNumSplitSlices() + CompliedBlock::getNumMatchSlices1() + CompliedBlock::getNumMatchSlices2();
     size_t total_hit = CompliedBlock::getNumCreationHit() + CompliedBlock::getNumGetSliceHit() + CompliedBlock::getNumSplitSlicesHit() + CompliedBlock::getNumMatchSlices1Hit() + CompliedBlock::getNumMatchSlices2Hit();
     printf(
-        os, "  %10d %10d %10d %10.2f %10d %10d %10.2f %10d %10d %10.2f %10d %10d %10.2f %10d %10d %10.2f %10d %10d %10.2f\n",
+        os, "  %10d %10d %10d %10.2f %10d %10d %10.2f %10d %10d %10.2f %10d %10d %10.2f %10d %10d %10.2f %10d %10d %10.2f\n\n",
         CompliedBlock::totalNumCbs(),
         CompliedBlock::getNumCreation(), CompliedBlock::getNumCreationHit(), ((double)CompliedBlock::getNumCreationHit() / CompliedBlock::getNumCreation()) * 100.0,
         CompliedBlock::getNumGetSlice(), CompliedBlock::getNumGetSliceHit(), ((double)CompliedBlock::getNumGetSliceHit() / CompliedBlock::getNumGetSlice()) * 100.0,
@@ -583,7 +583,7 @@ void CachedSincPerfMonitor::show(std::ostream& os) {
     );
 
     printf(
-        os, "# %10s %10s %10s %10s %10s %10s\n\n",
+        os, "# %10s %10s %10s %10s %10s %10s\n",
         "Crt.Idx", "Get.Idx", "Spl.Idx", "Mt1.Idx", "Mt2.Idx", "Total.Idx"
     );
     size_t total_idx = CompliedBlock::getNumCreationIndices() + CompliedBlock::getNumGetSliceIndices() + CompliedBlock::getNumSplitSlicesIndices() + CompliedBlock::getNumMatchSlices1Indices() + CompliedBlock::getNumMatchSlices2Indices();
@@ -1484,32 +1484,33 @@ CachedRule::CachedRule(
 {
     /* Initialize the E+-cache & T-cache */
     SimpleRelation* head_relation = kb.getRelation(headPredSymbol);
-    SplitRecords* split_records = head_relation->splitByEntailment();
-    std::vector<int*> const& non_entailed_record_vector = *(split_records->nonEntailedRecords);
-    std::vector<int*> const& entailed_record_vector = *(split_records->entailedRecords);
-    if (0 == entailed_record_vector.size()) {
-        posCache = new CacheFragment(head_relation, headPredSymbol);
-        entCache = new CacheFragment(headPredSymbol, arity);
-    } else if (0 == non_entailed_record_vector.size()) {
-        /* No record to entail, E+-cache and T-cache are both empty */
-        posCache = new CacheFragment(headPredSymbol, arity);
-        entCache = new CacheFragment(headPredSymbol, arity);
-    } else {
-        int** non_entailed_records = toArray(non_entailed_record_vector);
-        int** entailed_records = toArray(entailed_record_vector);
-        IntTable* non_entailed_record_table = new IntTable(non_entailed_records, non_entailed_record_vector.size(), arity);
-        IntTable* entailed_record_table = new IntTable(entailed_records, entailed_record_vector.size(), arity);
-        posCache = new CacheFragment(
-            CompliedBlock::create(non_entailed_records, non_entailed_record_vector.size(), arity, non_entailed_record_table, true, true), 
-            headPredSymbol
-        );
-        entCache = new CacheFragment(
-            CompliedBlock::create(entailed_records, entailed_record_vector.size(), arity, entailed_record_table, true, true),
-            headPredSymbol
-        );
-    }
+    // SplitRecords* split_records = head_relation->splitByEntailment();
+    // std::vector<int*> const& non_entailed_record_vector = *(split_records->nonEntailedRecords);
+    // std::vector<int*> const& entailed_record_vector = *(split_records->entailedRecords);
+    // if (0 == entailed_record_vector.size()) {
+    //     posCache = new CacheFragment(head_relation, headPredSymbol);
+    //     entCache = new CacheFragment(headPredSymbol, arity);
+    // } else if (0 == non_entailed_record_vector.size()) {
+    //     /* No record to entail, E+-cache and T-cache are both empty */
+    //     posCache = new CacheFragment(headPredSymbol, arity);
+    //     entCache = new CacheFragment(headPredSymbol, arity);
+    // } else {
+    //     int** non_entailed_records = toArray(non_entailed_record_vector);
+    //     int** entailed_records = toArray(entailed_record_vector);
+    //     IntTable* non_entailed_record_table = new IntTable(non_entailed_records, non_entailed_record_vector.size(), arity);
+    //     IntTable* entailed_record_table = new IntTable(entailed_records, entailed_record_vector.size(), arity);
+    //     posCache = new CacheFragment(
+    //         CompliedBlock::create(non_entailed_records, non_entailed_record_vector.size(), arity, non_entailed_record_table, true, true), 
+    //         headPredSymbol
+    //     );
+    //     entCache = new CacheFragment(
+    //         CompliedBlock::create(entailed_records, entailed_record_vector.size(), arity, entailed_record_table, true, true),
+    //         headPredSymbol
+    //     );
+    // }
+    posCache = new CacheFragment(head_relation, headPredSymbol);
     maintainPosCache = true;
-    maintainEntCache = true;
+    // maintainEntCache = true;
 
     /* Initialize the E-cache */
     allCache = new std::vector<CacheFragment*>();
@@ -1517,15 +1518,18 @@ CachedRule::CachedRule(
     maintainAllCache = true;
 
     /* Initial evaluation */
-    int pos_ent = non_entailed_record_vector.size();
-    int already_ent = entailed_record_vector.size();
+    // int pos_ent = non_entailed_record_vector.size();
+    // int already_ent = entailed_record_vector.size();
+    int already_ent = head_relation->totalEntailedRecords();
+    int pos_ent = head_relation->getTotalRows() - already_ent;
     double all_ent = pow(kb.totalConstants(), arity);
     eval = Eval(pos_ent, all_ent - already_ent, length);
-    delete split_records;
+    // delete split_records;
 }
 
 CachedRule::CachedRule(const CachedRule& another) : Rule(another), kb(another.kb), posCache(another.posCache), maintainPosCache(false),
-    entCache(another.entCache), maintainEntCache(false), allCache(another.allCache), maintainAllCache(false), 
+    // entCache(another.entCache), maintainEntCache(false), 
+    allCache(another.allCache), maintainAllCache(false), 
     predIdx2AllCacheTableInfo(another.predIdx2AllCacheTableInfo)
 {}
 
@@ -1533,9 +1537,9 @@ CachedRule::~CachedRule() {
     if (maintainPosCache) {
         delete posCache;
     }
-    if (maintainEntCache) {
-        delete entCache;
-    }
+    // if (maintainEntCache) {
+    //     delete entCache;
+    // }
     if (maintainAllCache) {
         for (CacheFragment* const& fragment: *allCache) {
             delete fragment;
@@ -1555,15 +1559,16 @@ void CachedRule::updateCacheIndices() {
     uint64_t time_start = currentTimeInNano();
     posCache->buildIndices();
     uint64_t time_pos_done = currentTimeInNano();
-    entCache->buildIndices();
-    uint64_t time_ent_done = currentTimeInNano();
+    // entCache->buildIndices();
+    // uint64_t time_ent_done = currentTimeInNano();
     for (CacheFragment* const& fragment: *allCache) {
         fragment->buildIndices();
     }
     uint64_t time_all_done = currentTimeInNano();
     posCacheIndexingTime = time_pos_done - time_start;
-    entCacheIndexingTime = time_ent_done - time_pos_done;
-    allCacheIndexingTime = time_all_done - time_ent_done;
+    // entCacheIndexingTime = time_ent_done - time_pos_done;
+    // allCacheIndexingTime = time_all_done - time_ent_done;
+    allCacheIndexingTime = time_all_done - time_pos_done;
 }
 
 sinc::EvidenceBatch* CachedRule::getEvidenceAndMarkEntailment() {
@@ -1738,10 +1743,10 @@ void CachedRule::releaseMemory() {
         delete posCache;
         maintainPosCache = false;
     }
-    if (maintainEntCache) {
-        delete entCache;
-        maintainEntCache = false;
-    }
+    // if (maintainEntCache) {
+    //     delete entCache;
+    //     maintainEntCache = false;
+    // }
     if (maintainAllCache) {
         for (CacheFragment* const& fragment: *allCache) {
             delete fragment;
@@ -1759,9 +1764,9 @@ uint64_t CachedRule::getPosCacheUpdateTime() const {
     return posCacheUpdateTime;
 }
 
-uint64_t CachedRule::getEntCacheUpdateTime() const {
-    return entCacheUpdateTime;
-}
+// uint64_t CachedRule::getEntCacheUpdateTime() const {
+//     return entCacheUpdateTime;
+// }
 
 uint64_t CachedRule::getAllCacheUpdateTime() const {
     return allCacheUpdateTime;
@@ -1771,9 +1776,9 @@ uint64_t CachedRule::getPosCacheIndexingTime() const {
     return posCacheIndexingTime;
 }
 
-uint64_t CachedRule::getEntCacheIndexingTime() const {
-    return entCacheIndexingTime;
-}
+// uint64_t CachedRule::getEntCacheIndexingTime() const {
+//     return entCacheIndexingTime;
+// }
 
 uint64_t CachedRule::getAllCacheIndexingTime() const {
     return allCacheIndexingTime;
@@ -1783,9 +1788,9 @@ const CacheFragment& CachedRule::getPosCache() const {
     return *posCache;
 }
 
-const CacheFragment& CachedRule::getEntCache() const {
-    return *entCache;
-}
+// const CacheFragment& CachedRule::getEntCache() const {
+//     return *entCache;
+// }
 
 const std::vector<CacheFragment*>& CachedRule::getAllCache() const {
     return *allCache;
@@ -1798,12 +1803,12 @@ void CachedRule::obtainPosCache() {
     }
 }
 
-void CachedRule::obtainEntCache() {
-    if (!maintainEntCache) {
-        entCache = new CacheFragment(*entCache);
-        maintainEntCache = true;
-    }
-}
+// void CachedRule::obtainEntCache() {
+//     if (!maintainEntCache) {
+//         entCache = new CacheFragment(*entCache);
+//         maintainEntCache = true;
+//     }
+// }
 
 void CachedRule::obtainAllCache() {
     if (!maintainAllCache) {
@@ -1863,8 +1868,31 @@ sinc::Eval CachedRule::calculateEval() const {
             all_ent *= fragment.countCombinations(vids);
         }
     }
-    int new_pos_ent = posCache->countTableSize(HEAD_PRED_IDX);
-    int already_ent = entCache->countTableSize(HEAD_PRED_IDX);
+    // int new_pos_ent = posCache->countTableSize(HEAD_PRED_IDX);
+    // int already_ent = entCache->countTableSize(HEAD_PRED_IDX);
+    int new_pos_ent = 0;
+    int already_ent = 0;
+    SimpleRelation const& head_relation = *kb.getRelation(head_pred.getPredSymbol());
+    std::unordered_set<const void*> used_rows;
+    std::unordered_set<const void*> used_cbs;
+    used_rows.reserve(head_relation.getTotalRows());
+    used_cbs.reserve(posCache->getEntries().size());
+    for (CacheFragment::entryType* const& entry: posCache->getEntries()) {
+        CompliedBlock const* cb = (*entry)[HEAD_PRED_IDX];
+        if (used_cbs.emplace(cb).second) {
+            int* const* const rows = cb->getComplianceSet();
+            for (int i = 0; i < cb->getTotalRows(); i++) {
+                int* const row = rows[i];
+                if (used_rows.emplace(row).second) {
+                    if (head_relation.isEntailed(row)) {
+                        already_ent++;
+                    } else {
+                        new_pos_ent++;
+                    }
+                }
+            }
+        }
+    }
 
     /* Update evaluation score */
     /* Those already proved should be excluded from the entire entailment set. Otherwise, they are counted as negative ones */
@@ -1882,9 +1910,9 @@ sinc::UpdateStatus CachedRule::specCase1HandlerPrePruning(int const predIdx, int
 
 sinc::UpdateStatus CachedRule::specCase1HandlerPostPruning(int const predIdx, int const argIdx, int const varId) {
     uint64_t time_start = currentTimeInNano();
-    obtainEntCache();
-    entCache->updateCase1a(predIdx, argIdx, varId);
-    uint64_t time_ent_done = currentTimeInNano();
+    // obtainEntCache();
+    // entCache->updateCase1a(predIdx, argIdx, varId);
+    // uint64_t time_ent_done = currentTimeInNano();
 
     obtainAllCache();
     if (HEAD_PRED_IDX != predIdx) { // No need to update the E-cache if the update is in the head
@@ -1924,8 +1952,9 @@ sinc::UpdateStatus CachedRule::specCase1HandlerPostPruning(int const predIdx, in
         }
     }
     uint64_t time_all_done = currentTimeInNano();
-    entCacheUpdateTime = time_ent_done - time_start;
-    allCacheUpdateTime = time_all_done - time_ent_done;
+    // entCacheUpdateTime = time_ent_done - time_start;
+    // allCacheUpdateTime = time_all_done - time_ent_done;
+    allCacheUpdateTime = time_all_done - time_start;
 
     return UpdateStatus::Normal;
 }
@@ -1942,10 +1971,10 @@ sinc::UpdateStatus CachedRule::specCase2HandlerPrePruning(int const predSymbol, 
 
 sinc::UpdateStatus CachedRule::specCase2HandlerPostPruning(int const predSymbol, int const arity, int const argIdx, int const varId) {
     uint64_t time_start = currentTimeInNano();
-    obtainEntCache();
+    // obtainEntCache();
     SimpleRelation* new_relation = kb.getRelation(predSymbol);
-    entCache->updateCase1b(new_relation, predSymbol, argIdx, varId);
-    uint64_t time_ent_done = currentTimeInNano();
+    // entCache->updateCase1b(new_relation, predSymbol, argIdx, varId);
+    // uint64_t time_ent_done = currentTimeInNano();
 
     obtainAllCache();
     CacheFragment* updated_fragment = nullptr;
@@ -1972,8 +2001,9 @@ sinc::UpdateStatus CachedRule::specCase2HandlerPostPruning(int const predSymbol,
         }
     }
     uint64_t time_all_done = currentTimeInNano();
-    entCacheUpdateTime = time_ent_done - time_start;
-    allCacheUpdateTime = time_all_done - time_ent_done;
+    // entCacheUpdateTime = time_ent_done - time_start;
+    // allCacheUpdateTime = time_all_done - time_ent_done;
+    allCacheUpdateTime = time_all_done - time_start;
 
     return UpdateStatus::Normal;
 }
@@ -1989,10 +2019,10 @@ sinc::UpdateStatus CachedRule::specCase3HandlerPrePruning(int const predIdx1, in
 
 sinc::UpdateStatus CachedRule::specCase3HandlerPostPruning(int const predIdx1, int const argIdx1, int const predIdx2, int const argIdx2) {
     uint64_t time_start = currentTimeInNano();
-    obtainEntCache();
+    // obtainEntCache();
     int new_vid = usedLimitedVars() - 1;
-    entCache->updateCase2a(predIdx1, argIdx1, predIdx2, argIdx2, new_vid);
-    uint64_t time_ent_done = currentTimeInNano();
+    // entCache->updateCase2a(predIdx1, argIdx1, predIdx2, argIdx2, new_vid);
+    // uint64_t time_ent_done = currentTimeInNano();
 
     obtainAllCache();
     TabInfo const& tab_info1 = predIdx2AllCacheTableInfo[predIdx1];
@@ -2032,8 +2062,9 @@ sinc::UpdateStatus CachedRule::specCase3HandlerPostPruning(int const predIdx1, i
         }
     }
     uint64_t time_all_done = currentTimeInNano();
-    entCacheUpdateTime = time_ent_done - time_start;
-    allCacheUpdateTime = time_all_done - time_ent_done;
+    // entCacheUpdateTime = time_ent_done - time_start;
+    // allCacheUpdateTime = time_all_done - time_ent_done;
+    allCacheUpdateTime = time_all_done - time_start;
 
     return UpdateStatus::Normal;
 }
@@ -2055,10 +2086,10 @@ sinc::UpdateStatus CachedRule::specCase4HandlerPostPruning(
 ) {
     long time_start = currentTimeInNano();
     SimpleRelation* new_relation = kb.getRelation(predSymbol);
-    obtainEntCache();
+    // obtainEntCache();
     int new_vid = usedLimitedVars() - 1;
-    entCache->updateCase2b(new_relation, predSymbol, argIdx1, predIdx2, argIdx2, new_vid);
-    uint64_t time_ent_done = currentTimeInNano();
+    // entCache->updateCase2b(new_relation, predSymbol, argIdx1, predIdx2, argIdx2, new_vid);
+    // uint64_t time_ent_done = currentTimeInNano();
 
     obtainAllCache();
     if (HEAD_PRED_IDX == predIdx2) {   // One is the head and the other is not
@@ -2078,8 +2109,9 @@ sinc::UpdateStatus CachedRule::specCase4HandlerPostPruning(
         }
     }
     uint64_t time_all_done = currentTimeInNano();
-    entCacheUpdateTime = time_ent_done - time_start;
-    allCacheUpdateTime = time_all_done - time_ent_done;
+    // entCacheUpdateTime = time_ent_done - time_start;
+    // allCacheUpdateTime = time_all_done - time_ent_done;
+    allCacheUpdateTime = time_all_done - time_start;
 
     return UpdateStatus::Normal;
 }
@@ -2095,9 +2127,9 @@ sinc::UpdateStatus CachedRule::specCase5HandlerPrePruning(int const predIdx, int
 
 sinc::UpdateStatus CachedRule::specCase5HandlerPostPruning(int const predIdx, int const argIdx, int const constant) {
     uint64_t time_start = currentTimeInNano();
-    obtainEntCache();
-    entCache->updateCase3(predIdx, argIdx, constant);
-    uint64_t time_ent_done = currentTimeInNano();
+    // obtainEntCache();
+    // entCache->updateCase3(predIdx, argIdx, constant);
+    // uint64_t time_ent_done = currentTimeInNano();
 
     obtainAllCache();
     if (HEAD_PRED_IDX != predIdx) { // No need to update the E-cache if the update is in the head
@@ -2111,8 +2143,9 @@ sinc::UpdateStatus CachedRule::specCase5HandlerPostPruning(int const predIdx, in
         }
     }
     uint64_t time_all_done = currentTimeInNano();
-    entCacheUpdateTime = time_ent_done - time_start;
-    allCacheUpdateTime = time_all_done - time_ent_done;
+    // entCacheUpdateTime = time_ent_done - time_start;
+    // allCacheUpdateTime = time_all_done - time_ent_done;
+    allCacheUpdateTime = time_all_done - time_start;
 
     return UpdateStatus::Normal;
 }
@@ -2248,7 +2281,7 @@ void RelationMinerWithCachedRule::selectAsBeam(Rule* r) {
     CachedRule* rule = (CachedRule*) r;
     rule->updateCacheIndices();
     monitor.posCacheIndexingTime += rule->getPosCacheIndexingTime();
-    monitor.entCacheIndexingTime += rule->getEntCacheIndexingTime();
+    // monitor.entCacheIndexingTime += rule->getEntCacheIndexingTime();
     monitor.allCacheIndexingTime += rule->getAllCacheIndexingTime();
 }
 
@@ -2258,7 +2291,7 @@ int RelationMinerWithCachedRule::checkThenAddRule(
     CachedRule* rule = (CachedRule*) updatedRule;
     if (UpdateStatus::Normal == updateStatus) {
         monitor.posCacheEntriesTotal += rule->getPosCache().getEntries().size();
-        monitor.entCacheEntriesTotal += rule->getEntCache().getEntries().size();
+        // monitor.entCacheEntriesTotal += rule->getEntCache().getEntries().size();
         int all_cache_entries = 0;
         if (!rule->getAllCache().empty()) {
             for (CacheFragment* const& fragment : rule->getAllCache()) {
@@ -2268,11 +2301,11 @@ int RelationMinerWithCachedRule::checkThenAddRule(
         }
         monitor.allCacheEntriesTotal += all_cache_entries;
         monitor.posCacheEntriesMax = std::max(monitor.posCacheEntriesMax, (int)rule->getPosCache().getEntries().size());
-        monitor.entCacheEntriesMax = std::max(monitor.entCacheEntriesMax, (int)rule->getEntCache().getEntries().size());
+        // monitor.entCacheEntriesMax = std::max(monitor.entCacheEntriesMax, (int)rule->getEntCache().getEntries().size());
         monitor.allCacheEntriesMax = std::max(monitor.allCacheEntriesMax, all_cache_entries);
         monitor.totalGeneratedRules++;
         monitor.posCacheUpdateTime += rule->getPosCacheUpdateTime();
-        monitor.entCacheUpdateTime += rule->getEntCacheUpdateTime();
+        // monitor.entCacheUpdateTime += rule->getEntCacheUpdateTime();
         monitor.allCacheUpdateTime += rule->getAllCacheUpdateTime();
     } else {
         monitor.prunedPosCacheUpdateTime += rule->getPosCacheUpdateTime();
@@ -2312,16 +2345,16 @@ void SincWithCache::finalizeRelationMiner(RelationMiner* miner) {
     RelationMinerWithCachedRule* rel_miner = (RelationMinerWithCachedRule*) miner;
     monitor.posCacheUpdateTime += rel_miner->monitor.posCacheUpdateTime;
     monitor.prunedPosCacheUpdateTime += rel_miner->monitor.prunedPosCacheUpdateTime;
-    monitor.entCacheUpdateTime += rel_miner->monitor.entCacheUpdateTime;
+    // monitor.entCacheUpdateTime += rel_miner->monitor.entCacheUpdateTime;
     monitor.allCacheUpdateTime += rel_miner->monitor.allCacheUpdateTime;
     monitor.posCacheIndexingTime += rel_miner->monitor.posCacheIndexingTime;
-    monitor.entCacheIndexingTime += rel_miner->monitor.entCacheIndexingTime;
+    // monitor.entCacheIndexingTime += rel_miner->monitor.entCacheIndexingTime;
     monitor.allCacheIndexingTime += rel_miner->monitor.allCacheIndexingTime;
     monitor.posCacheEntriesTotal += rel_miner->monitor.posCacheEntriesTotal;
-    monitor.entCacheEntriesTotal += rel_miner->monitor.entCacheEntriesTotal;
+    // monitor.entCacheEntriesTotal += rel_miner->monitor.entCacheEntriesTotal;
     monitor.allCacheEntriesTotal += rel_miner->monitor.allCacheEntriesTotal;
     monitor.posCacheEntriesMax = std::max(monitor.posCacheEntriesMax, rel_miner->monitor.posCacheEntriesMax);
-    monitor.entCacheEntriesMax = std::max(monitor.entCacheEntriesMax, rel_miner->monitor.entCacheEntriesMax);
+    // monitor.entCacheEntriesMax = std::max(monitor.entCacheEntriesMax, rel_miner->monitor.entCacheEntriesMax);
     monitor.allCacheEntriesMax = std::max(monitor.allCacheEntriesMax, rel_miner->monitor.allCacheEntriesMax);
     monitor.totalGeneratedRules += rel_miner->monitor.totalGeneratedRules;
     monitor.copyTime += rel_miner->monitor.copyTime;
