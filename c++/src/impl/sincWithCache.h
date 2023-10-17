@@ -6,7 +6,153 @@
 
 namespace sinc {
     /**
-     * A simplified complied block.
+     * This class is used for the return values of the `matchSlices` of the class `CompliedBlock`
+     * 
+     * NOTE: The pointers in the two vectors are maintained in the pool of `CompliedBlock`
+     * 
+     * @since 2.5
+     */
+    class CompliedBlock;
+    class MatchedSubCbs {
+    public:
+        std::vector<CompliedBlock*> cbs1;
+        std::vector<CompliedBlock*> cbs2;
+
+        size_t calcMemoryCost() const;
+    };
+
+    /**
+     * This class is the identifier for `getSlice()` of CBs
+     * 
+     * @since 2.5
+     */
+    class CbOprGetSlice {
+    public:
+        int const id;
+        int const col;
+        int const val;
+
+        CbOprGetSlice(int const id, int const col, int const val);
+        bool operator==(const CbOprGetSlice &another) const;
+        size_t hash() const;
+    };
+}
+
+/**
+ * This is for hashing "CbOprGetSlice" in unordered containers.
+ */
+template <>
+struct std::hash<sinc::CbOprGetSlice> {
+    size_t operator()(const sinc::CbOprGetSlice& r) const;
+};
+
+template <>
+struct std::hash<const sinc::CbOprGetSlice> {
+    size_t operator()(const sinc::CbOprGetSlice& r) const;
+};
+
+namespace sinc {
+    /**
+     * This class is the identifier for `splitSlice()` of CBs
+     * 
+     * @since 2.5
+     */
+    class CbOprSplitSlices {
+    public:
+        int const id;
+        int const col;
+
+        CbOprSplitSlices(int const id, int const col);
+        bool operator==(const CbOprSplitSlices &another) const;
+        size_t hash() const;
+    };
+}
+
+/**
+ * This is for hashing "CbOprSplitSlices" in unordered containers.
+ */
+template <>
+struct std::hash<sinc::CbOprSplitSlices> {
+    size_t operator()(const sinc::CbOprSplitSlices& r) const;
+};
+
+template <>
+struct std::hash<const sinc::CbOprSplitSlices> {
+    size_t operator()(const sinc::CbOprSplitSlices& r) const;
+};
+
+namespace sinc {
+    /**
+     * This class is the identifier for `matchSlices()` (involving only one CB) of CBs
+     * 
+     * @since 2.5
+     */
+    class CbOprMatchSlicesOneCb {
+    public:
+        int const id;
+        int const col1;
+        int const col2;
+
+        CbOprMatchSlicesOneCb(int const id, int const col1, int const col2);
+        bool operator==(const CbOprMatchSlicesOneCb &another) const;
+        size_t hash() const;
+    };
+}
+
+/**
+ * This is for hashing "CbOprMatchSlicesOneCb" in unordered containers.
+ */
+template <>
+struct std::hash<sinc::CbOprMatchSlicesOneCb> {
+    size_t operator()(const sinc::CbOprMatchSlicesOneCb& r) const;
+};
+
+template <>
+struct std::hash<const sinc::CbOprMatchSlicesOneCb> {
+    size_t operator()(const sinc::CbOprMatchSlicesOneCb& r) const;
+};
+
+namespace sinc {
+    /**
+     * This class is the identifier for `matchSlices()` (involving two CBs) of CBs
+     * 
+     * @since 2.5
+     */
+    class CbOprMatchSlicesTwoCbs {
+    public:
+        int const id1;
+        int const col1;
+        int const id2;
+        int const col2;
+
+        CbOprMatchSlicesTwoCbs(int const id1, int const col1, int const id2, int const col2);
+        bool operator==(const CbOprMatchSlicesTwoCbs &another) const;
+        size_t hash() const;
+    };
+}
+
+/**
+ * This is for hashing "CbOprMatchSlicesTwoCbs" in unordered containers.
+ */
+template <>
+struct std::hash<sinc::CbOprMatchSlicesTwoCbs> {
+    size_t operator()(const sinc::CbOprMatchSlicesTwoCbs& r) const;
+};
+
+template <>
+struct std::hash<const sinc::CbOprMatchSlicesTwoCbs> {
+    size_t operator()(const sinc::CbOprMatchSlicesTwoCbs& r) const;
+};
+
+namespace sinc {
+    /**
+     * A simplified complied block structure. All instances of CB are maintained in a pool. This pool can be used to retrieve and
+     * release related memory resources. Statistics of CBs, e.g., the number of generated CBs and memory consumption, can also be
+     * easily calculated by the pool.
+     * 
+     * In v2.5, there are four maps as retrieval indices for the cache update related CB calculations: `getSlice()`, `splitSlices()`,
+     * and two overloads of `matchSlices()`. The four functions encapsulates corresponding functions of `IntTable` and manages the
+     * creation of CBs, so that there will be no duplicated CBs in the pool.
      * 
      * @since 2.0
      */
@@ -15,12 +161,18 @@ namespace sinc {
         /**
          * Create a new CB and register it to the pool
          * 
+         * NOTE: This method is only used for test
+         * 
          * NOTE: The pointer `complianceSet` WILL be maintained by this CB object
+         * 
+         * @deprecated
          */
         static CompliedBlock* create(int** const complianceSet, int const totalRows, int const totalCols, bool maintainComplianceSet);
 
         /**
          * Create a new CB and register it to the pool
+         * 
+         * NOTE: Neither `complianceSet` nor `indices` should be `nullptr`
          * 
          * NOTE: The pointers `complianceSet` WILL be maintained by this CB object
          */
@@ -30,7 +182,66 @@ namespace sinc {
         );
 
         /**
-         * Release all pointers in the pool and clear the pool
+         * This function encapsulates the `getSlice()` function of `IntTable`. It retrieves the results and corresponding CBs if they
+         * already exist.
+         * 
+         * @returns `nullptr` if no such slice.
+         * 
+         * @since 2.5
+         */
+        static CompliedBlock* getSlice(const CompliedBlock& cb, int const col, int const val);
+
+        /**
+         * This function encapsulates the `splitSlices()` function of `IntTable`. It retrieves the results and corresponding CBs if
+         * they already exist.
+         * 
+         * @since 2.5
+         */
+        static std::vector<CompliedBlock*> const& splitSlices(const CompliedBlock& cb, int const col);
+
+        /**
+         * This function encapsulates the `matchSlices()` function of `IntTable`. It retrieves the results and corresponding CBs if
+         * they already exist.
+         * 
+         * In order to reduce the number of entries in the indices, symmetric operations are mapped to the same index. I.e., in the
+         * returning structure, slices for the CB with smaller id are stored in `MatchedSubCbs::cbs1`, as shown in the following
+         * pseudo code:
+         * 
+         * if (cb1.id <= cb2.id) {
+         *     MatchedSubCbs::cbs1 <- slices from cb1
+         *     MatchedSubCbs::cbs2 <- slices from cb2
+         * } else {
+         *     MatchedSubCbs::cbs1 <- slices from cb1
+         *     MatchedSubCbs::cbs2 <- slices from cb2
+         * }
+         * 
+         * @return If no such slices, a `nullptr` will be returned.
+         * 
+         * @since 2.5
+         */
+        static const MatchedSubCbs* matchSlices(const CompliedBlock& cb1, int const col1, const CompliedBlock& cb2, int const col2);
+
+        /**
+         * This function encapsulates the `matchSlices()` function of `IntTable`. It retrieves the results and corresponding CBs if
+         * they already exist.
+         * 
+         * @return If no such slices, a `nullptr` will be returned.
+         * 
+         * @since 2.5
+         */
+        static const std::vector<CompliedBlock*>* matchSlices(const CompliedBlock& cb, int const col1, int const col2);
+
+        /**
+         * This method estimates the amount of memory space for the CB pool and update maps
+         * 
+         * @since 2.5
+         */
+        static void reserveMemSpace(SimpleKb const& kb);
+
+        /**
+         * Release all pointers in the pool and clear the pool. All indices of CB update operations will also be cleared.
+         * 
+         * @since 2.4
          */
         static void clearPool();
 
@@ -39,10 +250,26 @@ namespace sinc {
          */
         static size_t totalNumCbs();
 
+        static size_t getNumCreation();
+        static size_t getNumCreationHit();
+        static size_t getNumCreationIndices();
+        static size_t getNumGetSlice();
+        static size_t getNumGetSliceHit();
+        static size_t getNumGetSliceIndices();
+        static size_t getNumSplitSlices();
+        static size_t getNumSplitSlicesHit();
+        static size_t getNumSplitSlicesIndices();
+        static size_t getNumMatchSlices1();
+        static size_t getNumMatchSlices1Hit();
+        static size_t getNumMatchSlices1Indices();
+        static size_t getNumMatchSlices2();
+        static size_t getNumMatchSlices2Hit();
+        static size_t getNumMatchSlices2Indices();
+
         /**
          * Count the total size of CBs in the pool
          */
-        static size_t totalCbMemoryCost();
+        static size_t totalMemoryCost();
 
         ~CompliedBlock();
 
@@ -51,17 +278,50 @@ namespace sinc {
          */
         void buildIndices();
 
+        int getId() const;
         int* const* getComplianceSet() const;
         const IntTable& getIndices() const;
         int getTotalRows() const;
         int getTotalCols() const;
         size_t memoryCost() const;
 
+        /**
+         * This method is for debugging
+         */
         void showComplianceSet() const;
+
+        /**
+         * This method is for debugging
+         */
+        void showAll() const;
 
     protected:
         static std::vector<CompliedBlock*> pool;
+        /** This map is for fetching CBs by creation */
+        static std::unordered_map<void*, CompliedBlock*> mapCreation;
+        /** NOTE: The values will NOT be `nullptr` */
+        static std::unordered_map<CbOprGetSlice, CompliedBlock*> mapGetSlice;
+        /** NOTE: The values will NOT be `nullptr` */
+        static std::unordered_map<CbOprSplitSlices, std::vector<CompliedBlock*>*> mapSplitSlices;
+        /** NOTE: The values MAY be `nullptr` */
+        static std::unordered_map<CbOprMatchSlicesOneCb, std::vector<CompliedBlock*>*> mapMatchSlicesOneCb;
+        /** NOTE: The values MAY be `nullptr` */
+        static std::unordered_map<CbOprMatchSlicesTwoCbs, MatchedSubCbs*> mapMatchSlicesTwoCbs;
 
+        /* Statistics of update operations */
+        static size_t numCreation;
+        static size_t numCreationHit;
+        static size_t numGetSlice;
+        static size_t numGetSliceHit;
+        static size_t numSplitSlices;
+        static size_t numSplitSlicesHit;
+        static size_t numMatchSlices1;
+        static size_t numMatchSlices1Hit;
+        static size_t numMatchSlices2;
+        static size_t numMatchSlices2Hit;
+
+        /** Unique ID of the CB object. This is the same as the index of this object in the pool. */
+        int const id;
         int** const complianceSet;
         IntTable* indices;
         int const totalRows;
@@ -77,14 +337,17 @@ namespace sinc {
         /**
          * NOTE: The pointer `complianceSet` WILL be maintained by this CB object
          */
-        CompliedBlock(int** const complianceSet, int const totalRows, int const totalCols, bool maintainComplianceSet);
+        CompliedBlock(int const id, int** const complianceSet, int const totalRows, int const totalCols, bool maintainComplianceSet);
 
         /**
+         * @param complianceSet This parameter shall NOT be `nullptr`
+         * @param indices This parameter shall NOT be `nullptr`
+         * 
          * NOTE: The pointers `complianceSet` and `indices` WILL be maintained by this CB object
          */
         CompliedBlock(
-            int** const complianceSet, int const totalRows, int const totalCols, IntTable* indices, bool maintainComplianceSet,
-            bool maintainIndices
+            int const id, int** const complianceSet, int const totalRows, int const totalCols, IntTable* indices,
+            bool maintainComplianceSet, bool maintainIndices
         );
     };
 
@@ -480,13 +743,13 @@ namespace sinc {
 
         uint64_t getCopyTime() const;
         uint64_t getPosCacheUpdateTime() const;
-        uint64_t getEntCacheUpdateTime() const;
+        // uint64_t getEntCacheUpdateTime() const;
         uint64_t getAllCacheUpdateTime() const;
         uint64_t getPosCacheIndexingTime() const;
-        uint64_t getEntCacheIndexingTime() const;
+        // uint64_t getEntCacheIndexingTime() const;
         uint64_t getAllCacheIndexingTime() const;
         const CacheFragment& getPosCache() const;
-        const CacheFragment& getEntCache() const;
+        // const CacheFragment& getEntCache() const;
         const std::vector<CacheFragment*>& getAllCache() const;
 
     protected:
@@ -495,9 +758,9 @@ namespace sinc {
         /** The cache for the positive entailments (E+-cache) (not entailed). One cache fragment is sufficient as all
          *  predicates are linked to the head. */
         CacheFragment* posCache;
-        /** This cache is used to monitor the already-entailed records (T-cache). One cache fragment is sufficient as all
-         *  predicates are linked to the head. */
-        CacheFragment* entCache;
+        // /** This cache is used to monitor the already-entailed records (T-cache). One cache fragment is sufficient as all
+        //  *  predicates are linked to the head. */
+        // CacheFragment* entCache;
         /** The cache for all the entailments (E-cache). The cache is composed of multiple fragments, each of which maintains
          *  a linked component of the rule body. The first relation should not be included, as the head should be removed
          *  from E-cache */
@@ -507,25 +770,25 @@ namespace sinc {
         std::vector<TabInfo> predIdx2AllCacheTableInfo;
         /** Whether the pointer `posCache` should be maintained by this object */
         bool maintainPosCache;
-        /** Whether the pointer `entCache` should be maintained by this object */
-        bool maintainEntCache;
+        // /** Whether the pointer `entCache` should be maintained by this object */
+        // bool maintainEntCache;
         /** Whether the pointer `allCache` and pointers within the vector should be maintained by this object */
         bool maintainAllCache;
 
         /* Monitoring info. The time (in nanoseconds) refers to the corresponding time consumption in the last update of the rule */
         uint64_t copyTime = 0;
         uint64_t posCacheUpdateTime = 0;
-        uint64_t entCacheUpdateTime = 0;
+        // uint64_t entCacheUpdateTime = 0;
         uint64_t allCacheUpdateTime = 0;
         uint64_t posCacheIndexingTime = 0;
-        uint64_t entCacheIndexingTime = 0;
+        // uint64_t entCacheIndexingTime = 0;
         uint64_t allCacheIndexingTime = 0;
 
         /** If this object does not maintain the E+-cache, get a copy of the cache */
         void obtainPosCache();
 
-        /** If this object does not maintain the T-cache, get a copy of the cache */
-        void obtainEntCache();
+        // /** If this object does not maintain the T-cache, get a copy of the cache */
+        // void obtainEntCache();
 
         /** If this object does not maintain the E-cache, get a copy of the cache */
         void obtainAllCache();
@@ -656,6 +919,13 @@ namespace sinc {
     public:
         SincWithCache(SincConfig* const config);
         SincWithCache(SincConfig* const config, SimpleKb* const kb);
+
+        /**
+         * This overridden function added a reservation of memory space for the CB pool and indices after the conventional process.
+         * 
+         * @since 2.5
+         */
+        void getTargetRelations(int* & targetRelationIds, int& numTargets) override;
 
     protected:
         CachedSincPerfMonitor monitor;
