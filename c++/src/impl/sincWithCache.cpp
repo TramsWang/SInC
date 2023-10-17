@@ -2358,6 +2358,7 @@ void SincWithCache::finalizeRelationMiner(RelationMiner* miner) {
     monitor.allCacheEntriesMax = std::max(monitor.allCacheEntriesMax, rel_miner->monitor.allCacheEntriesMax);
     monitor.totalGeneratedRules += rel_miner->monitor.totalGeneratedRules;
     monitor.copyTime += rel_miner->monitor.copyTime;
+    CompliedBlock::clearPool();
 }
 
 void SincWithCache::showMonitor() {
