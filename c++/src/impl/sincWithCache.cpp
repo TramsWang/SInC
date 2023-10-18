@@ -222,806 +222,33 @@ bool std::equal_to<const VarInfo*>::operator()(const VarInfo *r1, const VarInfo 
 }
 
 /**
- * CacheFragment
+ * BodyGvLinkInfo
  */
-using sinc::CacheFragment;
+using sinc::BodyGvLinkInfo;
+BodyGvLinkInfo::BodyGvLinkInfo(int const _bodyPredIdx, int const _bodyArgIdx, std::vector<int>* const _headVarLocs) : 
+    bodyPredIdx(_bodyPredIdx), bodyArgIdx(_bodyArgIdx), headVarLocs(_headVarLocs) {}
 
-CacheFragment::CacheFragment(IntTable* const firstRelation, int const relationSymbol) {
-    entries = new entriesType();
-
-    partAssignedRule.emplace_back(relationSymbol, firstRelation->getTotalCols());
-    entryType* first_entry = new entryType();
-    CompliedBlock* cb = CompliedBlock::create(
-        firstRelation->getAllRows(), firstRelation->getTotalRows(), firstRelation->getTotalCols(), firstRelation, false, false
-    );
-    first_entry->push_back(cb);
-    entries->push_back(first_entry);
-}
-
-CacheFragment::CacheFragment(CompliedBlock* const firstCb, int const relationSymbol) {
-    entries = new entriesType();
-
-    partAssignedRule.emplace_back(relationSymbol, firstCb->getTotalCols());
-    entryType* first_entry = new entryType();
-    first_entry->push_back(firstCb);
-    entries->push_back(first_entry);
-}
-
-CacheFragment::CacheFragment(int const relationSymbol, int const arity) {
-    entries = new entriesType();
-    partAssignedRule.emplace_back(relationSymbol, arity);
-}
-
-CacheFragment::CacheFragment(const CacheFragment& another) : partAssignedRule(another.partAssignedRule),
-    entries(new entriesType()), varInfoList(another.varInfoList) 
-{
-    entries->reserve(another.entries->size());
-    for (entryType* const& entry: *(another.entries)) {
-        entries->push_back(new entryType(*entry));
-    }
-}
-
-CacheFragment::~CacheFragment() {
-    releaseEntries();
-}
-
-void CacheFragment::updateCase1a(int const tabIdx, int const colIdx, int const vid) {
-    partAssignedRule[tabIdx].setArg(colIdx, ARG_VARIABLE(vid));
-    if (vid < varInfoList.size() && !varInfoList[vid].isEmpty()) {
-        /* Filter the two columns */
-        VarInfo& var_info = varInfoList[vid];
-        if (var_info.isPlv) {
-            /* Split by the two columns */
-            var_info.isPlv = false;
-            splitCacheEntries(var_info.tabIdx, var_info.colIdx, tabIdx, colIdx);
-        } else {
-            /* Match the new column to the original */
-            matchCacheEntries(var_info.tabIdx, var_info.colIdx, tabIdx, colIdx);
-        }
-    } else {
-        /* Record as a PLV */
-        addVarInfo(vid, tabIdx, colIdx, true);
-    }
-}
-
-void CacheFragment::updateCase1b(IntTable* const newRelation, int const relationSymbol, int const colIdx, int const vid) {
-    Predicate& new_pred = partAssignedRule.emplace_back(relationSymbol, newRelation->getTotalCols());
-    new_pred.setArg(colIdx, ARG_VARIABLE(vid));
-    VarInfo& var_info = varInfoList[vid];    // Assertion: this shall NOT be empty
-
-    /* Filter the two columns */
-    if (var_info.isPlv) {
-        /* Split by the two columns */
-        var_info.isPlv = false;
-        splitCacheEntries(var_info.tabIdx, var_info.colIdx, newRelation, colIdx);
-    } else {
-        /* Match the new column to the original */
-        matchCacheEntries(var_info.tabIdx, var_info.colIdx, newRelation, colIdx);
-    }
-}
-
-void CacheFragment::updateCase1c(CacheFragment const& fragment, int const tabIdx, int const colIdx, int const vid) {
-    /* Merge PAR */
-    int original_tabs = partAssignedRule.size();
-    for (Predicate const& predicate: fragment.partAssignedRule) {
-        partAssignedRule.push_back(predicate);
-    }
-    partAssignedRule[original_tabs + tabIdx].setArg(colIdx, ARG_VARIABLE(vid));
-
-    /* Merge LV info */
-    for (int i = fragment.varInfoList.size() - 1; i >= 0; i--) {
-        VarInfo const& var_info = fragment.varInfoList[i];
-        if (!var_info.isEmpty() && (i >= this->varInfoList.size() || this->varInfoList[i].isEmpty())) {
-            addVarInfo(i, original_tabs + var_info.tabIdx, var_info.colIdx, var_info.isPlv);
-        }
-    }
-
-    /* Merge entries */
-    const2EntriesMapType* merging_frag_const_2_entries_map = calcConst2EntriesMap(
-        fragment.getEntries(), tabIdx, colIdx, fragment.getPartAssignedRule()[tabIdx].getArity()
-    );
-    VarInfo& var_info = varInfoList[vid];    // Assertion: this shall NOT be empty
-    if (var_info.isPlv) {
-        var_info.isPlv = false;
-        const2EntriesMapType* base_frag_const_2_entries_map = calcConst2EntriesMap(
-            *entries, var_info.tabIdx, var_info.colIdx, partAssignedRule[var_info.tabIdx].getArity()
-        );
-        mergeFragmentEntries(*base_frag_const_2_entries_map, *merging_frag_const_2_entries_map);
-        releaseConst2EntryMap(base_frag_const_2_entries_map);
-    } else {
-        mergeFragmentEntries(*entries, var_info.tabIdx, var_info.colIdx, *merging_frag_const_2_entries_map);
-    }
-    releaseConst2EntryMap(merging_frag_const_2_entries_map);
-}
-
-void CacheFragment::updateCase2a(int const tabIdx1, int const colIdx1, int const tabIdx2, int const colIdx2, int const newVid) {
-    /* Modify PAR */
-    addVarInfo(newVid, tabIdx1, colIdx1, false);
-    int var_arg = ARG_VARIABLE(newVid);
-    partAssignedRule[tabIdx1].setArg(colIdx1, var_arg);
-    partAssignedRule[tabIdx2].setArg(colIdx2, var_arg);
-
-    /* Modify cache entries */
-    splitCacheEntries(tabIdx1, colIdx1, tabIdx2, colIdx2);
-}
-
-void CacheFragment::updateCase2b(
-    IntTable* const newRelation, int const relationSymbol, int const colIdx1, int const tabIdx2, int const colIdx2, int const newVid
-) {
-    /* Modify PAR */
-    addVarInfo(newVid, tabIdx2, colIdx2, false);
-    int var_arg = ARG_VARIABLE(newVid);
-    partAssignedRule[tabIdx2].setArg(colIdx2, var_arg);
-    Predicate& new_pred = partAssignedRule.emplace_back(relationSymbol, newRelation->getTotalCols());
-    new_pred.setArg(colIdx1, var_arg);
-
-    /* Modify cache entries */
-    splitCacheEntries(tabIdx2, colIdx2, newRelation, colIdx1);
-}
-
-void CacheFragment::updateCase2c(
-    int const tabIdx, int const colIdx, CacheFragment const& fragment, int const tabIdx2, int const colIdx2, int const newVid
-) {
-    /* Merge PAR */
-    int original_tabs = partAssignedRule.size();
-    for (Predicate const& predicate: fragment.partAssignedRule) {
-        partAssignedRule.push_back(predicate);
-    }
-    int var_arg = ARG_VARIABLE(newVid);
-    partAssignedRule[tabIdx].setArg(colIdx, var_arg);
-    partAssignedRule[original_tabs + tabIdx2].setArg(colIdx2, var_arg);
-
-    /* Merge LV info */
-    addVarInfo(newVid, tabIdx, colIdx, false);
-    for (int i = fragment.varInfoList.size() - 1; i >= 0; i--) {
-        VarInfo const& var_info = fragment.varInfoList[i];
-        if (!var_info.isEmpty() && (i >= this->varInfoList.size() || this->varInfoList[i].isEmpty())) {
-            addVarInfo(i, original_tabs + var_info.tabIdx, var_info.colIdx, var_info.isPlv);
-        }
-    }
-
-    /* Merge entries */
-    const2EntriesMapType* merging_frag_const_2_entries_map = calcConst2EntriesMap(
-        fragment.getEntries(), tabIdx2, colIdx2, fragment.getPartAssignedRule()[tabIdx2].getArity()
-    );
-    const2EntriesMapType* base_frag_const_2_entries_map = calcConst2EntriesMap(
-        *entries, tabIdx, colIdx, partAssignedRule[tabIdx].getArity()
-    );
-    mergeFragmentEntries(*base_frag_const_2_entries_map, *merging_frag_const_2_entries_map);
-    releaseConst2EntryMap(merging_frag_const_2_entries_map);
-    releaseConst2EntryMap(base_frag_const_2_entries_map);
-}
-
-void CacheFragment::updateCase3(int const tabIdx, int const colIdx, int const constant) {
-    /* Modify PAR */
-    partAssignedRule[tabIdx].setArg(colIdx, ARG_CONSTANT(constant));
-
-    /* Modify cache entries */
-    assignCacheEntries(tabIdx, colIdx, constant);
-}
-
-void CacheFragment::buildIndices() {
-    for (entryType* const& entry: *entries) {
-        for (CompliedBlock* const& cb: *entry) {
-            cb->buildIndices();
-        }
-    }
-}
-
-bool CacheFragment::hasLv(int const vid) const {
-    return (vid < varInfoList.size()) && !varInfoList[vid].isEmpty();
-}
-
-int CacheFragment::countCombinations(std::vector<int> const& vids) const {
-    std::vector<VarInfo> lvs;
-    std::vector<int> plv_col_index_lists[partAssignedRule.size()];    // Table index is the index of the array
-    std::vector<int> tab_idxs_with_plvs;
-    lvs.reserve(vids.size());
-    tab_idxs_with_plvs.reserve(vids.size());
-    for (int const& vid: vids) {
-        VarInfo const& var_info = varInfoList[vid];    // This shall NOT be empty
-        if (var_info.isPlv) {
-            if (plv_col_index_lists[var_info.tabIdx].empty()) {
-                tab_idxs_with_plvs.push_back(var_info.tabIdx);
-                plv_col_index_lists[var_info.tabIdx].reserve(vids.size());
-            }
-            plv_col_index_lists[var_info.tabIdx].push_back(var_info.colIdx);
-        } else {
-            lvs.push_back(var_info);
-        }
-    }
-
-    int const total_plvs = vids.size() - lvs.size();
-    int total_unique_bindings = 0;
-    if (0 == total_plvs) {
-        /* No PLV. Just count all combinations of LVs */
-        std::unordered_set<Record> lv_bindings;
-        lv_bindings.reserve(entries->size());
-        for (entryType* const& cache_entry: *entries) {
-            int* binding = new int[lvs.size()];
-            for (int i = 0; i < lvs.size(); i++) {
-                VarInfo const& lv_info = lvs[i];
-                binding[i] = (*cache_entry)[lv_info.tabIdx]->getComplianceSet()[0][lv_info.colIdx];
-            }
-            if (!lv_bindings.emplace(binding, lvs.size()).second) {
-                delete[] binding;
-            }
-        }
-        total_unique_bindings = lv_bindings.size();
-        for (Record const& r: lv_bindings) {
-            delete[] r.getArgs();
-        }
-    } else  {
-        std::unordered_map<Record, std::unordered_set<Record>*> lv_bindings_2_plv_bindings;
-        lv_bindings_2_plv_bindings.reserve(entries->size());
-        std::unordered_set<Record> plv_bindings_within_tab_sets[tab_idxs_with_plvs.size()];
-        for (entryType* const& cache_entry: *entries) {
-            /* Find LV binding first */
-            int* lv_binding = new int[lvs.size()];
-            for (int i = 0; i < lvs.size(); i++) {
-                VarInfo const& lv_info = lvs[i];
-                lv_binding[i] = (*cache_entry)[lv_info.tabIdx]->getComplianceSet()[0][lv_info.colIdx];
-            }
-
-            const Record rec_lv_binding(lv_binding, lvs.size());
-            std::unordered_set<Record>* complete_plv_bindings;
-            std::unordered_map<Record, std::unordered_set<Record>*>::iterator itr = lv_bindings_2_plv_bindings.find(rec_lv_binding);
-            if (lv_bindings_2_plv_bindings.end() == itr) {
-                complete_plv_bindings = new std::unordered_set<Record>();
-                lv_bindings_2_plv_bindings.emplace(rec_lv_binding, complete_plv_bindings);
-            } else {
-                delete[] lv_binding;
-                complete_plv_bindings = itr->second;
-            }
-
-            /* Cartesian product all the PLVs */
-            for (int i = 0; i < tab_idxs_with_plvs.size(); i++) {
-                int tab_idx = tab_idxs_with_plvs[i];
-                std::vector<int>& plv_col_idxs = plv_col_index_lists[tab_idx];
-                std::unordered_set<Record>& plv_bindings = plv_bindings_within_tab_sets[i];
-                CompliedBlock* cb = (*cache_entry)[tab_idx];
-                const int* const* compliance_records = cb->getComplianceSet();
-                for (int row_idx = 0; row_idx < cb->getTotalRows(); row_idx++) {
-                    const int* cs_record = compliance_records[row_idx];
-                    int* plv_binding_within_tab = new int[plv_col_idxs.size()];
-                    for (int j = 0; j < plv_col_idxs.size(); j++) {
-                        plv_binding_within_tab[j] = cs_record[plv_col_idxs[j]];
-                    }
-                    if (!plv_bindings.emplace(plv_binding_within_tab, plv_col_idxs.size()).second) {
-                        delete[] plv_binding_within_tab;
-                    }
-                }
-            }
-
-            if (1 == tab_idxs_with_plvs.size()) {
-                /* No need to perform Cartesian product */
-                for (Record const& r: plv_bindings_within_tab_sets[0]) {
-                    if (!complete_plv_bindings->insert(r).second) {
-                        delete[] r.getArgs();
-                    }
-                }
-                plv_bindings_within_tab_sets[0].clear();
-            } else {
-                /* Cartesian product required */
-                int arg_template[total_plvs]{};
-                addCompletePlvBindings(
-                    *complete_plv_bindings, plv_bindings_within_tab_sets, arg_template, 0, 0, tab_idxs_with_plvs.size()
-                );
-
-                /* Release Cartesian product resources */
-                for (int i = 0; i < tab_idxs_with_plvs.size(); i++) {
-                    for (Record const& r: plv_bindings_within_tab_sets[i]) {
-                        delete[] r.getArgs();
-                    }
-                    plv_bindings_within_tab_sets[i].clear();
-                }
-            }
-        }
-        for (std::pair<const Record, std::unordered_set<Record>*> const& kv: lv_bindings_2_plv_bindings) {
-            total_unique_bindings += kv.second->size();
-            delete[] kv.first.getArgs();
-            for (Record const& r: *(kv.second)) {
-                delete[] r.getArgs();
-            }
-            delete kv.second;
-        }
-    }
-    return total_unique_bindings;
-}
-
-std::unordered_set<sinc::Record>* CacheFragment::enumerateCombinations(std::vector<int> const& vids) const {
-    /* Split LVs and PLVs and find the locations of the vars */
-    /* Also, group PLVs within tabs */
-    std::vector<VarInfo> lvs;
-    std::vector<int> lv_template_idxs;
-    std::vector<int> plv_col_idx_lists[partAssignedRule.size()];    // Table index is the index of the array
-    std::vector<int> plv_2_template_idx_lists[partAssignedRule.size()];
-    std::vector<int> tab_idxs_with_plvs;
-    lvs.reserve(vids.size());
-    lv_template_idxs.reserve(vids.size());
-    tab_idxs_with_plvs.reserve(vids.size());
-    for (int template_idx = 0; template_idx < vids.size(); template_idx++) {
-        VarInfo const& var_info = varInfoList[vids[template_idx]];    // This shall NOT be empty
-        if (var_info.isPlv) {
-            if (plv_col_idx_lists[var_info.tabIdx].empty()) {
-                tab_idxs_with_plvs.push_back(var_info.tabIdx);
-                plv_col_idx_lists[var_info.tabIdx].reserve(vids.size());
-                plv_2_template_idx_lists[var_info.tabIdx].reserve(vids.size());
-            }
-            plv_col_idx_lists[var_info.tabIdx].push_back(var_info.colIdx);
-            plv_2_template_idx_lists[var_info.tabIdx].push_back(template_idx);
-        } else {
-            lv_template_idxs.push_back(template_idx);
-            lvs.push_back(var_info);
-        }
-    }
-
-    std::unordered_set<Record>* bindings = new std::unordered_set<Record>();
-    bindings->reserve(entries->size());
-    if (tab_idxs_with_plvs.empty()) {
-        /* No PLV. Just enumerate all combinations of LVs */
-        for (entryType* const& cache_entry: *entries) {
-            int* binding = new int[vids.size()];
-            for (int template_idx = 0; template_idx < lvs.size(); template_idx++) {
-                VarInfo const& lv_info = lvs[template_idx];
-                binding[template_idx] = (*cache_entry)[lv_info.tabIdx]->getComplianceSet()[0][lv_info.colIdx];
-            }
-            if (!bindings->emplace(binding, lvs.size()).second) {
-                delete[] binding;
-            }
-        }
-    } else  {
-        int* binding_with_only_lvs = new int[vids.size()];
-        std::unordered_set<Record> plv_bindings_within_tab_sets[tab_idxs_with_plvs.size()];
-        std::vector<int>* plv_2_template_idx_within_tab_lists[tab_idxs_with_plvs.size()];
-        for (entryType* const& cache_entry: *entries) {
-            /* Find LV binding first */
-            for (int i = 0; i < lvs.size(); i++) {
-                VarInfo const& lv_info = lvs[i];
-                binding_with_only_lvs[lv_template_idxs[i]] = (*cache_entry)[lv_info.tabIdx]->getComplianceSet()[0][lv_info.colIdx];
-            }
-
-            /* Cartesian product all the PLVs */
-            for (int i = 0; i < tab_idxs_with_plvs.size(); i++) {
-                int tab_idx = tab_idxs_with_plvs[i];
-                std::vector<int>& plv_col_idxs = plv_col_idx_lists[tab_idx];
-                std::unordered_set<Record>& plv_bindings = plv_bindings_within_tab_sets[i];
-                plv_2_template_idx_within_tab_lists[i] = &(plv_2_template_idx_lists[tab_idx]);
-                CompliedBlock* cb = (*cache_entry)[tab_idx];
-                const int* const* compliance_records = cb->getComplianceSet();
-                for (int row_idx = 0; row_idx < cb->getTotalRows(); row_idx++) {
-                    const int* cs_record = compliance_records[row_idx];
-                    int* plv_binding_within_tab = new int[plv_col_idxs.size()];
-                    for (int j = 0; j < plv_col_idxs.size(); j++) {
-                        plv_binding_within_tab[j] = cs_record[plv_col_idxs[j]];
-                    }
-                    if (!plv_bindings.emplace(plv_binding_within_tab, plv_col_idxs.size()).second) {
-                        delete[] plv_binding_within_tab;
-                    }
-                }
-            }
-            addPlvBindings2Templates(
-                    *bindings, plv_bindings_within_tab_sets, plv_2_template_idx_within_tab_lists, binding_with_only_lvs, 0,
-                    tab_idxs_with_plvs.size(), vids.size()
-            );
-
-            /* Release Cartesian product resources */
-            for (int i = 0; i < tab_idxs_with_plvs.size(); i++) {
-                for (Record const& r: plv_bindings_within_tab_sets[i]) {
-                    delete[] r.getArgs();
-                }
-                plv_bindings_within_tab_sets[i].clear();
-            }
-        }
-        delete[] binding_with_only_lvs;
-    }
-    return bindings;
-}
-
-bool CacheFragment::isEmpty() const {
-    return entries->empty();
-}
-
-void CacheFragment::clear() {
-    for (entryType* entry: *entries) {
-        delete entry;
-    }
-    entries->clear();
-}
-
-const CacheFragment::entriesType& CacheFragment::getEntries() const {
-    return *entries;
-}
-
-CacheFragment::entryType* CacheFragment::getEntry(int const idx) const {
-    return (*entries)[idx];
-}
-
-int CacheFragment::countTableSize(int const tabIdx) const {
-    /* Rows in compliance sets are all from original KB, thus the pointer of two rows are equal iff two rows are equal */
-    std::unordered_set<const int*> records;
-    records.reserve(entries->size());
-    for (entryType* entry: *entries) {
-        CompliedBlock* cb = (*entry)[tabIdx];
-        const int* const* cs = cb->getComplianceSet();
-        records.insert(cs, cs + cb->getTotalRows());
-    }
-    return records.size();
-}
-
-int CacheFragment::totalTables() const {
-    return partAssignedRule.size();
-}
-
-std::vector<sinc::Predicate> const& CacheFragment::getPartAssignedRule() const {
-    return partAssignedRule;
-}
-
-std::vector<VarInfo> const& CacheFragment::getVarInfoList() const {
-    return varInfoList;
-}
-
-void CacheFragment::showEntry(entryType const& entry) {
-    std::cout << "+++\n";
-    for (CompliedBlock* const& cb: entry) {
-        std::cout << "---\n";
-        cb->showComplianceSet();
-    }
-    // std::cout << "+++" << std::endl;
-}
-
-void CacheFragment::showEntries(entriesType const& entries) {
-    std::cout << "Entries:\n";
-    for (entryType* const& entry: entries) {
-        std::cout << "ooo\n";
-        showEntry(*entry);
-    }
-}
-
-void CacheFragment::splitCacheEntries(int const tabIdx1, int const colIdx1, int const tabIdx2, int const colIdx2) {
-    entriesType* new_entries = new entriesType();
-    if (tabIdx1 == tabIdx2) {
-        for (entryType* const& cache_entry: *entries) {
-            CompliedBlock& cb = *(*cache_entry)[tabIdx1];
-            IntTable::slicesType* slices = cb.getIndices().matchSlices(colIdx1, colIdx2);
-            for (IntTable::sliceType* const& slice: *slices) {
-                CompliedBlock* new_cb = CompliedBlock::create(
-                    toArray<int*>(*slice), slice->size(), partAssignedRule[tabIdx1].getArity(), true
-                );
-                entryType* new_entry = new entryType(*cache_entry);
-                (*new_entry)[tabIdx1] = new_cb;
-                new_entries->push_back(new_entry);
-            }
-            IntTable::releaseSlices(slices);
-        }
-    } else {
-        for (entryType* const& cache_entry: *entries) {
-            CompliedBlock& cb1 = *(*cache_entry)[tabIdx1];
-            CompliedBlock& cb2 = *(*cache_entry)[tabIdx2];
-            MatchedSubTables* slices = IntTable::matchSlices(cb1.getIndices(), colIdx1, cb2.getIndices(), colIdx2);
-            for (int i = 0; i < slices->slices1->size(); i++) {
-                IntTable::sliceType& slice1 = *(*(slices->slices1))[i];
-                IntTable::sliceType& slice2 = *(*(slices->slices2))[i];
-                CompliedBlock* new_cb1 = CompliedBlock::create(
-                    toArray<int*>(slice1), slice1.size(), partAssignedRule[tabIdx1].getArity(), true
-                );
-                CompliedBlock* new_cb2 = CompliedBlock::create(
-                    toArray<int*>(slice2), slice2.size(), partAssignedRule[tabIdx2].getArity(), true
-                );
-                entryType* new_entry = new entryType(*cache_entry);
-                (*new_entry)[tabIdx1] = new_cb1;
-                (*new_entry)[tabIdx2] = new_cb2;
-                new_entries->push_back(new_entry);
-            }
-            delete slices;
-        }
-    }
-    releaseEntries();
-    entries = new_entries;
-}
-
-void CacheFragment::splitCacheEntries(int const tabIdx1, int const colIdx1, IntTable* const newRelation, int const colIdx2) {
-    entriesType* new_entries = new entriesType();
-    for (entryType* const& cache_entry : *entries) {
-        CompliedBlock& cb1 = *(*cache_entry)[tabIdx1];
-        MatchedSubTables* slices = IntTable::matchSlices(cb1.getIndices(), colIdx1, *newRelation, colIdx2);
-        for (int i = 0; i < slices->slices1->size(); i++) {
-            IntTable::sliceType& slice1 = *(*(slices->slices1))[i];
-            IntTable::sliceType& slice2 = *(*(slices->slices2))[i];
-            CompliedBlock* new_cb1 = CompliedBlock::create(
-                toArray<int*>(slice1), slice1.size(), partAssignedRule[tabIdx1].getArity(), true
-            );
-            CompliedBlock* new_cb2 = CompliedBlock::create(
-                toArray<int*>(slice2), slice2.size(), newRelation->getTotalCols(), true
-            );
-            entryType* new_entry = new entryType(*cache_entry);
-            (*new_entry)[tabIdx1] = new_cb1;
-            new_entry->push_back(new_cb2);
-            new_entries->push_back(new_entry);
-        }
-        delete slices;
-    }
-    releaseEntries();
-    entries = new_entries;
-}
-
-void CacheFragment::matchCacheEntries(
-    int const matchedTabIdx, int const matchedColIdx, int const matchingTabIdx, int const matchingColIdx
-) {
-    entriesType* new_entries = new entriesType();
-    if (matchedTabIdx == matchingTabIdx) {
-        for (entryType* const& cache_entry : *entries) {
-            CompliedBlock& cb = *(*cache_entry)[matchedTabIdx];
-            int const matched_constant = cb.getComplianceSet()[0][matchedColIdx];
-            IntTable::sliceType* slice = cb.getIndices().getSlice(matchingColIdx, matched_constant);
-            if (nullptr != slice) { // assertion: must be non-empty
-                CompliedBlock* new_cb = CompliedBlock::create(
-                    toArray<int*>(*slice), slice->size(), partAssignedRule[matchedTabIdx].getArity(), true
-                );
-                entryType* new_entry = new entryType(*cache_entry);
-                (*new_entry)[matchedTabIdx] = new_cb;
-                new_entries->push_back(new_entry);
-                IntTable::releaseSlice(slice);
-            }
-        }
-    } else {
-        for (entryType* const& cache_entry : *entries) {
-            CompliedBlock& matched_cb = *(*cache_entry)[matchedTabIdx];
-            CompliedBlock& matching_cb = *(*cache_entry)[matchingTabIdx];
-            int const matched_constant = matched_cb.getComplianceSet()[0][matchedColIdx];
-            IntTable::sliceType* slice = matching_cb.getIndices().getSlice(matchingColIdx, matched_constant);
-            if (nullptr != slice) { // assertion: must be non-empty
-                CompliedBlock* new_cb = CompliedBlock::create(
-                    toArray<int*>(*slice), slice->size(), partAssignedRule[matchingTabIdx].getArity(), true
-                );
-                entryType* new_entry = new entryType(*cache_entry);
-                (*new_entry)[matchingTabIdx] = new_cb;
-                new_entries->push_back(new_entry);
-                IntTable::releaseSlice(slice);
-            }
-        }
-    }
-    releaseEntries();
-    entries = new_entries;
-}
-
-void CacheFragment::matchCacheEntries(
-    int const matchedTabIdx, int const matchedColIdx, IntTable* const newRelation, int matchingColIdx
-) {
-    entriesType* new_entries = new entriesType();
-    for (entryType* const& cache_entry : *entries) {
-        CompliedBlock& matched_cb = *(*cache_entry)[matchedTabIdx];
-        int const matched_constant = matched_cb.getComplianceSet()[0][matchedColIdx];
-        IntTable::sliceType* slice = newRelation->getSlice(matchingColIdx, matched_constant);
-        if (nullptr != slice) { // assertion: must be non-empty
-            CompliedBlock* new_cb = CompliedBlock::create(toArray<int*>(*slice), slice->size(), newRelation->getTotalCols(), true);
-            entryType* new_entry = new entryType(*cache_entry);
-            new_entry->push_back(new_cb);
-            new_entries->push_back(new_entry);
-            IntTable::releaseSlice(slice);
-        }
-    }
-    releaseEntries();
-    entries = new_entries;
-}
-
-void CacheFragment::assignCacheEntries(int const tabIdx, int const colIdx, int const constant) {
-    entriesType* new_entries = new entriesType();
-    for (entryType* const& cache_entry : *entries) {
-        CompliedBlock& cb = *(*cache_entry)[tabIdx];
-        IntTable::sliceType* slice = cb.getIndices().getSlice(colIdx, constant);
-        if (nullptr != slice) { // assertion: must be non-empty
-            CompliedBlock* new_cb = CompliedBlock::create(
-                toArray<int*>(*slice), slice->size(), partAssignedRule[tabIdx].getArity(), true
-            );
-            entryType* new_entry = new entryType(*cache_entry);
-            (*new_entry)[tabIdx] = new_cb;
-            new_entries->push_back(new_entry);
-            IntTable::releaseSlice(slice);
-        }
-    }
-    releaseEntries();
-    entries = new_entries;
-}
-
-void CacheFragment::addVarInfo(int const vid, int const tabIdx, int const colIdx, bool const isPlv) {
-    if (vid < varInfoList.size()) {
-        varInfoList[vid].tabIdx = tabIdx;
-        varInfoList[vid].colIdx = colIdx;
-        varInfoList[vid].isPlv = isPlv;
-    } else {
-        varInfoList.reserve(vid + 1);
-        for (int i = varInfoList.size(); i < vid; i++) {
-            varInfoList.emplace_back(-1, -1, false);
-        }
-        varInfoList.emplace_back(tabIdx, colIdx, isPlv);
-    }
-}
-
-CacheFragment::const2EntriesMapType* CacheFragment::calcConst2EntriesMap(
-    entriesType const& entries, int const tabIdx, int const colIdx, int const arity
-) {
-    const2EntriesMapType* const_2_entries_map = new const2EntriesMapType();
-    for (entryType* const& cache_entry: entries) {
-        CompliedBlock& cb = *(*cache_entry)[tabIdx];
-        IntTable::slicesType* slices = cb.getIndices().splitSlices(colIdx);
-        for (IntTable::sliceType* slice: *slices) {
-            int const constant = (*slice)[0][colIdx];
-            entriesType* entries_of_the_value;
-            const2EntriesMapType::iterator itr = const_2_entries_map->find(constant);
-            if (itr == const_2_entries_map->end()) {
-                entries_of_the_value = new entriesType();
-                const_2_entries_map->emplace(constant, entries_of_the_value);
-            } else {
-                entries_of_the_value = itr->second;
-            }
-            entryType* new_entry = new entryType(*cache_entry);
-            (*new_entry)[tabIdx] = CompliedBlock::create(toArray<int*>(*slice), slice->size(), arity, true);
-            entries_of_the_value->push_back(new_entry);
-        }
-        IntTable::releaseSlices(slices);
-    }
-    return const_2_entries_map;
-}
-
-void CacheFragment::mergeFragmentEntries(
-    const2EntriesMapType const& baseConst2EntriesMap, const2EntriesMapType const& mergingConst2EntriesMap
-) {
-    entriesType* new_entries = new entriesType();
-    for (std::pair<const int, entriesType*> const& base_map_kv: baseConst2EntriesMap) {
-        const2EntriesMapType::const_iterator merging_itr = mergingConst2EntriesMap.find(base_map_kv.first);
-        if (mergingConst2EntriesMap.end() != merging_itr) {
-            for (entryType* base_entry: *(base_map_kv.second)) {
-                for (entryType* merging_entry: *(merging_itr->second)) {
-                    entryType* new_entry = new entryType(*base_entry);
-                    new_entry->reserve(new_entry->size() + merging_entry->size());
-                    new_entry->insert(new_entry->end(), merging_entry->begin(), merging_entry->end());
-                    new_entries->push_back(new_entry);
-                }
-            }
-        }
-    }
-    releaseEntries();
-    entries = new_entries;
-}
-
-void CacheFragment::mergeFragmentEntries(
-    entriesType const& baseEntries, int const tabIdx, int const colIdx, const2EntriesMapType const& mergingConst2EntriesMap
-) {
-    entriesType* new_entries = new entriesType();
-    for (entryType* const& base_entry: baseEntries) {
-        int const constant = (*base_entry)[tabIdx]->getComplianceSet()[0][colIdx];
-        const2EntriesMapType::const_iterator merging_itr = mergingConst2EntriesMap.find(constant);
-        if (mergingConst2EntriesMap.end() != merging_itr) {
-            for (entryType* merging_entry: *(merging_itr->second)) {
-                entryType* new_entry = new entryType(*base_entry);
-                new_entry->reserve(new_entries->size() + merging_entry->size());
-                new_entry->insert(new_entry->end(), merging_entry->begin(), merging_entry->end());
-                new_entries->push_back(new_entry);
-            }
-        }
-    }
-    releaseEntries();
-    entries = new_entries;
-}
-
-void CacheFragment::releaseConst2EntryMap(const2EntriesMapType* map) {
-    for (std::pair<const int, entriesType*> const& kv : *map) {
-        for (entryType* const& entry: *(kv.second)) {
-            delete entry;
-        }
-        delete kv.second;
-    }
-    delete map;
-}
-
-void CacheFragment::addCompletePlvBindings(
-    std::unordered_set<Record>& completeBindings, std::unordered_set<Record>* const plvBindingSets, int* const argTemplate,
-    int const bindingSetIdx, int const templateStartIdx, int const numSets
-) const {
-    std::unordered_set<Record> const& plv_bindings = plvBindingSets[bindingSetIdx];
-    std::unordered_set<Record>::const_iterator itr = plv_bindings.begin();
-    int binding_length = itr->getArity();   // assertion: at least one element will be in the set
-    if (bindingSetIdx == numSets - 1) {
-        /* Complete each template and add to the set */
-        while (plv_bindings.end() != itr) {
-            int* plv_binding = itr->getArgs();
-            int* copy_start = argTemplate + templateStartIdx;
-            for (int i = 0; i < binding_length; i++) {
-                copy_start[i] = plv_binding[i];
-            }
-            int template_length = templateStartIdx + binding_length;
-            int* copied_binding = new int[template_length];
-            for (int i = 0; i < template_length; i++) {
-                copied_binding[i] = argTemplate[i];
-            }
-            if (!completeBindings.emplace(copied_binding, template_length).second) {
-                delete[] copied_binding;
-            }
-            itr++;
-        }
-    } else {
-        /* Complete part of the template and move to next recursion */
-        while (plv_bindings.end() != itr) {
-            int* plv_binding = itr->getArgs();
-            int* copy_start = argTemplate + templateStartIdx;
-            for (int i = 0; i < binding_length; i++) {
-                copy_start[i] = plv_binding[i];
-            }
-            addCompletePlvBindings(
-                    completeBindings, plvBindingSets, argTemplate, bindingSetIdx+1, templateStartIdx+binding_length, numSets
-            );
-            itr++;
-        }
-    }
-}
-
-void CacheFragment::addPlvBindings2Templates(
-    std::unordered_set<Record>& templateSet, std::unordered_set<Record>* const plvBindingSets,
-    std::vector<int>** const plv2TemplateIdxLists, int* const argTemplate, int const setIdx, int const numSets, int const templateLength
-) const {
-    std::unordered_set<Record> const& plv_bindings = plvBindingSets[setIdx];
-    std::vector<int> const& plv_2_template_idxs = *(plv2TemplateIdxLists[setIdx]);
-    if (setIdx == numSets - 1) {
-        /* Finish the last group of PLVs, add to the template set */
-        for (Record const& plv_binding: plv_bindings) {
-            for (int i = 0; i < plv_binding.getArity(); i++) {
-                argTemplate[plv_2_template_idxs[i]] = plv_binding.getArgs()[i];
-            }
-            int* copied_binding = new int[templateLength];
-            for (int i = 0; i < templateLength; i++) {
-                copied_binding[i] = argTemplate[i];
-            }
-            if (!templateSet.emplace(copied_binding, templateLength).second) {
-                delete[] copied_binding;
-            }
-        }
-    } else {
-        /* Add current binding to the template and move to the next recursion */
-        for (Record const& plv_binding: plv_bindings) {
-            for (int i = 0; i < plv_binding.getArity(); i++) {
-                argTemplate[plv_2_template_idxs[i]] = plv_binding.getArgs()[i];
-            }
-            addPlvBindings2Templates(templateSet, plvBindingSets, plv2TemplateIdxLists, argTemplate, setIdx + 1, numSets, templateLength);
-        }
-    }
-}
-
-void CacheFragment::releaseEntries() {
-    for (entryType* entry: *entries) {
-        delete entry;
-    }
-    delete entries;
-    entries = nullptr;
+BodyGvLinkInfo::~BodyGvLinkInfo() {
+    delete headVarLocs;
 }
 
 /**
- * TabInfo
+ * PlvLoc
  */
-using sinc::TabInfo;
+using sinc::PlvLoc;
+PlvLoc::PlvLoc() : bodyPredIdx(-1), bodyArgIdx(-1), headArgIdx(-1) {}
 
-TabInfo::TabInfo(int const _fragmentIdx, int const _tabIdx) : fragmentIdx(_fragmentIdx), tabIdx(_tabIdx) {}
+PlvLoc::PlvLoc(int const _bodyPredIdx, int const _bodyArgIdx, int const _headArgIdx) :
+    bodyPredIdx(_bodyPredIdx), bodyArgIdx(_bodyArgIdx), headArgIdx(_headArgIdx) {}
 
-TabInfo::TabInfo(const TabInfo& another) : fragmentIdx(another.fragmentIdx), tabIdx(another.tabIdx) {}
+PlvLoc::PlvLoc(const PlvLoc& another) : bodyPredIdx(another.bodyPredIdx), bodyArgIdx(another.bodyArgIdx), headArgIdx(another.headArgIdx) {}
 
-bool TabInfo::isEmpty() const {
-    return -1 == fragmentIdx;
+bool PlvLoc::isEmpty() const {
+    return -1 == bodyPredIdx;
 }
 
-TabInfo& TabInfo::operator=(TabInfo&& another) noexcept {
-    fragmentIdx = another.fragmentIdx;
-    tabIdx = another.tabIdx;
-    return *this;
-}
-
-TabInfo& TabInfo::operator=(const TabInfo& another) noexcept {
-    fragmentIdx = another.fragmentIdx;
-    tabIdx = another.tabIdx;
-    return *this;
-}
-
-bool TabInfo::operator==(const TabInfo &another) const {
-    return fragmentIdx == another.fragmentIdx && tabIdx == another.tabIdx;
+void PlvLoc::setEmpty() {
+    bodyPredIdx = -1;
 }
 
 /**
@@ -1039,32 +266,47 @@ CachedRule::CachedRule(
     std::vector<int*> const& non_entailed_record_vector = *(split_records->nonEntailedRecords);
     std::vector<int*> const& entailed_record_vector = *(split_records->entailedRecords);
     if (0 == entailed_record_vector.size()) {
-        posCache = new CacheFragment(head_relation, headPredSymbol);
-        entCache = new CacheFragment(headPredSymbol, arity);
+        CompliedBlock* cb_head = CompliedBlock::create(
+            head_relation->getAllRows(), head_relation->getTotalRows(), arity, head_relation, false, false
+        );
+        entryType* pos_init_entry = new entryType();
+        pos_init_entry->push_back(cb_head);
+        posCache = new entriesType();
+        posCache->push_back(pos_init_entry);
+        entCache = new entriesType();
     } else if (0 == non_entailed_record_vector.size()) {
         /* No record to entail, E+-cache and T-cache are both empty */
-        posCache = new CacheFragment(headPredSymbol, arity);
-        entCache = new CacheFragment(headPredSymbol, arity);
+        posCache = new entriesType();
+        entCache = new entriesType();
     } else {
         int** non_entailed_records = toArray(non_entailed_record_vector);
-        int** entailed_records = toArray(entailed_record_vector);
         IntTable* non_entailed_record_table = new IntTable(non_entailed_records, non_entailed_record_vector.size(), arity);
+        CompliedBlock* cb_head = CompliedBlock::create(
+            non_entailed_records, non_entailed_record_vector.size(), arity, non_entailed_record_table, true, true
+        );
+        entryType* pos_init_entry = new entryType();
+        pos_init_entry->push_back(cb_head);
+        posCache = new entriesType();
+        posCache->push_back(pos_init_entry);
+
+        int** entailed_records = toArray(entailed_record_vector);
         IntTable* entailed_record_table = new IntTable(entailed_records, entailed_record_vector.size(), arity);
-        posCache = new CacheFragment(
-            CompliedBlock::create(non_entailed_records, non_entailed_record_vector.size(), arity, non_entailed_record_table, true, true), 
-            headPredSymbol
+        CompliedBlock* cb_head_ent = CompliedBlock::create(
+            entailed_records, entailed_record_vector.size(), arity, entailed_record_table, true, true
         );
-        entCache = new CacheFragment(
-            CompliedBlock::create(entailed_records, entailed_record_vector.size(), arity, entailed_record_table, true, true),
-            headPredSymbol
-        );
+        entryType* ent_init_entry = new entryType();
+        ent_init_entry->push_back(cb_head_ent);
+        entCache = new entriesType();
+        entCache->push_back(ent_init_entry);
     }
     maintainPosCache = true;
     maintainEntCache = true;
 
     /* Initialize the E-cache */
-    allCache = new std::vector<CacheFragment*>();
-    predIdx2AllCacheTableInfo.emplace_back(-1, -1);    // head is not mapped to any fragment
+    entryType* all_init_entry = new entryType();
+    all_init_entry->push_back(nullptr); // Keep the same length of the cache entries
+    allCache = new entriesType();
+    allCache->push_back(all_init_entry);
     maintainAllCache = true;
 
     /* Initial evaluation */
@@ -1077,19 +319,25 @@ CachedRule::CachedRule(
 
 CachedRule::CachedRule(const CachedRule& another) : Rule(another), kb(another.kb), posCache(another.posCache), maintainPosCache(false),
     entCache(another.entCache), maintainEntCache(false), allCache(another.allCache), maintainAllCache(false), 
-    predIdx2AllCacheTableInfo(another.predIdx2AllCacheTableInfo)
+    plvList(another.plvList)
 {}
 
 CachedRule::~CachedRule() {
     if (maintainPosCache) {
+        for (entryType* const& entry: *posCache) {
+            delete entry;
+        }
         delete posCache;
     }
     if (maintainEntCache) {
+        for (entryType* const& entry: *entCache) {
+            delete entry;
+        }
         delete entCache;
     }
     if (maintainAllCache) {
-        for (CacheFragment* const& fragment: *allCache) {
-            delete fragment;
+        for (entryType* const& entry: *allCache) {
+            delete entry;
         }
         delete allCache;
     }
@@ -1104,12 +352,22 @@ CachedRule* CachedRule::clone() const {
 
 void CachedRule::updateCacheIndices() {
     uint64_t time_start = currentTimeInNano();
-    posCache->buildIndices();
+    for (entryType* const& entry: *posCache) {
+        for (CompliedBlock* const& cb: *entry) {
+            cb->buildIndices();
+        }
+    }
     uint64_t time_pos_done = currentTimeInNano();
-    entCache->buildIndices();
+    for (entryType* const& entry: *entCache) {
+        for (CompliedBlock* const& cb: *entry) {
+            cb->buildIndices();
+        }
+    }
     uint64_t time_ent_done = currentTimeInNano();
-    for (CacheFragment* const& fragment: *allCache) {
-        fragment->buildIndices();
+    for (entryType* const& entry: *allCache) {
+        for (int pred_idx = FIRST_BODY_PRED_IDX; pred_idx < structure.size(); pred_idx++) {
+            (*entry)[pred_idx]->buildIndices();
+        }
     }
     uint64_t time_all_done = currentTimeInNano();
     posCacheIndexingTime = time_pos_done - time_start;
@@ -1126,7 +384,7 @@ sinc::EvidenceBatch* CachedRule::getEvidenceAndMarkEntailment() {
     }
 
     SimpleRelation& target_relation = *(kb.getRelation(getHead().getPredSymbol()));
-    for (CacheFragment::entryType* const& cache_entry: posCache->getEntries()) {
+    for (entryType* const& cache_entry: *posCache) {
         /* Find the grounding body */
         int** grounding_template = new int*[structure.size()];
         for (int pred_idx = FIRST_BODY_PRED_IDX; pred_idx < structure.size(); pred_idx++) {
@@ -1187,64 +445,114 @@ std::unordered_set<sinc::Record>* CachedRule::getCounterexamples() const {
         }
     }
 
-    std::unordered_set<Record>* head_templates = new std::unordered_set<Record>();
-    int* cloned_args = new int[head_arity];
-    std::copy(head_pred.getArgs(), head_pred.getArgs() + head_arity, cloned_args);
-    if (allCache->empty()) {
-        /* If body is empty, create a single empty head template. The execution flow will go to line [a] */
-        head_templates->emplace(cloned_args, head_arity); // copy constant in head if any
-    } else {
-        /* Locate and remove GVs in head */
-        std::vector<int> gvids_in_all_cache_fragments[allCache->size()];
-        std::vector<std::vector<int>> head_arg_idx_lists[allCache->size()];
-        for (int frag_idx = 0; frag_idx < allCache->size(); frag_idx++) {
-            gvids_in_all_cache_fragments[frag_idx].reserve(head_arity);
-            head_arg_idx_lists[frag_idx].reserve(head_arity);
+    /* Find GVs and PLVs in the body and their links to the head */
+    /* List and group the argument indices of PLVs in each predicate */
+    std::vector<BodyGvLinkInfo> pred_idx_2_plv_links[structure.size()];
+    int pred_with_plvs_cnt = 0;
+    for (int vid = 0; vid < plvList.size(); vid++) {
+        PlvLoc const& plv_loc = plvList[vid];
+        if (!plv_loc.isEmpty()) {
+            std::unordered_map<int, std::vector<int> *>::iterator itr = head_only_vid_2_loc_map.find(vid);    // assertion: will be found
+            std::vector<int>* head_var_locs = itr->second;
+            head_only_vid_2_loc_map.erase(itr);
+            if (pred_idx_2_plv_links[plv_loc.bodyPredIdx].empty()) {
+                pred_idx_2_plv_links[plv_loc.bodyPredIdx].reserve(usedLimitedVars());
+                pred_with_plvs_cnt++;
+            }
+            pred_idx_2_plv_links[plv_loc.bodyPredIdx].emplace_back(plv_loc.bodyPredIdx, plv_loc.bodyArgIdx, head_var_locs);
         }
-        for (std::unordered_map<int, std::vector<int>*>::iterator itr = head_only_vid_2_loc_map.begin();
-                itr != head_only_vid_2_loc_map.end();) {
-            const int& head_vid = itr->first;
-            std::vector<int>& head_var_arg_idxs = *(itr->second);
-            bool found = false;
-            for (int frag_idx = 0; frag_idx < allCache->size(); frag_idx++) {
-                if ((*allCache)[frag_idx]->hasLv(head_vid)) {
-                    gvids_in_all_cache_fragments[frag_idx].push_back(head_vid);
-                    head_arg_idx_lists[frag_idx].push_back(head_var_arg_idxs);
-                    found = true;
-                    break;
+    }
+    std::vector<BodyGvLinkInfo> body_gv_links;
+    body_gv_links.reserve(usedLimitedVars());
+    for (int pred_idx = FIRST_BODY_PRED_IDX; pred_idx < structure.size(); pred_idx++) {
+        Predicate const& body_pred = structure[pred_idx];
+        for (int arg_idx = 0; arg_idx < body_pred.getArity(); arg_idx++) {
+            int argument = body_pred.getArg(arg_idx);
+            if (ARG_IS_VARIABLE(argument)) {
+                std::unordered_map<int, std::vector<int> *>::iterator itr = head_only_vid_2_loc_map.find(ARG_DECODE(argument));
+                if (head_only_vid_2_loc_map.end() != itr) {
+                    std::vector<int>* head_gv_locs = itr->second;
+                    head_only_vid_2_loc_map.erase(itr);
+                    body_gv_links.emplace_back(pred_idx, arg_idx, head_gv_locs);
                 }
             }
-            if (found) {
-                delete itr->second;
-                itr = head_only_vid_2_loc_map.erase(itr);
-            } else {
-                itr++;
-            }
         }
+    }
 
-        /* Enumerate GV bindings in fragments and generate head templates */
-        std::vector<int> valid_frag_indices;
-        valid_frag_indices.reserve(allCache->size());
-        std::unordered_set<Record>* bindings_in_fragments[allCache->size()]{};
-        for (int frag_idx = 0; frag_idx < allCache->size(); frag_idx++) {
-            if (!gvids_in_all_cache_fragments[frag_idx].empty()) {
-                valid_frag_indices.push_back(frag_idx);
-                bindings_in_fragments[frag_idx] = (*allCache)[frag_idx]->enumerateCombinations(gvids_in_all_cache_fragments[frag_idx]); // TODO: Directly instantiate bindings to template, so that the following function call can be removed
-            }
-        }
-        generateHeadTemplates(
-            *head_templates, bindings_in_fragments, head_arg_idx_lists, cloned_args, valid_frag_indices, head_arity, 0
-        );
-        for (int frag_idx = 0; frag_idx < allCache->size(); frag_idx++) {
-            std::unordered_set<Record>* bindings_in_fragment = bindings_in_fragments[frag_idx];
-            if (nullptr != bindings_in_fragment) {
-                for (Record const& r: *bindings_in_fragment) {
-                    delete[] r.getArgs();
+    /* Bind GVs in the head, producing templates */
+    std::unordered_set<Record>* head_templates = new std::unordered_set<Record>();
+    if (0 == pred_with_plvs_cnt) {
+        /* No PLV, bind all GVs as templates */
+        for (entryType* const& cache_entry: *allCache) {
+            int* new_template = new int[head_arity];
+            std::copy(head_pred.getArgs(), head_pred.getArgs() + head_arity, new_template);
+            for (BodyGvLinkInfo const& gv_link: body_gv_links) {
+                int const val = (*cache_entry)[gv_link.bodyPredIdx]->getComplianceSet()[0][gv_link.bodyArgIdx];
+                for (int const& head_arg_idx: *gv_link.headVarLocs) {
+                    new_template[head_arg_idx] = val;
                 }
-                delete bindings_in_fragment;
+            }
+            std::pair<std::unordered_set<Record>::iterator, bool> ret = head_templates->emplace(new_template, head_arity);
+            if (!ret.second) {
+                delete[] new_template;
             }
         }
-        delete[] cloned_args;
+    } else {
+        /* There are PLVs in the body */
+        /* Find the bindings combinations of the GVs and the PLVs */
+        int* base_template = new int[head_arity];
+        std::copy(head_pred.getArgs(), head_pred.getArgs() + head_arity, base_template);
+        std::unordered_set<Record> plv_bindings_within_pred_sets[pred_with_plvs_cnt];
+        std::vector<BodyGvLinkInfo>* plv_link_lists[pred_with_plvs_cnt]{};
+        for (entryType* const& cache_entry: *allCache) {
+            /* Bind the GVs first */
+            for (BodyGvLinkInfo const& gv_link: body_gv_links) {
+                int const val = (*cache_entry)[gv_link.bodyPredIdx]->getComplianceSet()[0][gv_link.bodyArgIdx];
+                for (int const& head_arg_idx: *gv_link.headVarLocs) {
+                    base_template[head_arg_idx] = val;
+                }
+            }
+
+            /* Find the combinations of PLV bindings */
+            /* Note: the PLVs in the same predicate should be bind at the same time according to the records in the
+                compliance set, and find the cartesian products of the groups of PLVs bindings. */
+            {
+                int i = 0;
+                for (int body_pred_idx = FIRST_BODY_PRED_IDX; body_pred_idx < structure.size(); body_pred_idx++) {
+                    std::vector<BodyGvLinkInfo>& plv_links = pred_idx_2_plv_links[body_pred_idx];
+                    if (plv_links.empty()) {
+                        continue;
+                    }
+                    std::unordered_set<Record>& plv_bindings = plv_bindings_within_pred_sets[i];
+                    CompliedBlock const& cb = *((*cache_entry)[body_pred_idx]);
+                    for (int j = 0; j < cb.getTotalRows(); j++) {
+                        int* const cs_record = cb.getComplianceSet()[j];
+                        int* const plv_binding_within_a_pred = new int[plv_links.size()];
+                        for (int k = 0; k < plv_links.size(); k++) {
+                            plv_binding_within_a_pred[k] = cs_record[plv_links[k].bodyArgIdx];
+                        }
+                        std::pair<std::unordered_set<Record>::iterator, bool> ret = plv_bindings.emplace(
+                            plv_binding_within_a_pred, plv_links.size()
+                        );
+                        if (!ret.second) {
+                            delete[] plv_binding_within_a_pred;
+                        }
+                    }
+                    plv_link_lists[i] = &plv_links;
+                    i++;
+                }
+            }
+            addBodyPlvBindings2HeadTemplates(
+                *head_templates, plv_bindings_within_pred_sets, plv_link_lists, base_template, 0, pred_with_plvs_cnt, head_arity
+            );
+            for (std::unordered_set<Record>& plv_bindings_within_pred_set: plv_bindings_within_pred_sets) {
+                for (Record const& record: plv_bindings_within_pred_set) {
+                    delete[] record.getArgs();
+                }
+                plv_bindings_within_pred_set.clear();
+            }
+        }
+        delete[] base_template;
     }
 
     /* Extend head templates */
@@ -1286,16 +594,22 @@ std::unordered_set<sinc::Record>* CachedRule::getCounterexamples() const {
 
 void CachedRule::releaseMemory() {
     if (maintainPosCache) {
+        for (entryType* const& entry: *posCache) {
+            delete entry;
+        }
         delete posCache;
         maintainPosCache = false;
     }
     if (maintainEntCache) {
+        for (entryType* const& entry: *entCache) {
+            delete entry;
+        }
         delete entCache;
         maintainEntCache = false;
     }
     if (maintainAllCache) {
-        for (CacheFragment* const& fragment: *allCache) {
-            delete fragment;
+        for (entryType* const& entry: *allCache) {
+            delete entry;
         }
         delete allCache;
         maintainAllCache = false;
@@ -1330,51 +644,66 @@ uint64_t CachedRule::getAllCacheIndexingTime() const {
     return allCacheIndexingTime;
 }
 
-const CacheFragment& CachedRule::getPosCache() const {
+const CachedRule::entriesType& CachedRule::getPosCache() const {
     return *posCache;
 }
 
-const CacheFragment& CachedRule::getEntCache() const {
+const CachedRule::entriesType& CachedRule::getEntCache() const {
     return *entCache;
 }
 
-const std::vector<CacheFragment*>& CachedRule::getAllCache() const {
+const CachedRule::entriesType& CachedRule::getAllCache() const {
     return *allCache;
 }
 
 void CachedRule::obtainPosCache() {
     if (!maintainPosCache) {
-        posCache = new CacheFragment(*posCache);
+        entriesType* entries = new entriesType();
+        for (entryType* const& entry: *posCache) {
+            entries->emplace_back(new entryType(*entry));
+        }
+        posCache = entries;
         maintainPosCache = true;
     }
 }
 
 void CachedRule::obtainEntCache() {
     if (!maintainEntCache) {
-        entCache = new CacheFragment(*entCache);
+        entriesType* entries = new entriesType();
+        for (entryType* const& entry: *entCache) {
+            entries->emplace_back(new entryType(*entry));
+        }
+        entCache = entries;
         maintainEntCache = true;
     }
 }
 
 void CachedRule::obtainAllCache() {
     if (!maintainAllCache) {
-        std::vector<CacheFragment*>* _all_cache = new std::vector<CacheFragment*>();
-        _all_cache->reserve(allCache->size());
-        for (CacheFragment* const& fragment: *allCache) {
-            _all_cache->push_back(new CacheFragment(*fragment));
+        entriesType* entries = new entriesType();
+        for (entryType* const& entry: *allCache) {
+            entries->emplace_back(new entryType(*entry));
         }
-        allCache = _all_cache;
+        allCache = entries;
         maintainAllCache = true;
     }
 }
 
 double CachedRule::recordCoverage() {
-    return ((double) posCache->countTableSize(HEAD_PRED_IDX)) / kb.getRelation(getHead().getPredSymbol())->getTotalRows();
+    std::unordered_set<int*> entailed_head;
+    for (entryType* const& entry: *posCache) {
+        CompliedBlock& cb = *((*entry)[HEAD_PRED_IDX]);
+        int* const* const rows = cb.getComplianceSet();
+        for (int i = 0; i < cb.getTotalRows(); i++) {
+            entailed_head.insert(rows[i]);
+        }
+    }
+    return ((double) entailed_head.size()) / kb.getRelation(getHead().getPredSymbol())->getTotalRows();
 }
 
 sinc::Eval CachedRule::calculateEval() const {
     /* Find all variables in the head */
-    std::unordered_set<int> head_only_lvs;  // For the head only LVs
+    std::unordered_set<int> head_only_lv_args;  // For the head only LVs
     int head_uv_cnt = 0;
     Predicate const& head_pred = getHead();
     for (int arg_idx = 0; arg_idx < head_pred.getArity(); arg_idx++) {
@@ -1382,50 +711,216 @@ sinc::Eval CachedRule::calculateEval() const {
         if (ARG_IS_EMPTY(argument)) {
             head_uv_cnt++;
         } else if (ARG_IS_VARIABLE(argument)) {
-            head_only_lvs.insert(ARG_DECODE(argument));    // The GVs will be removed later
+            head_only_lv_args.insert(argument);    // The GVs will be removed later
         }
     }
 
-    /* Locate and remove GVs */
-    std::vector<int> gvs_in_all_cache_fragments[allCache->size()];
-    for (std::unordered_set<int>::iterator itr = head_only_lvs.begin(); itr != head_only_lvs.end(); ) {
-        int const& head_lv = *itr;
-        bool found = false;
-        for (int frag_idx = 0; frag_idx < allCache->size(); frag_idx++) {
-            if ((*allCache)[frag_idx]->hasLv(head_lv)) {
-                gvs_in_all_cache_fragments[frag_idx].push_back(head_lv);
-                found = true;
-                break;
+    /* Find the first location of GVs in the body */
+    std::vector<ArgLocation> body_gv_locs;   // PLVs are not included
+    for (int pred_idx = FIRST_BODY_PRED_IDX; pred_idx < structure.size(); pred_idx++) {
+        Predicate const& body_pred = structure[pred_idx];
+        for (int arg_idx = 0; arg_idx < body_pred.getArity(); arg_idx++) {
+            int argument = body_pred.getArg(arg_idx);
+            if (head_only_lv_args.erase(argument) && plvList[ARG_DECODE(argument)].isEmpty()) {
+                body_gv_locs.emplace_back(pred_idx, arg_idx);
             }
         }
-        if (found) {
-            itr = head_only_lvs.erase(itr);
-        } else {
-            itr++;
-        }
     }
 
-    /* Count the number of entailments */
-    double all_ent = pow(kb.totalConstants(), head_uv_cnt + head_only_lvs.size());
-    for (int i = 0; i < allCache->size(); i++) {
-        std::vector<int> const& vids = gvs_in_all_cache_fragments[i];
-        if (!vids.empty()) {
-            CacheFragment const& fragment = *(*allCache)[i];
-            all_ent *= fragment.countCombinations(vids);
+    /* Count the number of all entailments */
+    bool no_plv_in_rule = true;
+    for (PlvLoc const& plv_loc: plvList) {
+        if (!plv_loc.isEmpty()) {
+            no_plv_in_rule = false;
+            break;
         }
     }
-    int new_pos_ent = posCache->countTableSize(HEAD_PRED_IDX);
-    int already_ent = entCache->countTableSize(HEAD_PRED_IDX);
+    int body_gv_plv_bindings_cnt = 0;
+    if (no_plv_in_rule) {
+        /* Count all combinations of body GVs */
+        std::unordered_set<Record> body_gv_bindings;
+        for (entryType* const& cache_entry: *allCache) {
+            int* binding = new int[body_gv_locs.size()];
+            for (int i = 0; i < body_gv_locs.size(); i++) {
+                ArgLocation const& loc = body_gv_locs[i];
+                binding[i] = (*cache_entry)[loc.predIdx]->getComplianceSet()[0][loc.argIdx];
+            }
+            std::pair<std::unordered_set<Record>::iterator, bool> ret = body_gv_bindings.emplace(binding, body_gv_locs.size());
+            if (!ret.second) {
+                delete[] binding;
+            }
+        }
+        body_gv_plv_bindings_cnt = body_gv_bindings.size();
+        for (Record const& record: body_gv_bindings) {
+            delete[] record.getArgs();
+        }
+    } else {
+        /* List argument indices of PLVs in each predicate */
+        std::vector<int> plv_arg_index_lists[structure.size()]; // Predicate index is the index of the array
+        int preds_containing_plvs = 0;
+        for (PlvLoc const& plv_loc: plvList) {
+            if (!plv_loc.isEmpty()) {
+                if (plv_arg_index_lists[plv_loc.bodyPredIdx].empty()) {
+                    preds_containing_plvs++;
+                }
+                plv_arg_index_lists[plv_loc.bodyPredIdx].push_back(plv_loc.bodyArgIdx);
+            }
+        }
+
+        /* Count the number of the combinations of GVs and PLVs */
+        std::unordered_map<Record, std::unordered_set<Record>*> body_gv_binding_2_plv_bindings;
+        std::unordered_set<Record> plv_bindings_within_pred_sets[preds_containing_plvs];
+        for (entryType* const& cache_entry: *allCache) {
+            /* Find the GV combination */
+            int* gv_binding = new int[body_gv_locs.size()];
+            for (int i = 0; i < body_gv_locs.size(); i++) {
+                ArgLocation const& loc = body_gv_locs[i];
+                gv_binding[i] = (*cache_entry)[loc.predIdx]->getComplianceSet()[0][loc.argIdx];
+            }
+
+            /* Find the combinations of PLV bindings */
+            /* Note: the PLVs in the same predicate should be bind at the same time according to the records in the
+                compliance set, and find the cartesian products of the groups of PLVs bindings. */
+            int total_binding_length = 0;
+            {
+                int i = 0;
+                for (int body_pred_idx = FIRST_BODY_PRED_IDX; body_pred_idx < structure.size(); body_pred_idx++) {
+                    std::vector<int>& plv_arg_idxs = plv_arg_index_lists[body_pred_idx];
+                    if (!plv_arg_idxs.empty()) {
+                        std::unordered_set<Record>& plv_bindings = plv_bindings_within_pred_sets[i];
+                        CompliedBlock const& cb = *((*cache_entry)[body_pred_idx]);
+                        int* const* rows = cb.getComplianceSet();
+                        for (int k = 0; k < cb.getTotalRows(); k++) {
+                            int* cs_record = rows[k];
+                            int* plv_binding_within_pred = new int[plv_arg_idxs.size()];
+                            for (int j = 0; j < plv_arg_idxs.size(); j++) {
+                                plv_binding_within_pred[j] = cs_record[plv_arg_idxs[j]];
+                            }
+                            std::pair<std::unordered_set<Record>::iterator, bool> ret = plv_bindings.emplace(
+                                plv_binding_within_pred, plv_arg_idxs.size()
+                            );
+                            if (!ret.second) {
+                                delete[] plv_binding_within_pred;
+                            }
+                        }
+                        i++;
+                        total_binding_length += plv_arg_idxs.size();
+                    }
+                }
+            }
+            std::unordered_set<Record>* complete_plv_bindings;
+            Record gv_binding_rec(gv_binding, body_gv_locs.size());
+            std::unordered_map<Record, std::unordered_set<Record>*>::iterator itr = body_gv_binding_2_plv_bindings.find(gv_binding_rec);
+            if (body_gv_binding_2_plv_bindings.end() == itr) {
+                complete_plv_bindings = new std::unordered_set<Record>();
+                body_gv_binding_2_plv_bindings.emplace(gv_binding_rec, complete_plv_bindings);
+            } else {
+                complete_plv_bindings = itr->second;
+                delete[] gv_binding;
+            }
+            int* arg_template = new int[total_binding_length];
+            addCompleteBodyPlvBindings(
+                    *complete_plv_bindings, plv_bindings_within_pred_sets, arg_template, 0, 0, preds_containing_plvs, total_binding_length
+            );
+            delete[] arg_template;
+            for (std::unordered_set<Record>& plv_bindings_within_pred_set: plv_bindings_within_pred_sets) {
+                for (Record const& record: plv_bindings_within_pred_set) {
+                    delete[] record.getArgs();
+                }
+                plv_bindings_within_pred_set.clear();
+            }
+        }
+        for (std::pair<const Record, std::unordered_set<Record>*> const& kv: body_gv_binding_2_plv_bindings) {
+            body_gv_plv_bindings_cnt += kv.second->size();
+            delete[] kv.first.getArgs();
+            for (Record const& record: *(kv.second)) {
+                delete[] record.getArgs();
+            }
+            delete kv.second;
+        }
+    }
+    double all_entails = body_gv_plv_bindings_cnt * std::pow(
+            kb.totalConstants(), head_uv_cnt + head_only_lv_args.size()
+    );
+    
+    /* Count for the total and new positive entailments */
+    std::unordered_set<int*> newly_proved;
+    std::unordered_set<int*> already_proved;
+    if (0 == head_uv_cnt) {
+        /* No UV in the head, PAR is the record */
+        for (entryType* const& cache_entry : *posCache) {
+            int* record = (*cache_entry)[HEAD_PRED_IDX]->getComplianceSet()[0];
+            newly_proved.insert(record);
+        }
+        for (entryType* const& cache_entry: *entCache) {
+            int* record = (*cache_entry)[HEAD_PRED_IDX]->getComplianceSet()[0];
+            already_proved.insert(record);
+        }
+    } else {
+        /* UVs in the head, find all records in the CSs */
+        for (entryType* const& cache_entry: *posCache) {
+            CompliedBlock const& cb = *((*cache_entry)[HEAD_PRED_IDX]);
+            int* const* rows = cb.getComplianceSet();
+            for (int i = 0; i < cb.getTotalRows(); i++) {
+                int* record = rows[i];
+                newly_proved.insert(record);
+            }
+        }
+        for (entryType* const& cache_entry: *entCache) {
+            CompliedBlock const& cb = *((*cache_entry)[HEAD_PRED_IDX]);
+            int* const* rows = cb.getComplianceSet();
+            for (int i = 0; i < cb.getTotalRows(); i++) {
+                int* record = rows[i];
+                already_proved.insert(record);
+            }
+        }
+    }
 
     /* Update evaluation score */
     /* Those already proved should be excluded from the entire entailment set. Otherwise, they are counted as negative ones */
-    return Eval(new_pos_ent, all_ent - already_ent, length);
+    return Eval(newly_proved.size(), all_entails - already_proved.size(), length);
+}
+
+void CachedRule::addCompleteBodyPlvBindings(
+        std::unordered_set<Record>& completeBindings, std::unordered_set<Record>* const plvBindingSets, int* const argTemplate,
+        int const bindingSetIdx, int const templateStartIdx, int const numSets, int const arity
+) const {
+    std::unordered_set<Record>& plv_bindings = plvBindingSets[bindingSetIdx];
+    std::unordered_set<Record>::iterator itr = plv_bindings.begin();
+    int binding_length = itr->getArity();
+    if (bindingSetIdx == numSets - 1) {
+        /* Complete each template and add to the set */
+        for (; plv_bindings.end() != itr; itr++) {
+            std::copy(itr->getArgs(), itr->getArgs() + binding_length, argTemplate + templateStartIdx);
+            int* new_arg = new int[arity];
+            std::copy(argTemplate, argTemplate + arity, new_arg);
+            std::pair<std::unordered_set<Record>::iterator, bool> ret = completeBindings.emplace(new_arg, arity);
+            if (!ret.second) {
+                delete[] new_arg;
+            }
+        }
+    } else {
+        /* Complete part of the template and move to next recursion */
+        for (; plv_bindings.end() != itr; itr++) {
+            std::copy(itr->getArgs(), itr->getArgs() + binding_length, argTemplate + templateStartIdx);
+            addCompleteBodyPlvBindings(
+                completeBindings, plvBindingSets, argTemplate, bindingSetIdx + 1, templateStartIdx + binding_length, numSets, arity
+            );
+        }
+    }
 }
 
 sinc::UpdateStatus CachedRule::specCase1HandlerPrePruning(int const predIdx, int const argIdx, int const varId) {
     uint64_t time_start = currentTimeInNano();
     obtainPosCache();
-    posCache->updateCase1a(predIdx, argIdx, varId);
+    for (ArgLocation const& arg_loc: *(limitedVarArgs[varId])) {
+        /* Find an argument that shares the same variable with the target */
+        if (arg_loc.predIdx != predIdx || arg_loc.argIdx != argIdx) {   // Don't compare with the target argument
+            /* Split */
+            posCache = splitCacheEntries(posCache, predIdx, argIdx, arg_loc.predIdx, arg_loc.argIdx);
+            break;
+        }
+    }
     uint64_t time_done = currentTimeInNano();
     posCacheUpdateTime = time_done - time_start;
     return UpdateStatus::Normal;
@@ -1434,46 +929,50 @@ sinc::UpdateStatus CachedRule::specCase1HandlerPrePruning(int const predIdx, int
 sinc::UpdateStatus CachedRule::specCase1HandlerPostPruning(int const predIdx, int const argIdx, int const varId) {
     uint64_t time_start = currentTimeInNano();
     obtainEntCache();
-    entCache->updateCase1a(predIdx, argIdx, varId);
+    for (ArgLocation const& arg_loc: *(limitedVarArgs[varId])) {
+        /* Find an argument that shares the same variable with the target */
+        if (arg_loc.predIdx != predIdx || arg_loc.argIdx != argIdx) {
+            /* Split */
+            entCache = splitCacheEntries(entCache, predIdx, argIdx, arg_loc.predIdx, arg_loc.argIdx);
+            break;
+        }
+    }
     uint64_t time_ent_done = currentTimeInNano();
 
     obtainAllCache();
     if (HEAD_PRED_IDX != predIdx) { // No need to update the E-cache if the update is in the head
-        TabInfo const& tab_info = predIdx2AllCacheTableInfo[predIdx];
-        CacheFragment* fragment = (*allCache)[tab_info.fragmentIdx];
-        bool cache_empty = false;
-        if (fragment->hasLv(varId)) {
-            /* Update within the fragment */
-            fragment->updateCase1a(tab_info.tabIdx, argIdx, varId);
-            cache_empty = fragment->isEmpty();
+        PlvLoc& plv_loc = plvList[varId];
+        if (!plv_loc.isEmpty()) {
+            /* Match the existing PLV, split */
+            allCache = splitCacheEntries(allCache, predIdx, argIdx, plv_loc.bodyPredIdx, plv_loc.bodyArgIdx);
+            plv_loc.setEmpty();
         } else {
-            /* Find the fragment that has the LV */
-            bool not_found = true;
-            for (int frag_idx2 = 0; frag_idx2 < allCache->size(); frag_idx2++) {
-                CacheFragment& fragment2 = *(*allCache)[frag_idx2];
-                if (fragment2.hasLv(varId)) {
-                    /* Find the LV in another fragment, merge the two fragments */
-                    not_found = false;
-                    int fragment_tab_idx = tab_info.tabIdx;
-                    mergeFragmentIndices(frag_idx2, tab_info.fragmentIdx);
-                    fragment2.updateCase1c(*fragment, fragment_tab_idx, argIdx, varId);
-                    cache_empty = fragment2.isEmpty();
-                    delete fragment;
+            bool found = false;
+            for (ArgLocation const& arg_loc: *(limitedVarArgs[varId])) {
+                /* Find an argument in the body that shares the same variable with the target */
+                if (HEAD_PRED_IDX != arg_loc.predIdx && (arg_loc.predIdx != predIdx || arg_loc.argIdx != argIdx)) { // Don't compare with the target argument
+                    /* Split */
+                    allCache = splitCacheEntries(allCache, predIdx, argIdx, arg_loc.predIdx, arg_loc.argIdx);
+                    found = true;
                     break;
                 }
             }
-            if (not_found) {
-                /* Update within the target fragment */
-                /* The var will be a PLV, so this fragment will not be empty */
-                fragment->updateCase1a(tab_info.tabIdx, argIdx, varId);
-            }
-        }
-        if (cache_empty) {
-            for (CacheFragment* const& _fragment: *allCache) {
-                _fragment->clear();
+            if (!found) {
+                /* No matching LV in the body, record as a PLV */
+                int const arg_var = ARG_VARIABLE(varId);
+                Predicate const& head_pred = getHead();
+                for (int arg_idx = 0; arg_idx < head_pred.getArity(); arg_idx++) {
+                    if (arg_var == head_pred.getArg(arg_idx)) {
+                        plvList[varId].bodyPredIdx = predIdx;
+                        plvList[varId].bodyArgIdx = argIdx;
+                        plvList[varId].headArgIdx = arg_idx;
+                        break;
+                    }
+                }
             }
         }
     }
+
     uint64_t time_all_done = currentTimeInNano();
     entCacheUpdateTime = time_ent_done - time_start;
     allCacheUpdateTime = time_all_done - time_ent_done;
@@ -1485,7 +984,15 @@ sinc::UpdateStatus CachedRule::specCase2HandlerPrePruning(int const predSymbol, 
     uint64_t time_start = currentTimeInNano();
     obtainPosCache();
     SimpleRelation* new_relation = kb.getRelation(predSymbol);
-    posCache->updateCase1b(new_relation, predSymbol, argIdx, varId);
+    for (ArgLocation const& arg_loc: *(limitedVarArgs[varId])) {
+        /* Find an argument that shares the same variable with the target */
+        if (arg_loc.predIdx != structure.size() - 1 || arg_loc.argIdx != argIdx) {  // Don't find in the appended predicate
+            /* Append + Split */
+            entriesType* tmp_cache = appendCacheEntries(posCache, new_relation);
+            posCache = splitCacheEntries(tmp_cache, structure.size() - 1, argIdx, arg_loc.predIdx, arg_loc.argIdx);
+            break;
+        }
+    }
     uint64_t time_done = currentTimeInNano();
     posCacheUpdateTime = time_done - time_start;
     return UpdateStatus::Normal;
@@ -1495,31 +1002,49 @@ sinc::UpdateStatus CachedRule::specCase2HandlerPostPruning(int const predSymbol,
     uint64_t time_start = currentTimeInNano();
     obtainEntCache();
     SimpleRelation* new_relation = kb.getRelation(predSymbol);
-    entCache->updateCase1b(new_relation, predSymbol, argIdx, varId);
-    uint64_t time_ent_done = currentTimeInNano();
-
-    obtainAllCache();
-    CacheFragment* updated_fragment = nullptr;
-    for (int frag_idx = 0; frag_idx < allCache->size(); frag_idx++) {
-        CacheFragment* fragment = (*allCache)[frag_idx];
-        if (fragment->hasLv(varId)) {
-            /* Append the new relation to the fragment that contains the LV */
-            updated_fragment = fragment;
-            predIdx2AllCacheTableInfo.emplace_back(frag_idx, fragment->getPartAssignedRule().size());
-            fragment->updateCase1b(new_relation, predSymbol, argIdx, varId);
+    for (ArgLocation const& arg_loc: *(limitedVarArgs[varId])) {
+        /* Find an argument that shares the same variable with the target */
+        if (arg_loc.predIdx != structure.size() - 1 || arg_loc.argIdx != argIdx) {  // Don't find in the appended predicate
+            /* Append + Split */
+            entriesType* tmp_cache = appendCacheEntries(entCache, new_relation);
+            entCache = splitCacheEntries(tmp_cache, structure.size() - 1, argIdx, arg_loc.predIdx, arg_loc.argIdx);
             break;
         }
     }
-    if (nullptr == updated_fragment) {
-        /* The LV has not been included in body yet. Create a new fragment */
-        updated_fragment = new CacheFragment(new_relation, predSymbol);
-        updated_fragment->updateCase1a(0, argIdx, varId);
-        predIdx2AllCacheTableInfo.emplace_back(allCache->size(), 0);
-        allCache->push_back(updated_fragment);
-    }
-    if (updated_fragment->isEmpty()) {
-        for (CacheFragment* const& _fragment: *allCache) {
-            _fragment->clear();
+    uint64_t time_ent_done = currentTimeInNano();
+
+    obtainAllCache();
+    PlvLoc& plv_loc = plvList[varId];
+    if (!plv_loc.isEmpty()) {
+        /* Match the found PLV, append then split */
+        entriesType* tmp_cache = appendCacheEntries(allCache, new_relation);
+        allCache = splitCacheEntries(tmp_cache, structure.size() - 1, argIdx, plv_loc.bodyPredIdx, plv_loc.bodyArgIdx);
+        plv_loc.setEmpty();
+    } else {
+        bool found = false;
+        for (ArgLocation const& arg_loc: *(limitedVarArgs[varId])) {
+            /* Find an argument in the body that shares the same variable with the target */
+            if (HEAD_PRED_IDX != arg_loc.predIdx && (arg_loc.predIdx != structure.size() - 1 || arg_loc.argIdx != argIdx)) { // Don't compare with the target argument
+                /* Append + Split */
+                entriesType* tmp_cache = appendCacheEntries(allCache, new_relation);
+                allCache = splitCacheEntries(tmp_cache, structure.size() - 1, argIdx, arg_loc.predIdx, arg_loc.argIdx);
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            /* No matching LV in the body, record as a PLV, and append */
+            int arg_var = ARG_VARIABLE(varId);
+            Predicate const& head_pred = getHead();
+            for (int arg_idx = 0; arg_idx < head_pred.getArity(); arg_idx++) {
+                if (arg_var == head_pred.getArg(arg_idx)) {
+                    plvList[varId].bodyPredIdx = structure.size() - 1;
+                    plvList[varId].bodyArgIdx = argIdx;
+                    plvList[varId].headArgIdx = arg_idx;
+                    break;
+                }
+            }
+            allCache = appendCacheEntries(allCache, new_relation);
         }
     }
     uint64_t time_all_done = currentTimeInNano();
@@ -1532,7 +1057,7 @@ sinc::UpdateStatus CachedRule::specCase2HandlerPostPruning(int const predSymbol,
 sinc::UpdateStatus CachedRule::specCase3HandlerPrePruning(int const predIdx1, int const argIdx1, int const predIdx2, int const argIdx2) {
     uint64_t time_start = currentTimeInNano();
     obtainPosCache();
-    posCache->updateCase2a(predIdx1, argIdx1, predIdx2, argIdx2, usedLimitedVars() - 1);
+    posCache = splitCacheEntries(posCache, predIdx1, argIdx1, predIdx2, argIdx2);
     uint64_t time_done = currentTimeInNano();
     posCacheUpdateTime = time_done - time_start;
     return UpdateStatus::Normal;
@@ -1541,46 +1066,26 @@ sinc::UpdateStatus CachedRule::specCase3HandlerPrePruning(int const predIdx1, in
 sinc::UpdateStatus CachedRule::specCase3HandlerPostPruning(int const predIdx1, int const argIdx1, int const predIdx2, int const argIdx2) {
     uint64_t time_start = currentTimeInNano();
     obtainEntCache();
-    int new_vid = usedLimitedVars() - 1;
-    entCache->updateCase2a(predIdx1, argIdx1, predIdx2, argIdx2, new_vid);
+    entCache = splitCacheEntries(entCache, predIdx1, argIdx1, predIdx2, argIdx2);
     uint64_t time_ent_done = currentTimeInNano();
 
     obtainAllCache();
-    TabInfo const& tab_info1 = predIdx2AllCacheTableInfo[predIdx1];
-    TabInfo const& tab_info2 = predIdx2AllCacheTableInfo[predIdx2];
-    CacheFragment* fragment1 = nullptr;
-    CacheFragment* fragment2 = nullptr;
-    if (HEAD_PRED_IDX == predIdx1) {
-        if (HEAD_PRED_IDX != predIdx2) {
-            /* Update the fragment of predIdx2 only */
-            fragment2 = (*allCache)[tab_info2.fragmentIdx];
-            fragment2->updateCase1a(tab_info2.tabIdx, argIdx2, new_vid);
-        }   //  Otherwise, update is in the head only, no need to change E-cache
-    } else {
-        fragment1 = (*allCache)[tab_info1.fragmentIdx];
-        if (HEAD_PRED_IDX != predIdx2) {
-            /* Update two predicates together */
-            if (tab_info1.fragmentIdx == tab_info2.fragmentIdx) {
-                /* Update within one fragment */
-                fragment1->updateCase2a(tab_info1.tabIdx, argIdx1, tab_info2.tabIdx, argIdx2, new_vid);
+    if (HEAD_PRED_IDX != predIdx1 || HEAD_PRED_IDX != predIdx2) {   // At least one modified predicate is in the body. Otherwise, nothing should be done.
+        if (HEAD_PRED_IDX == predIdx1 || HEAD_PRED_IDX == predIdx2) {   // One is the head and the other is not
+            /* The new variable is a PLV */
+            if (HEAD_PRED_IDX == predIdx1) {
+                plvList.emplace_back(predIdx2, argIdx2, argIdx1);
             } else {
-                /* Merge two fragments */
-                fragment2 = (*allCache)[tab_info2.fragmentIdx];
-                int fragment2_tab_idx = tab_info2.tabIdx;
-                mergeFragmentIndices(tab_info1.fragmentIdx, tab_info2.fragmentIdx);
-                fragment1->updateCase2c(tab_info1.tabIdx, argIdx1, *fragment2, fragment2_tab_idx, argIdx2, new_vid);
-                delete fragment2;
-                fragment2 = nullptr;
+                plvList.emplace_back(predIdx1, argIdx1, argIdx2);
             }
-        } else {
-            /* Update the fragment of predIdx1 only */
-            fragment1->updateCase1a(tab_info1.tabIdx, argIdx1, new_vid);
+        } else {    // Both are in the body
+            /* The new variable is not a PLV, split */
+            plvList.emplace_back();
+            allCache = splitCacheEntries(allCache, predIdx1, argIdx1, predIdx2, argIdx2);
         }
-    }
-    if ((nullptr != fragment1 && fragment1->isEmpty()) || (nullptr != fragment2 && fragment2->isEmpty())) {
-        for (CacheFragment* _fragment: *allCache) {
-            _fragment->clear();
-        }
+    } else {
+        /* Both are in the head. Extend the PLV list */
+        plvList.emplace_back();
     }
     uint64_t time_all_done = currentTimeInNano();
     entCacheUpdateTime = time_ent_done - time_start;
@@ -1595,7 +1100,8 @@ sinc::UpdateStatus CachedRule::specCase4HandlerPrePruning(
     uint64_t time_start = currentTimeInNano();
     obtainPosCache();
     SimpleRelation* new_relation = kb.getRelation(predSymbol);
-    posCache->updateCase2b(new_relation, predSymbol, argIdx1, predIdx2, argIdx2, usedLimitedVars() - 1);
+    entriesType* tmp_cache = appendCacheEntries(posCache, new_relation);
+    posCache = splitCacheEntries(tmp_cache, structure.size() - 1, argIdx1, predIdx2, argIdx2);
     uint64_t time_done = currentTimeInNano();
     posCacheUpdateTime = time_done - time_start;
     return UpdateStatus::Normal;
@@ -1607,26 +1113,20 @@ sinc::UpdateStatus CachedRule::specCase4HandlerPostPruning(
     long time_start = currentTimeInNano();
     SimpleRelation* new_relation = kb.getRelation(predSymbol);
     obtainEntCache();
-    int new_vid = usedLimitedVars() - 1;
-    entCache->updateCase2b(new_relation, predSymbol, argIdx1, predIdx2, argIdx2, new_vid);
+    entriesType* tmp_cache = appendCacheEntries(entCache, new_relation);
+    entCache = splitCacheEntries(tmp_cache, structure.size() - 1, argIdx1, predIdx2, argIdx2);
     uint64_t time_ent_done = currentTimeInNano();
 
     obtainAllCache();
     if (HEAD_PRED_IDX == predIdx2) {   // One is the head and the other is not
-        /* Create a new fragment for the new predicate */
-        predIdx2AllCacheTableInfo.emplace_back(allCache->size(), 0);
-        CacheFragment* fragment = new CacheFragment(new_relation, predSymbol);
-        fragment->updateCase1a(0, argIdx1, new_vid);
-        allCache->push_back(fragment);
+        /* The new variable is a PLV, append */
+        plvList.emplace_back(structure.size() - 1, argIdx1, argIdx2);
+        allCache = appendCacheEntries(allCache, new_relation);
     } else {    // Both are in the body
-        CacheFragment& fragment = *(*allCache)[predIdx2AllCacheTableInfo[predIdx2].fragmentIdx];
-        predIdx2AllCacheTableInfo.emplace_back(predIdx2AllCacheTableInfo[predIdx2].fragmentIdx, fragment.getPartAssignedRule().size());
-        fragment.updateCase2b(new_relation, predSymbol, argIdx1, predIdx2AllCacheTableInfo[predIdx2].tabIdx, argIdx2, new_vid);
-        if (fragment.isEmpty()) {
-            for (CacheFragment* const& _fragment: *allCache) {
-                _fragment->clear();
-            }
-        }
+        /* The new variable is not a PLV, append then split */
+        plvList.emplace_back();
+        tmp_cache = appendCacheEntries(allCache, new_relation);
+        allCache = splitCacheEntries(tmp_cache, structure.size() - 1, argIdx1, predIdx2, argIdx2);
     }
     uint64_t time_all_done = currentTimeInNano();
     entCacheUpdateTime = time_ent_done - time_start;
@@ -1638,7 +1138,7 @@ sinc::UpdateStatus CachedRule::specCase4HandlerPostPruning(
 sinc::UpdateStatus CachedRule::specCase5HandlerPrePruning(int const predIdx, int const argIdx, int const constant) {
     uint64_t time_start = currentTimeInNano();
     obtainPosCache();
-    posCache->updateCase3(predIdx, argIdx, constant);
+    posCache = assignCacheEntries(posCache, predIdx, argIdx, constant);
     uint64_t time_done = currentTimeInNano();
     posCacheUpdateTime = time_done - time_start;
     return UpdateStatus::Normal;
@@ -1647,19 +1147,13 @@ sinc::UpdateStatus CachedRule::specCase5HandlerPrePruning(int const predIdx, int
 sinc::UpdateStatus CachedRule::specCase5HandlerPostPruning(int const predIdx, int const argIdx, int const constant) {
     uint64_t time_start = currentTimeInNano();
     obtainEntCache();
-    entCache->updateCase3(predIdx, argIdx, constant);
+    entCache = assignCacheEntries(entCache, predIdx, argIdx, constant);
     uint64_t time_ent_done = currentTimeInNano();
 
     obtainAllCache();
     if (HEAD_PRED_IDX != predIdx) { // No need to update the E-cache if the update is in the head
-        TabInfo const& tab_info = predIdx2AllCacheTableInfo[predIdx];
-        CacheFragment& fragment = *(*allCache)[tab_info.fragmentIdx];
-        fragment.updateCase3(tab_info.tabIdx, argIdx, constant);
-        if (fragment.isEmpty()) {
-            for (CacheFragment* const& _fragment: *allCache) {
-                _fragment->clear();
-            }
-        }
+        /* Assign */
+        allCache = assignCacheEntries(allCache, predIdx, argIdx, constant);
     }
     uint64_t time_all_done = currentTimeInNano();
     entCacheUpdateTime = time_ent_done - time_start;
@@ -1676,61 +1170,112 @@ sinc::UpdateStatus CachedRule::generalizeHandlerPostPruning(int const predIdx, i
     return UpdateStatus::Invalid;
 }
 
-void CachedRule::mergeFragmentIndices(int const baseFragmentIdx, int const mergingFragmentIdx) {
-    /* Replace the merging fragment with the last */
-    int last_frag_idx = allCache->size() - 1;
-    int tabs_in_base = (*allCache)[baseFragmentIdx]->getPartAssignedRule().size();
-    (*allCache)[mergingFragmentIdx] = (*allCache)[last_frag_idx];   // The merging fragment will be released in the caller
-
-    /* Update predicate-fragment mapping */
-    for (std::vector<TabInfo>::iterator itr = predIdx2AllCacheTableInfo.begin() + 1;    // skip head
-            itr != predIdx2AllCacheTableInfo.end(); itr++) {
-        TabInfo& tab_info = *itr;
-        if (mergingFragmentIdx == tab_info.fragmentIdx) {
-            tab_info.fragmentIdx = baseFragmentIdx;
-            tab_info.tabIdx += tabs_in_base;
-        }
-        tab_info.fragmentIdx = (last_frag_idx == tab_info.fragmentIdx) ? mergingFragmentIdx : tab_info.fragmentIdx;
+CachedRule::entriesType* CachedRule::appendCacheEntries(entriesType* cache, IntTable* const newRelation) {
+    CompliedBlock* cb = CompliedBlock::create(
+        newRelation->getAllRows(), newRelation->getTotalRows(), newRelation->getTotalCols(), newRelation, false, false
+    );
+    entriesType* new_cache = new entriesType();
+    for (entryType* const& entry: *cache) {
+        entryType* new_entry = new entryType(*entry);
+        new_entry->push_back(cb);
+        new_cache->push_back(new_entry);
+        delete entry;
     }
-
-    /* Remove the last fragment */
-    allCache->pop_back();
+    delete cache;
+    return new_cache;
 }
 
-void CachedRule::generateHeadTemplates(
-    std::unordered_set<Record>& headTemplates, std::unordered_set<Record>** const bindingsInFragments,
-    std::vector<std::vector<int>>* const headArgIdxLists, int* const argTemplate,
-    std::vector<int> const& validFragmentIndices, int const headArity, int const idx
+CachedRule::entriesType* CachedRule::splitCacheEntries(entriesType* cache, int predIdx1, int argIdx1, int predIdx2, int argIdx2) {
+    entriesType* new_cache = new entriesType();
+    if (predIdx1 == predIdx2) {
+        for (entryType* const& cache_entry: *cache) {
+            CompliedBlock const& cb = *((*cache_entry)[predIdx1]);
+            IntTable::slicesType* slices = cb.getIndices().matchSlices(argIdx1, argIdx2);
+            for (IntTable::sliceType* slice: *slices) {
+                int matched_val = (*slice)[0][argIdx1];
+                CompliedBlock* new_cb = CompliedBlock::create(toArray(*slice), slice->size(), cb.getTotalCols(), true);
+                entryType* new_entry = new entryType(*cache_entry);
+                (*new_entry)[predIdx1] = new_cb;
+                new_cache->push_back(new_entry);
+            }
+            IntTable::releaseSlices(slices);
+            delete cache_entry;
+        }
+    } else {
+        for (entryType* const& cache_entry : *cache) {
+            CompliedBlock const& cb1 = *((*cache_entry)[predIdx1]);
+            CompliedBlock const& cb2 = *((*cache_entry)[predIdx2]);
+            MatchedSubTables* slices = IntTable::matchSlices(cb1.getIndices(), argIdx1, cb2.getIndices(), argIdx2);
+            for (int i = 0; i < slices->slices1->size(); i++) {
+                IntTable::sliceType* slice1 = (*(slices->slices1))[i];
+                IntTable::sliceType* slice2 = (*(slices->slices2))[i];
+                int matched_val = (*slice1)[0][argIdx1];
+                CompliedBlock* new_cb1 = CompliedBlock::create(toArray(*slice1), slice1->size(), cb1.getTotalCols(), true);
+                CompliedBlock* new_cb2 = CompliedBlock::create(toArray(*slice2), slice2->size(), cb2.getTotalCols(), true);
+                entryType* new_entry = new entryType(*cache_entry);
+                (*new_entry)[predIdx1] = new_cb1;
+                (*new_entry)[predIdx2] = new_cb2;
+                new_cache->push_back(new_entry);
+            }
+            delete slices;
+            delete cache_entry;
+        }
+    }
+    delete cache;
+    return new_cache;
+}
+
+CachedRule::entriesType* CachedRule::assignCacheEntries(entriesType* cache, int predIdx, int argIdx, int constant) {
+    entriesType* new_cache = new entriesType();
+    for (entryType* const& cache_entry: *cache) {
+        CompliedBlock const& cb = *((*cache_entry)[predIdx]);
+        IntTable::sliceType* slice = cb.getIndices().getSlice(argIdx, constant);
+        if (nullptr != slice) {
+            CompliedBlock* new_cb = CompliedBlock::create(toArray(*slice), slice->size(), cb.getTotalCols(), true);
+            entryType* new_entry = new entryType(*cache_entry);
+            (*new_entry)[predIdx] = new_cb;
+            new_cache->push_back(new_entry);
+            IntTable::releaseSlice(slice);
+        }
+        delete cache_entry;
+    }
+    delete cache;
+    return new_cache;
+}
+
+void CachedRule::addBodyPlvBindings2HeadTemplates(
+        std::unordered_set<Record>& headTemplates, std::unordered_set<Record>* const plvBindingSets,
+        std::vector<BodyGvLinkInfo>** const plvLinkLists, int* const argTemplate, int const linkIdx, int const numSets,
+        int const arity
 ) const {
-    std::unordered_set<Record>* bindings_in_fragment = bindingsInFragments[idx];
-    std::vector<std::vector<int>>& gv_links = headArgIdxLists[idx];
-    if (idx == validFragmentIndices.size() - 1) {
-        /* Finish the last group of bindings, add to the template set */
-        for (Record const& binding: *bindings_in_fragment) {
-            for (int i = 0; i < binding.getArity(); i++) {
-                std::vector<int>& head_arg_idxs = gv_links[i];
-                for (int const& head_arg_idx: head_arg_idxs) {
-                    argTemplate[head_arg_idx] = binding.getArgs()[i];
+    std::unordered_set<Record>& plv_bindings = plvBindingSets[linkIdx];
+    std::vector<BodyGvLinkInfo>& plv_links = *(plvLinkLists[linkIdx]);
+    if (linkIdx == numSets - 1) {
+        /* Finish the last group of PLVs, add to the template set */
+        for (Record const& plv_binding: plv_bindings) {
+            for (int i = 0; i < plv_binding.getArity(); i++) {
+                BodyGvLinkInfo const& plv_link = plv_links[i];
+                for (int const& head_arg_idx: *(plv_link.headVarLocs)) {
+                    argTemplate[head_arg_idx] = plv_binding.getArgs()[i];
                 }
             }
-            int* cloned_args = new int[headArity];
-            std::copy(argTemplate, argTemplate + headArity, cloned_args);
-            if (!headTemplates.emplace(cloned_args, headArity).second) {
+            int* cloned_args = new int[arity];
+            std::copy(argTemplate, argTemplate + arity, cloned_args);
+            std::pair<std::unordered_set<Record>::iterator, bool> ret = headTemplates.emplace(cloned_args, arity);
+            if (!ret.second) {
                 delete[] cloned_args;
             }
         }
     } else {
         /* Add current binding to the template and move to the next recursion */
-        for (Record const& binding: *bindings_in_fragment) {
-            for (int i = 0; i < binding.getArity(); i++) {
-                std::vector<int>& head_arg_idxs = gv_links[i];
-                for (int const& head_arg_idx: head_arg_idxs) {
-                    argTemplate[head_arg_idx] = binding.getArgs()[i];
+        for (Record const& plv_binding: plv_bindings) {
+            for (int i = 0; i < plv_binding.getArity(); i++) {
+                BodyGvLinkInfo const& plv_link = plv_links[i];
+                for (int const& head_arg_idx: *(plv_link.headVarLocs)) {
+                    argTemplate[head_arg_idx] = plv_binding.getArgs()[i];
                 }
             }
-            generateHeadTemplates(
-                headTemplates, bindingsInFragments, headArgIdxLists, argTemplate, validFragmentIndices, headArity, idx + 1
-            );
+            addBodyPlvBindings2HeadTemplates(headTemplates, plvBindingSets, plvLinkLists, argTemplate, linkIdx + 1, numSets, arity);
         }
     }
 }
@@ -1808,19 +1353,12 @@ int RelationMinerWithCachedRule::checkThenAddRule(
 ) {
     CachedRule* rule = (CachedRule*) updatedRule;
     if (UpdateStatus::Normal == updateStatus) {
-        monitor.posCacheEntriesTotal += rule->getPosCache().getEntries().size();
-        monitor.entCacheEntriesTotal += rule->getEntCache().getEntries().size();
-        int all_cache_entries = 0;
-        if (!rule->getAllCache().empty()) {
-            for (CacheFragment* const& fragment : rule->getAllCache()) {
-                all_cache_entries += fragment->getEntries().size();
-            }
-            all_cache_entries /= rule->getAllCache().size();
-        }
-        monitor.allCacheEntriesTotal += all_cache_entries;
-        monitor.posCacheEntriesMax = std::max(monitor.posCacheEntriesMax, (int)rule->getPosCache().getEntries().size());
-        monitor.entCacheEntriesMax = std::max(monitor.entCacheEntriesMax, (int)rule->getEntCache().getEntries().size());
-        monitor.allCacheEntriesMax = std::max(monitor.allCacheEntriesMax, all_cache_entries);
+        monitor.posCacheEntriesTotal += rule->getPosCache().size();
+        monitor.entCacheEntriesTotal += rule->getEntCache().size();
+        monitor.allCacheEntriesTotal += rule->getAllCache().size();
+        monitor.posCacheEntriesMax = std::max(monitor.posCacheEntriesMax, (int)rule->getPosCache().size());
+        monitor.entCacheEntriesMax = std::max(monitor.entCacheEntriesMax, (int)rule->getEntCache().size());
+        monitor.entCacheEntriesMax = std::max(monitor.allCacheEntriesMax, (int)rule->getAllCache().size());
         monitor.totalGeneratedRules++;
         monitor.posCacheUpdateTime += rule->getPosCacheUpdateTime();
         monitor.entCacheUpdateTime += rule->getEntCacheUpdateTime();

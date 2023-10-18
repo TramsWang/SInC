@@ -180,268 +180,46 @@ struct std::equal_to<const sinc::VarInfo*> {
 
 namespace sinc {
     /**
-     * A cache fragment is a structure where multiple relations are joined together and are linked by LVs. There is no relation
-     * in a fragment that shares no LV with the remaining part.
+     * This class is used for representing the link from a body GV to all GVs in the head.
      *
-     * The update of a fragment can be divided into the following cases:
-     *   1a: Convert a UV to existing LV in current fragment
-     *   1b: Append a new relation and convert a UV to existing LV
-     *   1c: Convert a UV to existing LV and merge with another fragment
-     *   2a: Convert two UVs to a new LV
-     *   2b: Append a new relation and convert two UVs to a new LV (one in the original part, one in the new relation)
-     *   2c: Merge two fragments by converting two UVs to a new LV (one UV in one fragment, the other UV in the other fragment)
-     *   3: Convert a UV to a constant
-     * 
-     * NOTE: It is hard to manage "copy-on-write" on the level of `CacheFragment`. Therefore, `CacheFragment`s are simply copied
-     * in the copy constructor.
-     * 
-     * @since 2.2
+     * @since 1.0
      */
-    class CacheFragment {
+    class BodyGvLinkInfo {
     public:
-        typedef std::vector<CompliedBlock*> entryType;
-        typedef std::vector<entryType*> entriesType;
+        /** The predicate index of the GV in the body */
+        int const bodyPredIdx;
+        /** The argument index of the GV in the body */
+        int const bodyArgIdx;
+        /** The argument indices of the GVs in the head */
+        std::vector<int>* const headVarLocs;
 
-        CacheFragment(IntTable* const firstRelation, int const relationSymbol); // Todo: Refine `const` modifier for all parameters
-
-        // CacheFragment(std::vector<int*> const& rows, int const relationSymbol, int const arity);
-
-        /**
-         * Construct an object by an existing CB.
-        */
-        CacheFragment(CompliedBlock* const firstCb, int const relationSymbol);
-
-        /**
-         * This constructor is used to construct an empty fragment
-         */
-        CacheFragment(int const relationSymbol, int const arity);
-
-        CacheFragment(const CacheFragment& another);
-
-        ~CacheFragment();
-
-        /**
-         * Update case 1a. If the LV has not been assigned in the fragment yet, record as a PLV.
-         */
-        void updateCase1a(int const tabIdx, int const colIdx, int const vid);
-
-        /**
-         * Update case 1b.
-         *
-         * NOTE: In this case, there must be an argument, in the PAR of this fragment, that has already been assigned to the LV.
-         */
-        void updateCase1b(IntTable* const newRelation, int const relationSymbol, int const colIdx, int const vid);
-
-        /**
-         * Update case 1c. The argument "fragment" will be merged into this fragment. The two arguments "tabIdx" and "colIdx"
-         * denote the position of the UV that will be converted to "vId" in "fragment".
-         *
-         * NOTE: In this case, there must be an argument, in the PAR of this fragment, that has already been assigned to the LV.
-         */
-        void updateCase1c(CacheFragment const& fragment, int const tabIdx, int const colIdx, int const vid);
-
-        /**
-         * Update case 2a.
-         */
-        void updateCase2a(int const tabIdx1, int const colIdx1, int const tabIdx2, int const colIdx2, int const newVid);
-
-        /**
-         * Update case 2b.
-         */
-        void updateCase2b(
-            IntTable* const newRelation, int const relationSymbol, int const colIdx1, int const tabIdx2, int const colIdx2,
-            int const newVid
-        );
-
-        /**
-         * Update case 2c. The argument "fragment" will be merged into this fragment. The two arguments "tabIdx2" and "colIdx2"
-         * denote the position of the UV in "fragment". "tabIdx" and "colIdx" denote the position of the UV in this fragment.
-         */
-        void updateCase2c(
-            int const tabIdx, int const colIdx, CacheFragment const& fragment, int const tabIdx2, int const colIdx2, int const newVid
-        );
-
-        /**
-         * Update case 3.
-         */
-        void updateCase3(int const tabIdx, int const colIdx, int const constant);
-
-        /**
-         * Build indices of each CB in the entries.
-         *
-         * NOTE: this should be called before update is made
-         */
-        void buildIndices();
-
-        bool hasLv(int const vid) const;
-
-        /**
-         * This method returns the number of unique combinations of all listed variables.
-         *
-         * NOTE: the listed variables must NOT contain duplications and LVs that are not presented in this fragment.
-         */
-        int countCombinations(std::vector<int> const& vids) const;
-
-        /**
-         * This method returns the set of combinations of all listed variables.
-         *
-         * NOTE: the listed variables must NOT contain duplications and LVs that are not presented in this fragment.
-         * 
-         * NOTE: The returned pointer to the set and the pointers returned by `getArgs()` of each record SHOULD be
-         * maintained by USER
-         */
-        std::unordered_set<Record>* enumerateCombinations(std::vector<int> const& vids) const;
-
-        bool isEmpty() const;
-
-        void clear();
-
-        const entriesType& getEntries() const;
-
-        entryType* getEntry(int const idx) const;
-
-        /**
-         * Count the number of unique records in a separate table.
-         */
-        int countTableSize(int const tabIdx) const;
-
-        int totalTables() const;
-
-        std::vector<Predicate> const& getPartAssignedRule() const;
-
-        std::vector<VarInfo> const& getVarInfoList() const;
-
-        static void showEntry(entryType const& entry);
-
-        static void showEntries(entriesType const& entries);
-
-    protected:
-        typedef std::unordered_map<int, entriesType*> const2EntriesMapType;
-
-        /** Partially assigned rule structure for this fragment. Predicate symbols are unnecessary here, but useful for debugging */
-        std::vector<Predicate> partAssignedRule;
-        /** Compact cache entries, each entry is a list of CB */
-        entriesType* entries; // Todo: If CB can be fully copy-on-write, that is, no two CBs in the memory contains the same compliance set, the specialization and counting can be faster
-        /** A list of LV info. Each index is the ID of an LV */
-        std::vector<VarInfo> varInfoList;
-
-        /**
-         * Split cache entries according to two columns in the fragment.
-         */
-        void splitCacheEntries(int const tabIdx1, int const colIdx1, int const tabIdx2, int const colIdx2);
-
-        /**
-         * Append a new relation and split cache entries according to two columns in the fragment. One column is in one of
-         * the original relations, and the other is in the appended relation.
-         */
-        void splitCacheEntries(int const tabIdx1, int const colIdx1, IntTable* const newRelation, int const colIdx2);
-
-        /**
-         * Match a column to another that has already been assigned an LV.
-         *
-         * @param matchedTabIdx  The index of the table containing the assigned LV
-         * @param matchedColIdx  The index of the column of the assigned LV
-         * @param matchingTabIdx The index of the table containing the matching column
-         * @param matchingColIdx The index of the matching column
-         */
-        void matchCacheEntries(int const matchedTabIdx, int const matchedColIdx, int const matchingTabIdx, int const matchingColIdx);
-
-        /**
-         * Append a new relation and match a column to another that has already been assigned an LV. The matching column is
-         * in the appended relation.
-         */
-        void matchCacheEntries(int const matchedTabIdx, int const matchedColIdx, IntTable* const newRelation, int matchingColIdx);
-
-        /**
-         * Filter a constant symbol at a certain column.
-         */
-        void assignCacheEntries(int const tabIdx, int const colIdx, int const constant);
-
-        /**
-         * Add a used LV info to the fragment.
-         *
-         * @param vid     The ID of the LV
-         * @param varInfo The Info structure of the LV
-         */
-        void addVarInfo(int const vid, int const tabIdx, int const colIdx, bool const isPlv);
-
-        /**
-         * This helper function splits and gathers entries with same value at a certain column.
-         */
-        static const2EntriesMapType* calcConst2EntriesMap(entriesType const& entries, int const tabIdx, int const colIdx, int const arity);
-
-        /**
-         * This helper function merges two batches entries that have already been gathered by the targeting columns.
-         * 
-         * NOTE: This method updates `entries`
-         */
-        void mergeFragmentEntries(
-            const2EntriesMapType const& baseConst2EntriesMap, const2EntriesMapType const& mergingConst2EntriesMap
-        );
-
-        /**
-         * This helper function merges a batch of entries gathered by mering value to a list of base entries
-         * 
-         * NOTE: This method updates `entries`
-         */
-        void mergeFragmentEntries(
-            entriesType const& baseEntries, int const tabIdx, int const colIdx, const2EntriesMapType const& mergingConst2EntriesMap
-        );
-
-        static void releaseConst2EntryMap(const2EntriesMapType* map);
-
-        /**
-         * Recursively compute the cartesian product of binding values of grouped PLVs and add each combination in the product
-         * to the binding set.
-         *
-         * @param completeBindings the binding set
-         * @param plvBindingSets the binding values of the grouped PLVs
-         * @param template the template array to hold the binding combination
-         * @param bindingSetIdx the index of the binding set in current recursion
-         * @param templateStartIdx the starting index of the template for the PLV bindings
-         * @param numSets              The number of elements in `plvBindingSets[]`
-         */
-        void addCompletePlvBindings(
-            std::unordered_set<Record>& completeBindings, std::unordered_set<Record>* const plvBindingSets, int* const argTemplate,
-            int const bindingSetIdx, int const templateStartIdx, int const numSets
-        ) const;
-
-        /**
-         * Recursively add PLV bindings to a given template
-         *
-         * @param templateSet          The set of finished templates
-         * @param plvBindingSets       The bindings of PLVs grouped by predicate
-         * @param plv2TemplateIdxLists The linked arguments in the head for each PLV
-         * @param template             An argument list template
-         * @param setIdx               The index of the PLV group
-         * @param numSets              The number of elements in `plvBindingSets[]`
-         * @param templateLength       The length of `argTemplate[]`
-         */
-        void addPlvBindings2Templates(
-            std::unordered_set<Record>& templateSet, std::unordered_set<Record>* const plvBindingSets,
-            std::vector<int>** const plv2TemplateIdxLists, int* const argTemplate, int const setIdx, int const numSets,
-            int const templateLength
-        ) const;
-
-        void releaseEntries();
+        BodyGvLinkInfo(int const bodyPredIdx, int const bodyArgIdx, std::vector<int>* const headVarLocs);
+        ~BodyGvLinkInfo();
     };
 
     /**
-     * This class is for mapping predicates in the rule to tables in cache fragments in the E-cache.
-     * 
-     * @since 2.3
+     * This class is used for marking the location of a pre-LV (PLV) in the body and one of the corresponding LV in the head.
+     *
+     * @since 2.0
      */
-    class TabInfo {
+    class PlvLoc {
     public:
-        int fragmentIdx;
-        int tabIdx;
+        /** The index of the body predicate */
+        int bodyPredIdx;
+        /** The index of the argument in the predicate */
+        int bodyArgIdx;
+        /** The index of the argument in the head */
+        int headArgIdx;
 
-        TabInfo(int const fragmentIdx, int const tabIdx);
-        TabInfo(const TabInfo& another);
+        /**
+         * Create empty instance
+         */
+        PlvLoc();
+
+        PlvLoc(int const bodyPredIdx, int const bodyArgIdx, int const headArgIdx);
+        PlvLoc(const PlvLoc& another);
         bool isEmpty() const;
-        TabInfo& operator=(TabInfo&& another) noexcept;
-        TabInfo& operator=(const TabInfo& another) noexcept;
-        bool operator==(const TabInfo &another) const;
+        void setEmpty();
     };
 
     /**
@@ -456,6 +234,9 @@ namespace sinc {
      */
     class CachedRule : public Rule {
     public:
+        typedef std::vector<CompliedBlock*> entryType;
+        typedef std::vector<entryType*> entriesType;
+
         /**
          * Initialize the most general rule.
          *
@@ -485,26 +266,25 @@ namespace sinc {
         uint64_t getPosCacheIndexingTime() const;
         uint64_t getEntCacheIndexingTime() const;
         uint64_t getAllCacheIndexingTime() const;
-        const CacheFragment& getPosCache() const;
-        const CacheFragment& getEntCache() const;
-        const std::vector<CacheFragment*>& getAllCache() const;
+        const entriesType& getPosCache() const;
+        const entriesType& getEntCache() const;
+        const entriesType& getAllCache() const;
 
     protected:
         /** The original KB */
         SimpleKb& kb;
         /** The cache for the positive entailments (E+-cache) (not entailed). One cache fragment is sufficient as all
          *  predicates are linked to the head. */
-        CacheFragment* posCache;
+        entriesType* posCache;
         /** This cache is used to monitor the already-entailed records (T-cache). One cache fragment is sufficient as all
          *  predicates are linked to the head. */
-        CacheFragment* entCache;
+        entriesType* entCache;
         /** The cache for all the entailments (E-cache). The cache is composed of multiple fragments, each of which maintains
          *  a linked component of the rule body. The first relation should not be included, as the head should be removed
          *  from E-cache */
-        std::vector<CacheFragment*>* allCache;
-        /** This list is a mapping from predicate indices in the rule structure to fragment and table indices in the E-cache.
-         *  The array indices are predicate indices. */
-        std::vector<TabInfo> predIdx2AllCacheTableInfo;
+        entriesType* allCache;
+        /** The list of a PLV in the body. This list should always be of the same length as "limitedVarCnts" */
+        std::vector<PlvLoc> plvList;
         /** Whether the pointer `posCache` should be maintained by this object */
         bool maintainPosCache;
         /** Whether the pointer `entCache` should be maintained by this object */
@@ -551,34 +331,71 @@ namespace sinc {
         UpdateStatus generalizeHandlerPostPruning(int const predIdx, int const argIdx) override;
 
         /**
-         * Update fragment indices and predicate index mappings when two fragments merge together.
+         * Append a raw complied block to each entry of the cache.
          *
-         * NOTE: This should be called BEFORE the two fragments are merged
-         * 
-         * NOTE: This method will remove the reference to the merging fragment
+         * Note: all indices should be up-to-date in the entries
          *
-         * @param baseFragmentIdx    The index of the base fragment. This fragment will not be changed.
-         * @param mergingFragmentIdx The index of the fragment that will be merged into the base. This fragment will be removed after the merge
+         * @param cache The original cache
+         * @param predSymbol The numeration of the appended relation
+         * @return A new cache containing all updated cache entries
          */
-        void mergeFragmentIndices(int const baseFragmentIdx, int const mergingFragmentIdx);
+        entriesType* appendCacheEntries(entriesType* cache, IntTable* const newRelation);
+
+        /**
+         * Split entries in a cache according to two arguments in the rule.
+         *
+         * Note: all indices should be up-to-date in the entries
+         *
+         * @param cache The original cache
+         * @param predIdx1 The 1st predicate index
+         * @param argIdx1 The argument index in the 1st predicate
+         * @param predIdx2 The 2nd predicate index
+         * @param argIdx2 The argument index in the 2nd predicate
+         * @return A new cache containing all updated cache entries
+         */
+        entriesType* splitCacheEntries(entriesType* cache, int predIdx1, int argIdx1, int predIdx2, int argIdx2);
+
+        /**
+         * Assign a constant to an argument in each cache entry.
+         *
+         * Note: all indices should be up-to-date in the entries
+         *
+         * @param cache The original cache
+         * @param predIdx The index of the modified predicate
+         * @param argIdx The index of the argument in the predicate
+         * @param constant The numeration of the constant
+         * @return A new cache containing all updated cache entries
+         */
+        entriesType* assignCacheEntries(entriesType* cache, int predIdx, int argIdx, int constant);
+
+        /**
+         * Recursively compute the cartesian product of binding values of grouped PLVs and add each combination in the product
+         * to the binding set.
+         *
+         * @param completeBindings the binding set
+         * @param plvBindingSets the binding values of the grouped PLVs
+         * @param template the template array to hold the binding combination
+         * @param bindingSetIdx the index of the binding set in current recursion
+         * @param templateStartIdx the starting index of the template for the PLV bindings
+         */
+        void addCompleteBodyPlvBindings(
+                std::unordered_set<Record>& completeBindings, std::unordered_set<Record>* const plvBindingSets, int* const argTemplate,
+                int const bindingSetIdx, int const templateStartIdx, int const numSets, int const arity
+        ) const ;
 
         /**
          * Recursively add PLV bindings to the linked head arguments.
          *
-         * NOTE: This should only be called when body is not empty
-         *
-         * @param headTemplates       The set of head templates
-         * @param bindingsInFragments The bindings of LVs grouped by cache fragment
-         * @param headArgIdxLists     The linked head argument indices for LV groups
-         * @param template            A template of the head templates
-         * @param validFragmentIndices The indices of fragments that contains LVs to be substituted
-         * @param headArity            The arity of the head predicate
-         * @param idx             The index of `validFragmentIndices`
+         * @param headTemplates The set of head templates
+         * @param plvBindingSets The bindings of PLVs grouped by predicate
+         * @param plvLinkLists The linked arguments in the head for each PLV
+         * @param template An argument list template
+         * @param linkIdx The index of the PLV group
          */
-        void generateHeadTemplates(
-            std::unordered_set<Record>& headTempaltes, std::unordered_set<Record>** const bindingsInFragments,
-            std::vector<std::vector<int>>* const headArgIdxLists, int* const argTemplate,
-            std::vector<int> const& validFragmentIndices, int const headArity, int const fragIdx
+        void addBodyPlvBindings2HeadTemplates(
+                std::unordered_set<Record>& headTemplates, std::unordered_set<Record>* const plvBindingSets,
+                std::vector<BodyGvLinkInfo>** const plvLinkLists, int* const argTemplate, int const linkIdx, int const numSets,
+                int const arity
         ) const;
 
         /**
