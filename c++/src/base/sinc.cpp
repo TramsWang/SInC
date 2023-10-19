@@ -51,10 +51,17 @@ void BaseMonitor::show(std::ostream& os) {
     rusage usage;
     if (0 != getrusage(RUSAGE_SELF, &usage)) {
         std::cerr << "Failed to get `rusage`" << std::endl;
-    } else {
-        os << "--- Basic Memory Cost ---\n";
-        os << "Peak RAM: " << formatMemorySize(usage.ru_maxrss) << '(' << usage.ru_maxrss << "K)\n\n";
+        usage.ru_maxrss = 1024 * 1024 * 1024;   // set to 1T
     }
+    os << "--- Basic Memory Cost ---\n";
+    printf(os, "%10s %10s %10s %10s %10s %10s %10s\n", "KB", "KB(%)", "Dep.G", "Dep.G(%)", "CKB", "CKB(%)", "Peak");
+    printf(
+        os, "%10s %10.2f %10s %10.2f %10s %10.2f %10s\n\n",
+        formatMemorySize(kbMemCost).c_str(), ((double) kbMemCost) / usage.ru_maxrss * 100.0,
+        formatMemorySize(dependencyGraphMemCost).c_str(), ((double) dependencyGraphMemCost) / usage.ru_maxrss * 100.0,
+        formatMemorySize(ckbMemCost).c_str(), ((double) ckbMemCost) / usage.ru_maxrss * 100.0,
+        formatMemorySize(usage.ru_maxrss).c_str()
+    );
 
     os << "--- Statistics ---\n";
     printf(
@@ -610,6 +617,19 @@ void SInC::dumpCompressedKb() {
 }
 
 void SInC::showMonitor() {
+    /* Calculate memory cost */
+    monitor.kbMemCost = kb->memoryCost() / 1024;
+    monitor.ckbMemCost = compressedKb->memoryCost() / 1024;
+    monitor.dependencyGraphMemCost += (
+        sizeof(std::pair<Predicate*, RelationMiner::nodeType*>) + sizeof(Predicate) + sizeof(RelationMiner::nodeType)
+    ) * predicate2NodeMap.size();
+    monitor.dependencyGraphMemCost += sizeof(std::pair<RelationMiner::nodeType*, std::unordered_set<RelationMiner::nodeType*>*>) * dependencyGraph.size();
+    for (std::pair<RelationMiner::nodeType*, std::unordered_set<RelationMiner::nodeType*>*> const& kv: dependencyGraph) {
+        monitor.dependencyGraphMemCost += sizeof(std::unordered_set<RelationMiner::nodeType*>) + 
+        sizeof(RelationMiner::nodeType*) * kv.second->size();
+    }
+    monitor.dependencyGraphMemCost /= 1024;
+
     monitor.show(*logger);
 }
 

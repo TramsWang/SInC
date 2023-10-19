@@ -128,6 +128,11 @@ namespace sinc {
         /** This member keeps track of the number of evaluated SQL queries */
         int evaluatedSqls = 0;
 
+        /* Memory cost (KB) */
+        size_t kbMemCost = 0;
+        size_t dependencyGraphMemCost = 0;
+        size_t ckbMemCost = 0;
+
         void show(std::ostream& os) override;
     };
 

@@ -112,6 +112,9 @@ namespace sinc {
         int allCacheEntriesMax = 0;
         int totalGeneratedRules = 0;
 
+        /* Memory cost (KB) */
+        size_t cbMemCost = 0;
+
         void show(std::ostream& os) override;
     };
 
