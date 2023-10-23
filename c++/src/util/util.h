@@ -1,6 +1,7 @@
 #pragma once
 
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <fstream>
 #include <array>
@@ -286,6 +287,18 @@ namespace sinc {
      */
     template <class T>
     T* toArray(std::vector<T> const& v) {
+        T* arr = new T[v.size()];
+        std::copy(v.begin(), v.end(), arr);
+        return arr;
+    }
+
+    /**
+     * This method copy the data in a vector to an array.
+     * 
+     * NOTE: The returned pointer should be deleted by "delete[]".
+     */
+    template <class T>
+    T* toArray(std::unordered_set<T> const& v) {
         T* arr = new T[v.size()];
         std::copy(v.begin(), v.end(), arr);
         return arr;

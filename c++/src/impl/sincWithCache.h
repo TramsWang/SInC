@@ -1,10 +1,16 @@
 #pragma once
 
 #include "../base/sinc.h"
-#include "../kb/intTable.h"
 #include <unordered_map>
 
 namespace sinc {
+    class CompliedBlock;
+    class MatchedSubCbs {
+    public:
+        std::vector<CompliedBlock*> cbs1;
+        std::vector<CompliedBlock*> cbs2;
+    };
+    
     /**
      * A simplified complied block.
      * 
@@ -18,16 +24,6 @@ namespace sinc {
          * NOTE: The pointer `complianceSet` WILL be maintained by this CB object
          */
         static CompliedBlock* create(int** const complianceSet, int const totalRows, int const totalCols, bool maintainComplianceSet);
-
-        /**
-         * Create a new CB and register it to the pool
-         * 
-         * NOTE: The pointers `complianceSet` WILL be maintained by this CB object
-         */
-        static CompliedBlock* create(
-            int** const complianceSet, int const totalRows, int const totalCols, IntTable* indices,
-            bool maintainComplianceSet, bool maintainIndices
-        );
 
         /**
          * Release all pointers in the pool and clear the pool
@@ -51,8 +47,27 @@ namespace sinc {
          */
         void buildIndices();
 
+        /**
+         * @returns `nullptr` if no such slice.
+         */
+        static CompliedBlock* getSlice(const CompliedBlock& cb, int const col, int const val);
+
+        /**
+         * @return Will NOT return `nullptr`
+         */
+        static std::vector<CompliedBlock*>* splitSlices(const CompliedBlock& cb, int const col);
+
+        /**
+         * @return If no such slices, a `nullptr` will be returned.
+         */
+        static const MatchedSubCbs* matchSlices(const CompliedBlock& cb1, int const col1, const CompliedBlock& cb2, int const col2);
+
+        /**
+         * @return If no such slices, a `nullptr` will be returned.
+         */
+        static const std::vector<CompliedBlock*>* matchSlices(const CompliedBlock& cb, int const col1, int const col2);
+
         int* const* getComplianceSet() const;
-        const IntTable& getIndices() const;
         int getTotalRows() const;
         int getTotalCols() const;
         size_t memoryCost() const;
@@ -63,11 +78,10 @@ namespace sinc {
         static std::vector<CompliedBlock*> pool;
 
         int** const complianceSet;
-        IntTable* indices;
+        std::unordered_map<int, std::vector<int*>*>* indices;
         int const totalRows;
         int const totalCols;
         bool mainTainComplianceSet;
-        bool maintainIndices;
 
         /**
          * Register a pointer to a CB in the static pool
@@ -78,14 +92,6 @@ namespace sinc {
          * NOTE: The pointer `complianceSet` WILL be maintained by this CB object
          */
         CompliedBlock(int** const complianceSet, int const totalRows, int const totalCols, bool maintainComplianceSet);
-
-        /**
-         * NOTE: The pointers `complianceSet` and `indices` WILL be maintained by this CB object
-         */
-        CompliedBlock(
-            int** const complianceSet, int const totalRows, int const totalCols, IntTable* indices, bool maintainComplianceSet,
-            bool maintainIndices
-        );
     };
 
     /**
