@@ -348,7 +348,7 @@ size_t IntTable::memoryCost() const {
         int length = valuesByColsLengths[i];
         size += (
             sizeof(int*) + sizeof(int) * length // `valuesByCols`
-        ) * 2 + sizeof(int);    // `startOffsetsByCOls``
+        ) * 2 + sizeof(int);    // `startOffsetsByCols`
     }
     return size;
 }
