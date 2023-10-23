@@ -210,6 +210,8 @@ namespace sinc {
         bool operator==(const Rule &another) const;
         size_t hash() const;
 
+        virtual size_t memoryCost() const;
+
     protected:
         /** The cache of all used fingerprints */
         fingerprintCacheType& fingerprintCache;

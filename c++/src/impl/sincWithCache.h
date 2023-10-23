@@ -269,7 +269,7 @@ namespace sinc {
         /**
          * Count the total size of CBs in the pool
          */
-        static size_t totalMemoryCost();
+        static size_t totalCbMemoryCost();
 
         ~CompliedBlock();
 
@@ -374,6 +374,9 @@ namespace sinc {
         int entCacheEntriesMax = 0;
         int allCacheEntriesMax = 0;
         int totalGeneratedRules = 0;
+
+        /* Memory cost (KB) */
+        size_t cbMemCost = 0;
 
         void show(std::ostream& os) override;
     };

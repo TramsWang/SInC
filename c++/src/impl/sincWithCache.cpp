@@ -416,7 +416,7 @@ size_t CompliedBlock::getNumMatchSlices2Indices() {
     return mapMatchSlicesTwoCbs.size();
 }
 
-size_t CompliedBlock::totalMemoryCost() {
+size_t CompliedBlock::totalCbMemoryCost() {
     size_t size = sizeof(pool) + sizeof(CompliedBlock*) * pool.capacity();
     for (CompliedBlock* const& cb: pool) {
         size += cb->memoryCost();
@@ -556,12 +556,11 @@ void CachedSincPerfMonitor::show(std::ostream& os) {
     rusage usage;
     if (0 != getrusage(RUSAGE_SELF, &usage)) {
         std::cerr << "Failed to get `rusage`" << std::endl;
-        usage.ru_maxrss = 0;
+        usage.ru_maxrss = 1024 * 1024 * 1024;   // set to 1T
     }
-    size_t cb_mem_cost = CompliedBlock::totalMemoryCost() / 1024;
     printf(
         os, "%10d %10s %10.2f\n\n",
-        CompliedBlock::totalNumCbs(), formatMemorySize(cb_mem_cost).c_str(), ((double) cb_mem_cost) / usage.ru_maxrss * 100.0
+        CompliedBlock::totalNumCbs(), formatMemorySize(cbMemCost).c_str(), ((double) cbMemCost) / usage.ru_maxrss * 100.0
     );
 
     os << "--- CB Statistics ---\n";
@@ -2363,6 +2362,10 @@ void SincWithCache::finalizeRelationMiner(RelationMiner* miner) {
 
 void SincWithCache::showMonitor() {
     SInC::showMonitor();
+
+    /* Calculate memory cost */
+    monitor.cbMemCost = CompliedBlock::totalCbMemoryCost() / 1024;
+
     monitor.show(*logger);
 }
 

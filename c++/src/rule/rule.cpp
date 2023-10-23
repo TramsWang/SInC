@@ -465,6 +465,14 @@ size_t Rule::hash() const {
     return fingerprint->hash();
 }
 
+size_t Rule::memoryCost() const {
+    size_t size = sizeof(Rule) + sizeof(Predicate) * structure.size() + sizeof(std::vector<ArgLocation>*) * limitedVarArgs.size();
+    for (std::vector<ArgLocation>* const& arg_locs: limitedVarArgs) {
+        size += sizeof(ArgLocation) * arg_locs->size();
+    }
+    return size;
+}
+
 void Rule::updateFingerprint() {
     uint64_t time_start = sinc::currentTimeInNano();
     if (releaseFingerprint) {

@@ -195,6 +195,8 @@ namespace sinc {
          */
         SplitRecords* splitByEntailment() const;
 
+        size_t memoryCost() const override;
+
     protected:
         /** The flags are used to denote whether a record has been marked entailed */
         int* const entailmentFlags;
@@ -367,6 +369,8 @@ namespace sinc {
 
         const char* const * getRelationNames() const;
 
+        size_t memoryCost() const;
+
     protected:
         /** The name of the KB */
         const char* const name;
@@ -477,6 +481,8 @@ namespace sinc {
         const char* getName() const;
 
         const std::vector<int>& getSupplementaryConstants() const;
+
+        size_t memoryCost() const;
 
     protected:
         /** The name of the compressed KB */

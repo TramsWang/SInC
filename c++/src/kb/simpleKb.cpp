@@ -233,6 +233,15 @@ SplitRecords* SimpleRelation::splitByEntailment() const {
     return new SplitRecords(entailed_records, non_entailed_records);
 }
 
+size_t SimpleRelation::memoryCost() const {
+    size_t size = IntTable::memoryCost() - sizeof(IntTable) + sizeof(SimpleRelation);
+    size += sizeof(int) * flagLength + sizeof(char) * (strlen(name) + 1);
+    if (maintainRecords) {
+        size += sizeof(int) * totalRows * totalCols;    // size of records
+    }
+    return size;
+}
+
 void SimpleRelation::setEntailmentFlag(int const idx) {
     entailmentFlags[idx / BITS_PER_INT] |= 0x1 << (idx % BITS_PER_INT);
 }
@@ -494,6 +503,27 @@ const char* const * SimpleKb::getRelationNames() const {
     return relationNames;
 }
 
+size_t SimpleKb::memoryCost() const {
+    size_t size = sizeof(SimpleKb) + sizeof(char) * (strlen(name) + 1) + sizeof(*relations) + 
+        (sizeof(SimpleRelation*) + sizeof(char*)) * relations->size() + 
+        sizeof(*relationNameMap);
+    for (int i = 0; i < relations->size(); i++) {
+        SimpleRelation* relation = (*relations)[i];
+        std::vector<int>** const& promising_constant = promisingConstants[i];
+        size += relation->memoryCost();
+        size += sizeof(std::vector<int>*) * relation->getTotalCols();
+        for (int arg_idx = 0; arg_idx < relation->getTotalCols(); arg_idx++) {
+            std::vector<int>& v = *(promising_constant[arg_idx]);
+            size += sizeof(int) * v.size() + sizeof(v);
+        }
+    }
+    size += sizeof(std::vector<int>**) * relations->size();
+    for (std::pair<const std::string, SimpleRelation*> const& kv: *relationNameMap) {
+        size += sizeof(kv) + sizeof(char) * (kv.first.length() + 1);
+    }
+    return size;
+}
+
 /**
  * SimpleCompressedKb
  */
@@ -701,3 +731,20 @@ const std::vector<int>& SimpleCompressedKb::getSupplementaryConstants() const {
     return supplementaryConstants;
 }
 
+size_t SimpleCompressedKb::memoryCost() const {
+    size_t size = sizeof(SimpleCompressedKb) + sizeof(char) * (strlen(name) + 1) + 
+        sizeof(Rule*) * hypothesis.size() + 
+        (sizeof(std::vector<int*>) + sizeof(std::unordered_set<Record>)) * originalKb->totalRelations() + 
+        sizeof(int) * supplementaryConstants.size();
+    for (Rule* const& rule: hypothesis) {
+        size += rule->memoryCost();
+    }
+    for (int i = 0; i < originalKb->totalRelations(); i++) {
+        SimpleRelation* relation = originalKb->getRelation(i);
+        std::vector<int*> const& fvs_records = fvsRecords[i];
+        std::unordered_set<Record> const& counterexample_set = counterexampleSets[i];
+        size += sizeof(int*) * fvs_records.size();
+        size += (sizeof(Record) + sizeof(int) * relation->getTotalCols()) * counterexample_set.size();
+    }
+    return size;
+}
