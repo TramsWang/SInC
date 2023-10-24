@@ -102,7 +102,8 @@ double Eval::getRuleLength() const {
 
 std::string Eval::toString() const {
     std::ostringstream os;
-    os << "(+)" << posEtls << "; (-)" << negEtls << "; |" << ruleLength << "|; δ=" << compCapacity << "; τ=" << "; h=" << infoGain;
+    os << "(+)" << posEtls << "; (-)" << negEtls << "; |" << ruleLength << "|; δ=" << compCapacity << "; τ=" << compRatio <<
+        "; h=" << infoGain;
     return os.str();
 }
 

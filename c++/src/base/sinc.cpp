@@ -149,10 +149,8 @@ Rule* RelationMiner::findRule() {
         for (int i = 0; i < beamwidth && nullptr != beams[i]; i++) {
             Rule* const r = beams[i];
             selectAsBeam(r);
-            #if DEBUG_LEVEL >= DEBUG_VERBOSE
-                logFormatter.printf("Extend: %s\n", r.toString(kb.getRelationNames()));
-                logger.flush();
-            #endif
+            logFormatter.printf("Extend: %s\n", r->toString(kb.getRelationNames()).c_str());
+            logger.flush();
 
             /* Find the specializations and generalizations of rule 'r' */
             int specializations_cnt = findSpecializations(*r, top_candidates);

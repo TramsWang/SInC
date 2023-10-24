@@ -1822,7 +1822,25 @@ void CachedRule::obtainAllCache() {
 }
 
 double CachedRule::recordCoverage() {
-    return ((double) posCache->countTableSize(HEAD_PRED_IDX)) / kb.getRelation(getHead().getPredSymbol())->getTotalRows();
+    int new_pos_ent = 0;
+    SimpleRelation const& head_relation = *kb.getRelation(getHead().getPredSymbol());
+    std::unordered_set<const void*> used_rows;
+    std::unordered_set<const void*> used_cbs;
+    used_rows.reserve(head_relation.getTotalRows());
+    used_cbs.reserve(posCache->getEntries().size());
+    for (CacheFragment::entryType* const& entry: posCache->getEntries()) {
+        CompliedBlock const* cb = (*entry)[HEAD_PRED_IDX];
+        if (used_cbs.emplace(cb).second) {
+            int* const* const rows = cb->getComplianceSet();
+            for (int i = 0; i < cb->getTotalRows(); i++) {
+                int* const row = rows[i];
+                if (used_rows.emplace(row).second && !head_relation.isEntailed(row)) {
+                    new_pos_ent++;
+                }
+            }
+        }
+    }
+    return ((double) new_pos_ent) / kb.getRelation(getHead().getPredSymbol())->getTotalRows();
 }
 
 sinc::Eval CachedRule::calculateEval() const {
@@ -1867,8 +1885,6 @@ sinc::Eval CachedRule::calculateEval() const {
             all_ent *= fragment.countCombinations(vids);
         }
     }
-    // int new_pos_ent = posCache->countTableSize(HEAD_PRED_IDX);
-    // int already_ent = entCache->countTableSize(HEAD_PRED_IDX);
     int new_pos_ent = 0;
     int already_ent = 0;
     SimpleRelation const& head_relation = *kb.getRelation(head_pred.getPredSymbol());
