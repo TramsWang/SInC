@@ -8,21 +8,11 @@
  * CompliedBlock
  */
 using sinc::CompliedBlock;
-using sinc::IntTable;
 
 std::vector<CompliedBlock*> CompliedBlock::pool;
 
 CompliedBlock* CompliedBlock::create(int** _complianceSet, int const _totalRows, int const _totalCols, bool _maintainComplianceSet) {
     CompliedBlock* cb = new CompliedBlock(_complianceSet, _totalRows, _totalCols, _maintainComplianceSet);
-    registerCb(cb);
-    return cb;
-}
-
-CompliedBlock* CompliedBlock::create(
-    int** _complianceSet, int const _totalRows, int const _totalCols, IntTable* _indices,
-    bool _maintainComplianceSet, bool _maintainIndices
-) {
-    CompliedBlock* cb = new CompliedBlock(_complianceSet, _totalRows, _totalCols, _indices, _maintainComplianceSet, _maintainIndices);
     registerCb(cb);
     return cb;
 }
@@ -43,35 +33,106 @@ size_t CompliedBlock::totalNumCbs() {
 }
 
 size_t CompliedBlock::totalCbMemoryCost() {
-    size_t size = sizeof(pool);
+    size_t size = sizeof(pool) + sizeof(CompliedBlock*) * pool.capacity();
     for (CompliedBlock* const& cb: pool) {
         size += cb->memoryCost();
     }
     return size;
 }
 
+CompliedBlock* CompliedBlock::getSlice(const CompliedBlock& cb, int const col, int const val) {
+    std::unordered_map<int, std::vector<int*>*>::iterator itr = cb.indices[col].find(val);
+    if (cb.indices[col].end() == itr) {
+        return nullptr;
+    }
+    return CompliedBlock::create(toArray(*(itr->second)), itr->second->size(), cb.totalCols, true);
+}
+
+std::vector<CompliedBlock*>* CompliedBlock::splitSlices(const CompliedBlock& cb, int const col) {
+    std::vector<CompliedBlock*>* vec = new std::vector<CompliedBlock*>();
+    for (std::pair<const int, std::vector<int*>*> const& kv: cb.indices[col]) {
+        vec->push_back(CompliedBlock::create(toArray(*(kv.second)), kv.second->size(), cb.totalCols, true));
+    }
+    return vec;
+}
+
+const sinc::MatchedSubCbs* CompliedBlock::matchSlices(
+    const CompliedBlock& cb1, int const col1, const CompliedBlock& cb2, int const col2
+) {
+    MatchedSubCbs* result = new MatchedSubCbs();
+    std::unordered_map<int, std::vector<int*>*> map1 = cb1.indices[col1];
+    std::unordered_map<int, std::vector<int*>*> map2 = cb2.indices[col2];
+    for (std::pair<const int, std::vector<int*>*> const& kv1: map1) {
+        std::unordered_map<int, std::vector<int*>*>::iterator itr = map2.find(kv1.first);
+        if (map2.end() != itr) {
+            result->cbs1.push_back(CompliedBlock::create(toArray(*(kv1.second)), kv1.second->size(), cb1.totalCols, true));
+            result->cbs2.push_back(CompliedBlock::create(toArray(*(itr->second)), itr->second->size(), cb2.totalCols, true));
+        }
+    }
+    if (result->cbs1.empty()) {
+        delete result;
+        return nullptr;
+    }
+    return result;
+}
+
+const std::vector<CompliedBlock*>* CompliedBlock::matchSlices(const CompliedBlock& cb, int const col1, int const col2) {
+    std::vector<CompliedBlock*>* vec = new std::vector<CompliedBlock*>();
+    for (std::pair<const int, std::vector<int*>*> const& kv: cb.indices[col1]) {
+        std::vector<int*> rows;
+        for (int* const& row: *(kv.second)) {
+            if (kv.first == row[col2]) {
+                rows.push_back(row);
+            }
+        }
+        if (!rows.empty()) {
+            vec->push_back(CompliedBlock::create(toArray(rows), rows.size(), cb.totalCols, true));
+        }
+    }
+    if (vec->empty()) {
+        delete vec;
+        return nullptr;
+    }
+    return vec;
+}
+
 CompliedBlock::CompliedBlock(int** _complianceSet, int const _totalRows, int const _totalCols, bool _maintainComplianceSet): 
     complianceSet(_complianceSet), totalRows(_totalRows), totalCols(_totalCols), indices(nullptr),
-    mainTainComplianceSet(_maintainComplianceSet), maintainIndices(false) {}
-
-CompliedBlock::CompliedBlock(int** _complianceSet, int const _totalRows, int const _totalCols, IntTable* _indices,
-    bool _maintainComplianceSet, bool _maintainIndices
-) : complianceSet(_complianceSet), totalRows(_totalRows), totalCols(_totalCols), indices(_indices),
-    mainTainComplianceSet(_maintainComplianceSet), maintainIndices(_maintainIndices && nullptr != _indices) {}
+    mainTainComplianceSet(_maintainComplianceSet) {}
 
 CompliedBlock::~CompliedBlock() {
     if (mainTainComplianceSet) {
         delete[] complianceSet;
     }
-    if (maintainIndices) {
-        delete indices;
+    if (nullptr != indices) {
+        for (int col_idx = 0; col_idx < totalCols; col_idx++) {
+            for (std::pair<const int, std::vector<int*>*> const& kv: indices[col_idx]) {
+                delete kv.second;
+            }
+        }
+        delete[] indices;
     }
 }
 
 void CompliedBlock::buildIndices() {
     if (nullptr == indices) {
-        indices = new IntTable(complianceSet, totalRows, totalCols);
-        maintainIndices = true;
+        indices = new std::unordered_map<int, std::vector<int*>*>[totalCols];
+        for (int i = 0; i < totalRows; i++) {
+            int* row = complianceSet[i];
+            for (int arg_idx = 0; arg_idx < totalCols; arg_idx++) {
+                std::unordered_map<int, std::vector<int*>*>& map = indices[arg_idx];
+                int const val = row[arg_idx];
+                std::unordered_map<int, std::vector<int*>*>::iterator itr = map.find(val);
+                std::vector<int*>* set;
+                if (map.end() == itr) {
+                    set = new std::vector<int*>();
+                    map.emplace(val, set);
+                } else {
+                    set = itr->second;
+                }
+                set->push_back(row);
+            }
+        }
     }
 }
 
@@ -79,8 +140,8 @@ int* const* CompliedBlock::getComplianceSet() const {
     return complianceSet;
 }
 
-const IntTable& CompliedBlock::getIndices() const {
-    return *indices;
+const std::unordered_map<int, std::vector<int*>*>* CompliedBlock::getIndices() const {
+    return indices;
 }
 
 int CompliedBlock::getTotalRows() const {
@@ -96,8 +157,15 @@ size_t CompliedBlock::memoryCost() const {
     if (mainTainComplianceSet) {
         size += sizeof(int*) * totalRows;
     }
-    if (maintainIndices) {
-        size += indices->memoryCost();
+    if (nullptr != indices) {
+        size += sizeof(std::unordered_map<int, std::vector<int*>*>*) * totalCols;
+        for (int i = 0; i < totalCols; i++) {
+            std::unordered_map<int, std::vector<int*>*>& map = indices[i];
+            size += sizeof(std::pair<int, std::vector<int*>*>) * map.bucket_count() * std::max(1.0f, map.max_load_factor());
+            for (std::pair<const int, std::vector<int*>*> const& kv: map) {
+                size += sizeof(std::vector<int*>) + sizeof(int*) * kv.second->capacity();
+            }
+        }
     }
     return size;
 }
@@ -232,8 +300,9 @@ CacheFragment::CacheFragment(IntTable* const firstRelation, int const relationSy
     partAssignedRule.emplace_back(relationSymbol, firstRelation->getTotalCols());
     entryType* first_entry = new entryType();
     CompliedBlock* cb = CompliedBlock::create(
-        firstRelation->getAllRows(), firstRelation->getTotalRows(), firstRelation->getTotalCols(), firstRelation, false, false
+        firstRelation->getAllRows(), firstRelation->getTotalRows(), firstRelation->getTotalCols(), false
     );
+    cb->buildIndices();
     first_entry->push_back(cb);
     entries->push_back(first_entry);
 }
@@ -683,37 +752,32 @@ void CacheFragment::splitCacheEntries(int const tabIdx1, int const colIdx1, int 
     if (tabIdx1 == tabIdx2) {
         for (entryType* const& cache_entry: *entries) {
             CompliedBlock& cb = *(*cache_entry)[tabIdx1];
-            IntTable::slicesType* slices = cb.getIndices().matchSlices(colIdx1, colIdx2);
-            for (IntTable::sliceType* const& slice: *slices) {
-                CompliedBlock* new_cb = CompliedBlock::create(
-                    toArray<int*>(*slice), slice->size(), partAssignedRule[tabIdx1].getArity(), true
-                );
-                entryType* new_entry = new entryType(*cache_entry);
-                (*new_entry)[tabIdx1] = new_cb;
-                new_entries->push_back(new_entry);
+            const std::vector<CompliedBlock*>* slices = CompliedBlock::matchSlices(cb, colIdx1, colIdx2);
+            if (nullptr != slices) {
+                for (CompliedBlock* const& slice: *slices) {
+                    entryType* new_entry = new entryType(*cache_entry);
+                    (*new_entry)[tabIdx1] = slice;
+                    new_entries->push_back(new_entry);
+                }
+                delete slices;
             }
-            IntTable::releaseSlices(slices);
         }
     } else {
         for (entryType* const& cache_entry: *entries) {
             CompliedBlock& cb1 = *(*cache_entry)[tabIdx1];
             CompliedBlock& cb2 = *(*cache_entry)[tabIdx2];
-            MatchedSubTables* slices = IntTable::matchSlices(cb1.getIndices(), colIdx1, cb2.getIndices(), colIdx2);
-            for (int i = 0; i < slices->slices1->size(); i++) {
-                IntTable::sliceType& slice1 = *(*(slices->slices1))[i];
-                IntTable::sliceType& slice2 = *(*(slices->slices2))[i];
-                CompliedBlock* new_cb1 = CompliedBlock::create(
-                    toArray<int*>(slice1), slice1.size(), partAssignedRule[tabIdx1].getArity(), true
-                );
-                CompliedBlock* new_cb2 = CompliedBlock::create(
-                    toArray<int*>(slice2), slice2.size(), partAssignedRule[tabIdx2].getArity(), true
-                );
-                entryType* new_entry = new entryType(*cache_entry);
-                (*new_entry)[tabIdx1] = new_cb1;
-                (*new_entry)[tabIdx2] = new_cb2;
-                new_entries->push_back(new_entry);
+            MatchedSubCbs const* slices = CompliedBlock::matchSlices(cb1, colIdx1, cb2, colIdx2);
+            if (nullptr != slices) {
+                for (int i = 0; i < slices->cbs1.size(); i++) {
+                    CompliedBlock* slice1 = (slices->cbs1)[i];
+                    CompliedBlock* slice2 = (slices->cbs2)[i];
+                    entryType* new_entry = new entryType(*cache_entry);
+                    (*new_entry)[tabIdx1] = slice1;
+                    (*new_entry)[tabIdx2] = slice2;
+                    new_entries->push_back(new_entry);
+                }
+                delete slices;
             }
-            delete slices;
         }
     }
     releaseEntries();
@@ -724,22 +788,22 @@ void CacheFragment::splitCacheEntries(int const tabIdx1, int const colIdx1, IntT
     entriesType* new_entries = new entriesType();
     for (entryType* const& cache_entry : *entries) {
         CompliedBlock& cb1 = *(*cache_entry)[tabIdx1];
-        MatchedSubTables* slices = IntTable::matchSlices(cb1.getIndices(), colIdx1, *newRelation, colIdx2);
-        for (int i = 0; i < slices->slices1->size(); i++) {
-            IntTable::sliceType& slice1 = *(*(slices->slices1))[i];
-            IntTable::sliceType& slice2 = *(*(slices->slices2))[i];
-            CompliedBlock* new_cb1 = CompliedBlock::create(
-                toArray<int*>(slice1), slice1.size(), partAssignedRule[tabIdx1].getArity(), true
-            );
-            CompliedBlock* new_cb2 = CompliedBlock::create(
-                toArray<int*>(slice2), slice2.size(), newRelation->getTotalCols(), true
-            );
-            entryType* new_entry = new entryType(*cache_entry);
-            (*new_entry)[tabIdx1] = new_cb1;
-            new_entry->push_back(new_cb2);
-            new_entries->push_back(new_entry);
+        CompliedBlock* new_cb = CompliedBlock::create(
+            newRelation->getAllRows(), newRelation->getTotalRows(), newRelation->getTotalCols(), false
+        );
+        new_cb->buildIndices();
+        MatchedSubCbs const* slices = CompliedBlock::matchSlices(cb1, colIdx1, *new_cb, colIdx2);
+        if (nullptr != slices) {
+            for (int i = 0; i < slices->cbs1.size(); i++) {
+                CompliedBlock* slice1 = slices->cbs1[i];
+                CompliedBlock* slice2 = slices->cbs2[i];
+                entryType* new_entry = new entryType(*cache_entry);
+                (*new_entry)[tabIdx1] = slice1;
+                new_entry->push_back(slice2);
+                new_entries->push_back(new_entry);
+            }
+            delete slices;
         }
-        delete slices;
     }
     releaseEntries();
     entries = new_entries;
@@ -753,15 +817,11 @@ void CacheFragment::matchCacheEntries(
         for (entryType* const& cache_entry : *entries) {
             CompliedBlock& cb = *(*cache_entry)[matchedTabIdx];
             int const matched_constant = cb.getComplianceSet()[0][matchedColIdx];
-            IntTable::sliceType* slice = cb.getIndices().getSlice(matchingColIdx, matched_constant);
-            if (nullptr != slice) { // assertion: must be non-empty
-                CompliedBlock* new_cb = CompliedBlock::create(
-                    toArray<int*>(*slice), slice->size(), partAssignedRule[matchedTabIdx].getArity(), true
-                );
+            CompliedBlock* slice = CompliedBlock::getSlice(cb, matchingColIdx, matched_constant);
+            if (nullptr != slice) {
                 entryType* new_entry = new entryType(*cache_entry);
-                (*new_entry)[matchedTabIdx] = new_cb;
+                (*new_entry)[matchedTabIdx] = slice;
                 new_entries->push_back(new_entry);
-                IntTable::releaseSlice(slice);
             }
         }
     } else {
@@ -769,15 +829,11 @@ void CacheFragment::matchCacheEntries(
             CompliedBlock& matched_cb = *(*cache_entry)[matchedTabIdx];
             CompliedBlock& matching_cb = *(*cache_entry)[matchingTabIdx];
             int const matched_constant = matched_cb.getComplianceSet()[0][matchedColIdx];
-            IntTable::sliceType* slice = matching_cb.getIndices().getSlice(matchingColIdx, matched_constant);
-            if (nullptr != slice) { // assertion: must be non-empty
-                CompliedBlock* new_cb = CompliedBlock::create(
-                    toArray<int*>(*slice), slice->size(), partAssignedRule[matchingTabIdx].getArity(), true
-                );
+            CompliedBlock* slice = CompliedBlock::getSlice(matching_cb, matchingColIdx, matched_constant);
+            if (nullptr != slice) {
                 entryType* new_entry = new entryType(*cache_entry);
-                (*new_entry)[matchingTabIdx] = new_cb;
+                (*new_entry)[matchingTabIdx] = slice;
                 new_entries->push_back(new_entry);
-                IntTable::releaseSlice(slice);
             }
         }
     }
@@ -809,15 +865,11 @@ void CacheFragment::assignCacheEntries(int const tabIdx, int const colIdx, int c
     entriesType* new_entries = new entriesType();
     for (entryType* const& cache_entry : *entries) {
         CompliedBlock& cb = *(*cache_entry)[tabIdx];
-        IntTable::sliceType* slice = cb.getIndices().getSlice(colIdx, constant);
-        if (nullptr != slice) { // assertion: must be non-empty
-            CompliedBlock* new_cb = CompliedBlock::create(
-                toArray<int*>(*slice), slice->size(), partAssignedRule[tabIdx].getArity(), true
-            );
+        CompliedBlock* slice = CompliedBlock::getSlice(cb, colIdx, constant);
+        if (nullptr != slice) {
             entryType* new_entry = new entryType(*cache_entry);
-            (*new_entry)[tabIdx] = new_cb;
+            (*new_entry)[tabIdx] = slice;
             new_entries->push_back(new_entry);
-            IntTable::releaseSlice(slice);
         }
     }
     releaseEntries();
@@ -844,9 +896,9 @@ CacheFragment::const2EntriesMapType* CacheFragment::calcConst2EntriesMap(
     const2EntriesMapType* const_2_entries_map = new const2EntriesMapType();
     for (entryType* const& cache_entry: entries) {
         CompliedBlock& cb = *(*cache_entry)[tabIdx];
-        IntTable::slicesType* slices = cb.getIndices().splitSlices(colIdx);
-        for (IntTable::sliceType* slice: *slices) {
-            int const constant = (*slice)[0][colIdx];
+        std::vector<CompliedBlock*>* slices = CompliedBlock::splitSlices(cb, colIdx);
+        for (CompliedBlock* slice: *slices) {
+            int const constant = slice->getComplianceSet()[0][colIdx];
             entriesType* entries_of_the_value;
             const2EntriesMapType::iterator itr = const_2_entries_map->find(constant);
             if (itr == const_2_entries_map->end()) {
@@ -856,10 +908,10 @@ CacheFragment::const2EntriesMapType* CacheFragment::calcConst2EntriesMap(
                 entries_of_the_value = itr->second;
             }
             entryType* new_entry = new entryType(*cache_entry);
-            (*new_entry)[tabIdx] = CompliedBlock::create(toArray<int*>(*slice), slice->size(), arity, true);
+            (*new_entry)[tabIdx] = slice;
             entries_of_the_value->push_back(new_entry);
         }
-        IntTable::releaseSlices(slices);
+        delete slices;
     }
     return const_2_entries_map;
 }
@@ -1046,21 +1098,19 @@ CachedRule::CachedRule(
         posCache = new CacheFragment(headPredSymbol, arity);
         entCache = new CacheFragment(headPredSymbol, arity);
     } else {
-        int** non_entailed_records = toArray(non_entailed_record_vector);
-        int** entailed_records = toArray(entailed_record_vector);
-        IntTable* non_entailed_record_table = new IntTable(non_entailed_records, non_entailed_record_vector.size(), arity);
-        IntTable* entailed_record_table = new IntTable(entailed_records, entailed_record_vector.size(), arity);
         posCache = new CacheFragment(
-            CompliedBlock::create(non_entailed_records, non_entailed_record_vector.size(), arity, non_entailed_record_table, true, true), 
+            CompliedBlock::create(toArray(non_entailed_record_vector), non_entailed_record_vector.size(), arity, true), 
             headPredSymbol
         );
         entCache = new CacheFragment(
-            CompliedBlock::create(entailed_records, entailed_record_vector.size(), arity, entailed_record_table, true, true),
+            CompliedBlock::create(toArray(entailed_record_vector), entailed_record_vector.size(), arity, true),
             headPredSymbol
         );
     }
     maintainPosCache = true;
     maintainEntCache = true;
+    posCache->buildIndices();
+    entCache->buildIndices();
 
     /* Initialize the E-cache */
     allCache = new std::vector<CacheFragment*>();
