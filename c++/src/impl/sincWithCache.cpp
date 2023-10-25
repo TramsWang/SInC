@@ -786,12 +786,12 @@ void CacheFragment::splitCacheEntries(int const tabIdx1, int const colIdx1, int 
 
 void CacheFragment::splitCacheEntries(int const tabIdx1, int const colIdx1, IntTable* const newRelation, int const colIdx2) {
     entriesType* new_entries = new entriesType();
+    CompliedBlock* new_cb = CompliedBlock::create(
+        newRelation->getAllRows(), newRelation->getTotalRows(), newRelation->getTotalCols(), false
+    );
+    new_cb->buildIndices();
     for (entryType* const& cache_entry : *entries) {
         CompliedBlock& cb1 = *(*cache_entry)[tabIdx1];
-        CompliedBlock* new_cb = CompliedBlock::create(
-            newRelation->getAllRows(), newRelation->getTotalRows(), newRelation->getTotalCols(), false
-        );
-        new_cb->buildIndices();
         MatchedSubCbs const* slices = CompliedBlock::matchSlices(cb1, colIdx1, *new_cb, colIdx2);
         if (nullptr != slices) {
             for (int i = 0; i < slices->cbs1.size(); i++) {
