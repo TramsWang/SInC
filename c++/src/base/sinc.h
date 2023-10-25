@@ -11,10 +11,12 @@
 #include "../rule/rule.h"
 
 #define NANO_TO_MILL(T) ((T) / 1000000)
+#define NANO_TO_SECOND(T) ((T) / 1000000000)
 #define LOG_FILE_NAME "log.meta"
 #define STD_OUTPUT_FILE_NAME "stdout.meta"
 #define STD_ERROR_FILE_NAME "stderr.meta"
 #define INTERRUPT_CMD "stop"
+#define MAX_RUN_TIME_IN_SECOND 10
 
 /* Followings are macros for parsing command line options and arguments */
 #define DEFAULT_PATH "."
@@ -195,11 +197,6 @@ namespace sinc {
          */
         void run();
 
-        /**
-         * Interrupt mining and discontinue the iteration in `run()`
-         */
-        void discontinue();
-
         std::unordered_set<Record>& getCounterexamples() const;
         std::vector<Rule*>& getHypothesis() const;
 
@@ -224,8 +221,6 @@ namespace sinc {
         std::unordered_set<Record>& counterexamples;
         /** The tabu set */
         Rule::tabuMapType tabuMap;
-        /** Mark whether the mining iteration in `run()` should continue */
-        bool shouldContinue = true;
 
         /** Logger */
         std::ostream& logger;
@@ -319,6 +314,8 @@ namespace sinc {
         static fs::path getStdOutFilePath(fs::path& dumpPath, const char* dumpName);
         static fs::path getStdErrFilePath(fs::path& dumpPath, const char* dumpName);
 
+        static bool isTimeOut();
+
         /**
          * Create a SInC object with configurations.
          *
@@ -356,6 +353,8 @@ namespace sinc {
         void run();
 
     protected:
+        static uint64_t runStartTime;
+
         /* Runtime configurations */
         /** SInC configuration */
         SincConfig* config;

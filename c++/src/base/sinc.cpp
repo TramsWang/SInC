@@ -109,7 +109,7 @@ void RelationMiner::run() {
     Rule* rule;
     int covered_facts = 0;
     int const total_facts = kb.getRelation(targetRelation)->getTotalRows();
-    while (shouldContinue && (covered_facts < total_facts) && (nullptr != (rule = findRule()))) {
+    while (!SInC::isTimeOut() && (covered_facts < total_facts) && (nullptr != (rule = findRule()))) {
         hypothesis.push_back(rule);
         covered_facts += updateKbAndDependencyGraph(*rule);
         rule->releaseMemory();
@@ -120,10 +120,6 @@ void RelationMiner::run() {
         logger.flush();
     }
     logger << "Done" << std::endl;
-}
-
-void RelationMiner::discontinue() {
-    shouldContinue = false;
 }
 
 using sinc::Record;
@@ -146,13 +142,11 @@ Rule* RelationMiner::findRule() {
     while (true) {
         /* Find the candidates in the next round according to current beams */
         Rule** top_candidates = new Rule*[beamwidth]{};
-        for (int i = 0; i < beamwidth && nullptr != beams[i]; i++) {
+        for (int i = 0; i < beamwidth && nullptr != beams[i] && !SInC::isTimeOut(); i++) {
             Rule* const r = beams[i];
             selectAsBeam(r);
-            #if DEBUG_LEVEL >= DEBUG_VERBOSE
-                logFormatter.printf("Extend: %s\n", r.toString(kb.getRelationNames()));
-                logger.flush();
-            #endif
+            logFormatter.printf("Extend: %s\n", r->toString(kb.getRelationNames()).c_str());
+            logger.flush();
 
             /* Find the specializations and generalizations of rule 'r' */
             int specializations_cnt = findSpecializations(*r, top_candidates);
@@ -166,7 +160,7 @@ Rule* RelationMiner::findRule() {
                 }
             }
         }
-        if (!shouldContinue) {
+        if (SInC::isTimeOut()) {
             /* Stop the finding procedure at the current stage and return the best rule */
             Rule* best_rule = beams[0];
             for (int i = 1; i < beamwidth && nullptr != beams[i]; i++) {
@@ -272,15 +266,17 @@ int RelationMiner::findSpecializations(Rule& rule, Rule** const candidates) {
     std::vector<SimpleRelation*>* const relations = kb.getRelations();
     for (int var_id = 0; var_id < rule.usedLimitedVars(); var_id++) {
         /* Case 1 */
-        for (ArgLocation const& vacant: empty_args) {
+        for (int i = 0; i < empty_args.size() && !SInC::isTimeOut(); i++) {
+            ArgLocation const& vacant = empty_args[i];
             Rule* const new_rule = rule.clone();
             UpdateStatus const update_status = new_rule->specializeCase1(vacant.predIdx, vacant.argIdx, var_id);
             added_candidate_cnt += checkThenAddRule(update_status, new_rule, rule, candidates);
         }
 
         /* Case 2 */
-        for (SimpleRelation* const& relation: *relations) {
-            for (int arg_idx = 0; arg_idx < relation->getTotalCols(); arg_idx++) {
+        for (int i = 0; i < relations->size() && !SInC::isTimeOut(); i++) {
+            SimpleRelation* relation = (*relations)[i];
+            for (int arg_idx = 0; arg_idx < relation->getTotalCols() && !SInC::isTimeOut(); arg_idx++) {
                 Rule* const new_rule = rule.clone();
                 UpdateStatus const update_status = new_rule->specializeCase2(
                         relation->id, relation->getTotalCols(), arg_idx, var_id
@@ -291,14 +287,15 @@ int RelationMiner::findSpecializations(Rule& rule, Rule** const candidates) {
     }
 
     /* Case 3, 4, and 5 */
-    for (int i = 0; i < empty_args.size(); i++) {
+    for (int i = 0; i < empty_args.size() && !SInC::isTimeOut(); i++) {
         /* Find the first empty argument */
         ArgLocation const& empty_arg_loc_1 = empty_args[i];
         Predicate const& predicate1 = rule.getPredicate(empty_arg_loc_1.predIdx);
 
         /* Case 5 */
         std::vector<int>* const_list = kb.getPromisingConstants(predicate1.getPredSymbol())[empty_arg_loc_1.argIdx];
-        for (int const& constant: *const_list) {
+        for (int j = 0; j < const_list->size() && !SInC::isTimeOut(); j++) {
+            int const constant = (*const_list)[j];
             Rule* const new_rule = rule.clone();
             UpdateStatus const update_status = new_rule->specializeCase5(
                     empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx, constant
@@ -307,7 +304,7 @@ int RelationMiner::findSpecializations(Rule& rule, Rule** const candidates) {
         }
 
         /* Case 3 */
-        for (int j = i + 1; j < empty_args.size(); j++) {
+        for (int j = i + 1; j < empty_args.size() && !SInC::isTimeOut(); j++) {
             /* Find another empty argument */
             ArgLocation const& empty_arg_loc_2 = empty_args[j];
             Rule* const new_rule = rule.clone();
@@ -318,8 +315,9 @@ int RelationMiner::findSpecializations(Rule& rule, Rule** const candidates) {
         }
 
         /* Case 4 */
-        for (SimpleRelation* const& relation: *relations) {
-            for (int arg_idx = 0; arg_idx < relation->getTotalCols(); arg_idx++) {
+        for (int j = 0; j < relations->size() && !SInC::isTimeOut(); j++) {
+            SimpleRelation* relation = (*relations)[j];
+            for (int arg_idx = 0; arg_idx < relation->getTotalCols() && !SInC::isTimeOut(); arg_idx++) {
                 Rule* const new_rule = rule.clone();
                 UpdateStatus const update_status = new_rule->specializeCase4(
                         relation->id, relation->getTotalCols(), arg_idx, empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx
@@ -333,10 +331,10 @@ int RelationMiner::findSpecializations(Rule& rule, Rule** const candidates) {
 
 int RelationMiner::findGeneralizations(Rule& rule, Rule** const candidates) {
     int added_candidate_cnt = 0;
-    for (int pred_idx = HEAD_PRED_IDX; pred_idx < rule.numPredicates(); pred_idx++) {
+    for (int pred_idx = HEAD_PRED_IDX; pred_idx < rule.numPredicates() && !SInC::isTimeOut(); pred_idx++) {
         /* Independent fragment may appear in a generalized rule, but this will be found by checking rule validness */
         Predicate const& predicate = rule.getPredicate(pred_idx);
-        for (int arg_idx = 0; arg_idx < predicate.getArity(); arg_idx++) {
+        for (int arg_idx = 0; arg_idx < predicate.getArity() && !SInC::isTimeOut(); arg_idx++) {
             if (ARG_IS_NON_EMPTY(predicate.getArg(arg_idx))) {
                 Rule* const new_rule = rule.clone();
                 UpdateStatus const update_status = new_rule->generalize(pred_idx, arg_idx);
@@ -479,6 +477,8 @@ int RelationMiner::updateKbAndDependencyGraph(Rule& rule) {
 using sinc::SInC;
 namespace fs = std::filesystem;
 
+uint64_t SInC::runStartTime = sinc::currentTimeInNano();
+
 fs::path SInC::getLogFilePath(fs::path& dumpPath, const char* dumpName) {
     return dumpPath / dumpName / LOG_FILE_NAME;
 }
@@ -489,6 +489,11 @@ fs::path SInC::getStdOutFilePath(fs::path& dumpPath, const char* dumpName) {
 
 fs::path SInC::getStdErrFilePath(fs::path& dumpPath, const char* dumpName) {
     return dumpPath / dumpName / STD_ERROR_FILE_NAME;
+}
+
+bool SInC::isTimeOut() {
+    uint64_t used_time_in_second = NANO_TO_SECOND(currentTimeInNano() - runStartTime);
+    return MAX_RUN_TIME_IN_SECOND <= used_time_in_second;
 }
 
 SInC::SInC(SincConfig* const _config) : SInC(_config, nullptr) {}
@@ -554,6 +559,8 @@ sinc::SimpleCompressedKb& SInC::getCompressedKb() const {
 }
 
 void SInC::run() {
+    runStartTime = currentTimeInNano();
+
     /* Set out/err stream to output files */
     coutBuf = std::cout.rdbuf();
     try {
@@ -682,7 +689,7 @@ void SInC::compress() {
     RelationMiner* relation_miner;
     try {
         getTargetRelations(target_relations, num_targets);
-        for (int i = 0; i < num_targets; i++) {
+        for (int i = 0; i < num_targets && !isTimeOut(); i++) {
             int relation_num = target_relations[i];
             relation_miner = createRelationMiner(relation_num);
             relation_miner->run();  // counterexamples and hypothesis should be added to `compressedKb` in this procedure
@@ -695,9 +702,11 @@ void SInC::compress() {
         }
     } catch (std::exception const& e) {
         std::cerr << e.what() << std::endl;
-        logError("Relation Miner failed. Interrupt");
+        logError("Relation Miner failed. Skip mining");
         if (nullptr != relation_miner) {
-            relation_miner->discontinue();
+            finalizeRelationMiner(relation_miner);
+            delete relation_miner;
+            relation_miner = nullptr;
         }
     }
     delete[] target_relations;
