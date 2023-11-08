@@ -310,14 +310,14 @@ void CompliedBlock::reserveMemSpace(SimpleKb const& kb) {
         for (int col_idx = 0; col_idx < arity; col_idx++) {
             est_get_slice_size += promising_constants[col_idx]->size();
         }
-        est_split_slices_size += arity;
+        // est_split_slices_size += arity;
         est_match_slices_one_cb_size += arity * arity;
         est_match_slices_two_cbs_size += arity;
     }
     est_get_slice_size *= num_relations;
-    est_split_slices_size *= num_relations;
-    est_match_slices_one_cb_size *= num_relations;
-    est_match_slices_two_cbs_size *= est_match_slices_two_cbs_size * num_relations;
+    est_split_slices_size = kb.totalConstants();
+    // est_match_slices_one_cb_size *= num_relations;
+    est_match_slices_two_cbs_size *= est_match_slices_two_cbs_size;
     int est_pool_size = num_relations + est_get_slice_size + est_split_slices_size + est_match_slices_one_cb_size +
         est_match_slices_two_cbs_size;
     mapGetSlice.reserve(est_get_slice_size);
