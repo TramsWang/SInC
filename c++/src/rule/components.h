@@ -78,6 +78,8 @@ namespace sinc {
          */
         Eval(double const posEtls, double const allEtls, int const ruleLength);
 
+        Eval(double const posEtls, double const allEtls, int const ruleLength, double const previousCompRatio, double const previousInfoGain);
+
         Eval(const Eval& another);
 
         /**

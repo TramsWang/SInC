@@ -55,13 +55,18 @@ EvalMetric::Value EvalMetric::getBySymbol(const std::string& symbol) {
  * Eval
  */
 using sinc::Eval;
-Eval::Eval(double const _posEtls, double const _allEtls, int const _ruleLength) :
+Eval::Eval(double const _posEtls, double const _allEtls, int const _ruleLength) : Eval(_posEtls, _allEtls, _ruleLength, 0, 0) {}
+
+Eval::Eval(double const _posEtls, double const _allEtls, int const _ruleLength, double const previousCompRatio, double const previousInfoGain) :
     posEtls(_posEtls), allEtls(_allEtls), negEtls(_allEtls - _posEtls), ruleLength(_ruleLength)
 {
     double tmp_ratio = posEtls / (allEtls + ruleLength);
     compRatio = std::isnan(tmp_ratio) ? 0 : tmp_ratio;
     compCapacity = posEtls - negEtls - ruleLength;
-    infoGain = (0 == posEtls || 0 == compRatio) ? (-1.0/0.0) : posEtls * std::log(1+compRatio);
+
+    double info_prev = -std::log(previousCompRatio + 0.01);    // 0.01 is to avoid log(0)
+    double info_now = -std::log(compRatio + 0.01);
+    infoGain = previousInfoGain + posEtls * (info_prev - info_now);
 }
 
 Eval::Eval(const Eval& another) : posEtls(another.posEtls), negEtls(another.negEtls), allEtls(another.negEtls),

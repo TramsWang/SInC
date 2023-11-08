@@ -1522,7 +1522,7 @@ CachedRule::CachedRule(
     int already_ent = head_relation->totalEntailedRecords();
     int pos_ent = head_relation->getTotalRows() - already_ent;
     double all_ent = pow(kb.totalConstants(), arity);
-    eval = Eval(pos_ent, all_ent - already_ent, length);
+    eval = Eval(pos_ent, all_ent - already_ent, length, 0, 0);
     // delete split_records;
 }
 
@@ -1911,7 +1911,10 @@ sinc::Eval CachedRule::calculateEval() const {
 
     /* Update evaluation score */
     /* Those already proved should be excluded from the entire entailment set. Otherwise, they are counted as negative ones */
-    return Eval(new_pos_ent, all_ent - already_ent, length);
+    return Eval(
+        new_pos_ent, all_ent - already_ent, length, 
+        eval.value(EvalMetric::Value::CompressionRatio), eval.value(EvalMetric::Value::InfoGain)
+    );
 }
 
 sinc::UpdateStatus CachedRule::specCase1HandlerPrePruning(int const predIdx, int const argIdx, int const varId) {

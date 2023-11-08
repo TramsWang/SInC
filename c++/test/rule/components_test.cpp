@@ -27,7 +27,7 @@ TEST(TestEval, TestConstructor) {
     EXPECT_EQ(e1.getRuleLength(), 0);
     EXPECT_EQ(e1.value(EvalMetric::CompressionRatio), 0.0);
     EXPECT_EQ(e1.value(EvalMetric::CompressionCapacity), 0.0);
-    EXPECT_EQ(e1.value(EvalMetric::InfoGain), -1.0/0.0);
+    EXPECT_EQ(e1.value(EvalMetric::InfoGain), 0);
     EXPECT_FALSE(e1.useful());
 
     Eval e2(6, 7, 3);
