@@ -319,6 +319,13 @@ namespace sinc {
          */
         virtual void show(std::ostream& os) = 0;
 
+        /**
+         * This method format and output the size of memory usage.
+         * 
+         * @param size  Memory size in KB
+         */
+        std::string formatMemorySize(double sizeKb);
+
     protected:
         /* The buffer is used for formatting the strings */
         char buf[1024];
@@ -327,12 +334,5 @@ namespace sinc {
          * This method help format the strings to `os` as `sprintf`
          */
         std::ostream& printf(std::ostream& os, const char* format, ...);
-
-        /**
-         * This method format and output the size of memory usage.
-         * 
-         * @param size  Memory size in KB
-         */
-        std::string formatMemorySize(double sizeKb);
     };
 }

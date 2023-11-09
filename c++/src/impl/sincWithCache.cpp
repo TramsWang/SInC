@@ -1478,7 +1478,8 @@ bool TabInfo::operator==(const TabInfo &another) const {
 using sinc::CachedRule;
 
 CachedRule::CachedRule(
-    int const headPredSymbol, int const arity, fingerprintCacheType& fingerprintCache, tabuMapType& category2TabuSetMap, SimpleKb& _kb
+    int const headPredSymbol, int const arity, fingerprintCacheType& fingerprintCache, tabuMapType& category2TabuSetMap, SimpleKb& _kb,
+    std::unordered_set<Record> const* counterexamples
 ) : Rule(headPredSymbol, arity, fingerprintCache, category2TabuSetMap), kb(_kb)
 {
     /* Initialize the E+-cache & T-cache */
@@ -1516,19 +1517,38 @@ CachedRule::CachedRule(
     predIdx2AllCacheTableInfo.emplace_back(-1, -1);    // head is not mapped to any fragment
     maintainAllCache = true;
 
+    /* Initialize the C-cache */
+    int already_ceg = 0;
+    if (nullptr == counterexamples || counterexamples->empty()) {
+        cegCache = new CacheFragment(headPredSymbol, arity);
+    } else {
+        already_ceg = counterexamples->size();
+        int** existing_cegs = new int*[already_ceg];
+        int i = 0;
+        for (Record const& record: *counterexamples) {
+            existing_cegs[i] = record.getArgs();
+            i++;
+        }
+        IntTable* ceg_records = new IntTable(existing_cegs, already_ceg, arity);
+        cegCache = new CacheFragment(
+            CompliedBlock::create(existing_cegs, already_ceg, arity, ceg_records, true, true), headPredSymbol
+        );
+    }
+    maintainCegCache = true;
+
     /* Initial evaluation */
     // int pos_ent = non_entailed_record_vector.size();
     // int already_ent = entailed_record_vector.size();
     int already_ent = head_relation->totalEntailedRecords();
     int pos_ent = head_relation->getTotalRows() - already_ent;
     double all_ent = pow(kb.totalConstants(), arity);
-    eval = Eval(pos_ent, all_ent - already_ent, length, 0, 0);
+    eval = Eval(pos_ent, all_ent - already_ent - already_ceg, length);
     // delete split_records;
 }
 
 CachedRule::CachedRule(const CachedRule& another) : Rule(another), kb(another.kb), posCache(another.posCache), maintainPosCache(false),
     // entCache(another.entCache), maintainEntCache(false), 
-    allCache(another.allCache), maintainAllCache(false), 
+    allCache(another.allCache), maintainAllCache(false), cegCache(another.cegCache), maintainCegCache(false),
     predIdx2AllCacheTableInfo(another.predIdx2AllCacheTableInfo)
 {}
 
@@ -1544,6 +1564,9 @@ CachedRule::~CachedRule() {
             delete fragment;
         }
         delete allCache;
+    }
+    if (maintainCegCache) {
+        delete cegCache;
     }
 }
 
@@ -1564,10 +1587,13 @@ void CachedRule::updateCacheIndices() {
         fragment->buildIndices();
     }
     uint64_t time_all_done = currentTimeInNano();
+    cegCache->buildIndices();
+    uint64_t time_ceg_done = currentTimeInNano();
     posCacheIndexingTime = time_pos_done - time_start;
     // entCacheIndexingTime = time_ent_done - time_pos_done;
     // allCacheIndexingTime = time_all_done - time_ent_done;
     allCacheIndexingTime = time_all_done - time_pos_done;
+    cegCacheIndexingTime = time_ceg_done - time_all_done;
 }
 
 sinc::EvidenceBatch* CachedRule::getEvidenceAndMarkEntailment() {
@@ -1753,6 +1779,10 @@ void CachedRule::releaseMemory() {
         delete allCache;
         maintainAllCache = false;
     }
+    if (maintainCegCache) {
+        delete cegCache;
+        maintainCegCache = false;
+    }
 }
 
 uint64_t CachedRule::getCopyTime() const {
@@ -1771,6 +1801,10 @@ uint64_t CachedRule::getAllCacheUpdateTime() const {
     return allCacheUpdateTime;
 }
 
+uint64_t CachedRule::getCegCacheUpdateTime() const {
+    return cegCacheUpdateTime;
+}
+
 uint64_t CachedRule::getPosCacheIndexingTime() const {
     return posCacheIndexingTime;
 }
@@ -1783,6 +1817,10 @@ uint64_t CachedRule::getAllCacheIndexingTime() const {
     return allCacheIndexingTime;
 }
 
+uint64_t CachedRule::getCegCacheIndexingTime() const {
+    return cegCacheIndexingTime;
+}
+
 const CacheFragment& CachedRule::getPosCache() const {
     return *posCache;
 }
@@ -1793,6 +1831,10 @@ const CacheFragment& CachedRule::getPosCache() const {
 
 const std::vector<CacheFragment*>& CachedRule::getAllCache() const {
     return *allCache;
+}
+
+const CacheFragment& CachedRule::getCegCache() const {
+    return *cegCache;
 }
 
 void CachedRule::obtainPosCache() {
@@ -1818,6 +1860,13 @@ void CachedRule::obtainAllCache() {
         }
         allCache = _all_cache;
         maintainAllCache = true;
+    }
+}
+
+void CachedRule::obtainCegCache() {
+    if (!maintainCegCache) {
+        cegCache = new CacheFragment(*cegCache);
+        maintainCegCache = true;
     }
 }
 
@@ -1908,11 +1957,12 @@ sinc::Eval CachedRule::calculateEval() const {
             }
         }
     }
+    int already_ceg = cegCache->countTableSize(HEAD_PRED_IDX);
 
     /* Update evaluation score */
     /* Those already proved should be excluded from the entire entailment set. Otherwise, they are counted as negative ones */
     return Eval(
-        new_pos_ent, all_ent - already_ent, length, 
+        new_pos_ent, all_ent - already_ent - already_ceg, length, 
         eval.value(EvalMetric::Value::CompressionRatio), eval.value(EvalMetric::Value::InfoGain)
     );
 }
@@ -1931,6 +1981,9 @@ sinc::UpdateStatus CachedRule::specCase1HandlerPostPruning(int const predIdx, in
     // obtainEntCache();
     // entCache->updateCase1a(predIdx, argIdx, varId);
     // uint64_t time_ent_done = currentTimeInNano();
+    obtainCegCache();
+    cegCache->updateCase1a(predIdx, argIdx, varId);
+    uint64_t time_ceg_done = currentTimeInNano();
 
     obtainAllCache();
     if (HEAD_PRED_IDX != predIdx) { // No need to update the E-cache if the update is in the head
@@ -1970,9 +2023,9 @@ sinc::UpdateStatus CachedRule::specCase1HandlerPostPruning(int const predIdx, in
         }
     }
     uint64_t time_all_done = currentTimeInNano();
+    cegCacheUpdateTime = time_ceg_done - time_start;
     // entCacheUpdateTime = time_ent_done - time_start;
-    // allCacheUpdateTime = time_all_done - time_ent_done;
-    allCacheUpdateTime = time_all_done - time_start;
+    allCacheUpdateTime = time_all_done - time_ceg_done;
 
     return UpdateStatus::Normal;
 }
@@ -1993,6 +2046,9 @@ sinc::UpdateStatus CachedRule::specCase2HandlerPostPruning(int const predSymbol,
     SimpleRelation* new_relation = kb.getRelation(predSymbol);
     // entCache->updateCase1b(new_relation, predSymbol, argIdx, varId);
     // uint64_t time_ent_done = currentTimeInNano();
+    obtainCegCache();
+    cegCache->updateCase1b(new_relation, predSymbol, argIdx, varId);
+    uint64_t time_ceg_done = currentTimeInNano();
 
     obtainAllCache();
     CacheFragment* updated_fragment = nullptr;
@@ -2019,9 +2075,9 @@ sinc::UpdateStatus CachedRule::specCase2HandlerPostPruning(int const predSymbol,
         }
     }
     uint64_t time_all_done = currentTimeInNano();
+    cegCacheUpdateTime = time_ceg_done - time_start;
     // entCacheUpdateTime = time_ent_done - time_start;
-    // allCacheUpdateTime = time_all_done - time_ent_done;
-    allCacheUpdateTime = time_all_done - time_start;
+    allCacheUpdateTime = time_all_done - time_ceg_done;
 
     return UpdateStatus::Normal;
 }
@@ -2041,6 +2097,9 @@ sinc::UpdateStatus CachedRule::specCase3HandlerPostPruning(int const predIdx1, i
     int new_vid = usedLimitedVars() - 1;
     // entCache->updateCase2a(predIdx1, argIdx1, predIdx2, argIdx2, new_vid);
     // uint64_t time_ent_done = currentTimeInNano();
+    obtainCegCache();
+    cegCache->updateCase2a(predIdx1, argIdx1, predIdx2, argIdx2, new_vid);
+    uint64_t time_ceg_done = currentTimeInNano();
 
     obtainAllCache();
     TabInfo const& tab_info1 = predIdx2AllCacheTableInfo[predIdx1];
@@ -2080,9 +2139,9 @@ sinc::UpdateStatus CachedRule::specCase3HandlerPostPruning(int const predIdx1, i
         }
     }
     uint64_t time_all_done = currentTimeInNano();
+    cegCacheUpdateTime = time_ceg_done - time_start;
     // entCacheUpdateTime = time_ent_done - time_start;
-    // allCacheUpdateTime = time_all_done - time_ent_done;
-    allCacheUpdateTime = time_all_done - time_start;
+    allCacheUpdateTime = time_all_done - time_ceg_done;
 
     return UpdateStatus::Normal;
 }
@@ -2108,6 +2167,9 @@ sinc::UpdateStatus CachedRule::specCase4HandlerPostPruning(
     int new_vid = usedLimitedVars() - 1;
     // entCache->updateCase2b(new_relation, predSymbol, argIdx1, predIdx2, argIdx2, new_vid);
     // uint64_t time_ent_done = currentTimeInNano();
+    obtainCegCache();
+    cegCache->updateCase2b(new_relation, predSymbol, argIdx1, predIdx2, argIdx2, new_vid);
+    uint64_t time_ceg_done = currentTimeInNano();
 
     obtainAllCache();
     if (HEAD_PRED_IDX == predIdx2) {   // One is the head and the other is not
@@ -2127,9 +2189,9 @@ sinc::UpdateStatus CachedRule::specCase4HandlerPostPruning(
         }
     }
     uint64_t time_all_done = currentTimeInNano();
+    cegCacheUpdateTime = time_ceg_done - time_start;
     // entCacheUpdateTime = time_ent_done - time_start;
-    // allCacheUpdateTime = time_all_done - time_ent_done;
-    allCacheUpdateTime = time_all_done - time_start;
+    allCacheUpdateTime = time_all_done - time_ceg_done;
 
     return UpdateStatus::Normal;
 }
@@ -2148,6 +2210,9 @@ sinc::UpdateStatus CachedRule::specCase5HandlerPostPruning(int const predIdx, in
     // obtainEntCache();
     // entCache->updateCase3(predIdx, argIdx, constant);
     // uint64_t time_ent_done = currentTimeInNano();
+    obtainCegCache();
+    cegCache->updateCase3(predIdx, argIdx, constant);
+    uint64_t time_ceg_done = currentTimeInNano();
 
     obtainAllCache();
     if (HEAD_PRED_IDX != predIdx) { // No need to update the E-cache if the update is in the head
@@ -2161,9 +2226,9 @@ sinc::UpdateStatus CachedRule::specCase5HandlerPostPruning(int const predIdx, in
         }
     }
     uint64_t time_all_done = currentTimeInNano();
+    cegCacheUpdateTime = time_ceg_done - time_start;
     // entCacheUpdateTime = time_ent_done - time_start;
-    // allCacheUpdateTime = time_all_done - time_ent_done;
-    allCacheUpdateTime = time_all_done - time_start;
+    allCacheUpdateTime = time_all_done - time_ceg_done;
 
     return UpdateStatus::Normal;
 }
@@ -2292,7 +2357,7 @@ RelationMinerWithCachedRule::~RelationMinerWithCachedRule() {
 sinc::Rule* RelationMinerWithCachedRule::getStartRule() {
     Rule::fingerprintCacheType* cache = new Rule::fingerprintCacheType();
     fingerprintCaches.push_back(cache);
-    return new CachedRule(targetRelation, kb.getRelation(targetRelation)->getTotalCols(), *cache, tabuMap, kb);
+    return new CachedRule(targetRelation, kb.getRelation(targetRelation)->getTotalCols(), *cache, tabuMap, kb, &counterexamples);
 }
 
 void RelationMinerWithCachedRule::selectAsBeam(Rule* r) {
@@ -2377,6 +2442,12 @@ void SincWithCache::finalizeRelationMiner(RelationMiner* miner) {
     monitor.totalGeneratedRules += rel_miner->monitor.totalGeneratedRules;
     monitor.copyTime += rel_miner->monitor.copyTime;
     CompliedBlock::clearPool();
+
+    /* Log memory usage */
+    rusage usage;
+    getrusage(RUSAGE_SELF, &usage);
+    (*logger) << "Finalized Max Mem:" << monitor.formatMemorySize(usage.ru_maxrss) << std::endl;
+
 }
 
 void SincWithCache::showMonitor() {

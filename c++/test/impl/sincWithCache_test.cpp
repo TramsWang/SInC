@@ -1794,7 +1794,7 @@ TEST_F(TestCachedRule, TestFamilyRule1) {
     Eval eval(0, 0, 0);
 
     /* parent(?, ?) :- */
-    CachedRule rule(NUM_PARENT, 2, cache, tabuMap, *kb);
+    CachedRule rule(NUM_PARENT, 2, cache, tabuMap, *kb, nullptr);
     EXPECT_STREQ("parent(?,?):-", rule.toDumpString(kb->getRelationNames()).c_str());
     eval = Eval(9, 16 * 16, 0);
     EXPECT_EQ(eval, rule.getEval());
@@ -1863,7 +1863,7 @@ TEST_F(TestCachedRule, TestFamilyRule1) {
 
     /* parent(X, Y) :- father(X, Y) */
     releaseCacheAndTabuMap();
-    CachedRule rule2(NUM_PARENT, 2, cache, tabuMap, *kb);
+    CachedRule rule2(NUM_PARENT, 2, cache, tabuMap, *kb, nullptr);
     rule2.updateCacheIndices();
     EXPECT_EQ(UpdateStatus::Normal, rule2.specializeCase4(NUM_FATHER, 2, 0, 0, 0));
     rule2.updateCacheIndices();
@@ -1900,7 +1900,7 @@ TEST_F(TestCachedRule, TestFamilyRule2) {
     Eval eval(0, 0, 0);
 
     /* parent(?, ?) :- */
-    CachedRule rule(NUM_PARENT, 2, cache, tabuMap, *kb);
+    CachedRule rule(NUM_PARENT, 2, cache, tabuMap, *kb, nullptr);
     EXPECT_STREQ("parent(?,?):-", rule.toDumpString(kb->getRelationNames()).c_str());
     EXPECT_EQ(Eval(9, 16 * 16, 0), rule.getEval());
     EXPECT_EQ(0, rule.usedLimitedVars());
@@ -1951,7 +1951,7 @@ TEST_F(TestCachedRule, TestFamilyRule2) {
 
     /* parent(Y, X) :- father(Y, X) */
     releaseCacheAndTabuMap();
-    CachedRule rule2(NUM_PARENT, 2, cache, tabuMap, *kb);
+    CachedRule rule2(NUM_PARENT, 2, cache, tabuMap, *kb, nullptr);
     rule2.updateCacheIndices();
     EXPECT_EQ(UpdateStatus::Normal, rule2.specializeCase4(NUM_FATHER, 2, 1, 0, 1));
     rule2.updateCacheIndices();
@@ -1988,7 +1988,7 @@ TEST_F(TestCachedRule, TestFamilyRule3) {
     Eval eval(0, 0, 0);
 
     /* grandParent(?, ?) :- */
-    CachedRule rule(NUM_GRANDPARENT, 2, cache, tabuMap, *kb);
+    CachedRule rule(NUM_GRANDPARENT, 2, cache, tabuMap, *kb, nullptr);
     EXPECT_STREQ("grandParent(?,?):-", rule.toDumpString(kb->getRelationNames()).c_str());
     eval = Eval(3, 16 * 16, 0);
     EXPECT_EQ(eval, rule.getEval());
@@ -2060,7 +2060,7 @@ TEST_F(TestCachedRule, TestFamilyRule3) {
 
     /* grandParent(X, Y) :- parent(X, Z), parent(Z, Y) */
     releaseCacheAndTabuMap();
-    CachedRule rule2(NUM_GRANDPARENT, 2, cache, tabuMap, *kb);
+    CachedRule rule2(NUM_GRANDPARENT, 2, cache, tabuMap, *kb, nullptr);
     EXPECT_EQ(UpdateStatus::Normal, rule2.specializeCase4(NUM_PARENT, 2, 0, 0, 0));
     rule2.updateCacheIndices();
     EXPECT_EQ(UpdateStatus::Normal, rule2.specializeCase4(NUM_PARENT, 2, 1, 0, 1));
@@ -2099,7 +2099,7 @@ TEST_F(TestCachedRule, TestFamilyRule4) {
     Eval eval(0, 0, 0);
 
     /* grandParent(?, ?) :- */
-    CachedRule rule(NUM_GRANDPARENT, 2, cache, tabuMap, *kb);
+    CachedRule rule(NUM_GRANDPARENT, 2, cache, tabuMap, *kb, nullptr);
     EXPECT_STREQ("grandParent(?,?):-", rule.toDumpString(kb->getRelationNames()).c_str());
     eval = Eval(3, 16 * 16, 0);
     EXPECT_EQ(eval, rule.getEval());
@@ -2179,7 +2179,7 @@ TEST_F(TestCachedRule, TestFamilyRule5) {
     Eval eval(0, 0, 0);
 
     /* grandParent(?, ?) :- */
-    CachedRule rule(NUM_GRANDPARENT, 2, cache, tabuMap, *kb);
+    CachedRule rule(NUM_GRANDPARENT, 2, cache, tabuMap, *kb, nullptr);
     EXPECT_STREQ("grandParent(?,?):-", rule.toDumpString(kb->getRelationNames()).c_str());
     eval = Eval(3, 16 * 16, 0);
     EXPECT_EQ(eval, rule.getEval());
@@ -2248,7 +2248,7 @@ TEST_F(TestCachedRule, TestFamilyRule6) {
     Eval eval(0, 0, 0);
 
     /* grandParent(?, ?) :- */
-    CachedRule rule(NUM_GRANDPARENT, 2, cache, tabuMap, *kb);
+    CachedRule rule(NUM_GRANDPARENT, 2, cache, tabuMap, *kb, nullptr);
     EXPECT_STREQ("grandParent(?,?):-", rule.toDumpString(kb->getRelationNames()).c_str());
     eval = Eval(3, 16 * 16, 0);
     EXPECT_EQ(eval, rule.getEval());
@@ -2332,7 +2332,7 @@ TEST_F(TestCachedRule, TestFamilyRule7) {
     Eval eval(0, 0, 0);
 
     /* parent(?, ?) :- */
-    CachedRule rule(NUM_PARENT, 2, cache, tabuMap, *kb);
+    CachedRule rule(NUM_PARENT, 2, cache, tabuMap, *kb, nullptr);
     EXPECT_STREQ("parent(?,?):-", rule.toDumpString(kb->getRelationNames()).c_str());
     eval = Eval(9, 16 * 16, 0);
     EXPECT_EQ(eval, rule.getEval());
@@ -2376,7 +2376,7 @@ TEST_F(TestCachedRule, TestFamilyRule8) {
     Eval eval(0, 0, 0);
 
     /* father(?, ?) :- */
-    CachedRule rule(NUM_FATHER, 2, cache, tabuMap, *kb);
+    CachedRule rule(NUM_FATHER, 2, cache, tabuMap, *kb, nullptr);
     EXPECT_STREQ("father(?,?):-", rule.toDumpString(kb->getRelationNames()).c_str());
     eval = Eval(5, 16 * 16, 0);
     EXPECT_EQ(eval, rule.getEval());
@@ -2476,7 +2476,7 @@ TEST_F(TestCachedRule, TestFamilyRule9) {
     Eval eval(0, 0, 0);
 
     /* father(?, ?) :- */
-    CachedRule rule(NUM_FATHER, 2, cache, tabuMap, *kb);
+    CachedRule rule(NUM_FATHER, 2, cache, tabuMap, *kb, nullptr);
     EXPECT_STREQ("father(?,?):-", rule.toDumpString(kb->getRelationNames()).c_str());
     eval = Eval(5, 16 * 16, 0);
     EXPECT_EQ(eval, rule.getEval());
@@ -2499,7 +2499,7 @@ TEST_F(TestCachedRule, TestFamilyRule9) {
 
     /* father(?, ?) :- */
     releaseCacheAndTabuMap();
-    CachedRule rule2(NUM_FATHER, 2, cache, tabuMap, *kb);
+    CachedRule rule2(NUM_FATHER, 2, cache, tabuMap, *kb, nullptr);
     EXPECT_STREQ("father(?,?):-", rule2.toDumpString(kb->getRelationNames()).c_str());
     eval = Eval(3, 16 * 16 - 2, 0);
     EXPECT_EQ(eval, rule2.getEval());
@@ -2545,7 +2545,7 @@ TEST_F(TestCachedRule, TestCounterexample) {
     SimpleKb* kb = kbFamily();
 
     /* father(?, ?) :- */
-    CachedRule rule(NUM_FATHER, 2, cache, tabuMap, *kb);
+    CachedRule rule(NUM_FATHER, 2, cache, tabuMap, *kb, nullptr);
     EXPECT_STREQ("father(?,?):-", rule.toDumpString(kb->getRelationNames()).c_str());
     Eval eval(5, 16 * 16, 0);
     EXPECT_EQ(eval, rule.getEval());
@@ -2581,7 +2581,7 @@ TEST_F(TestCachedRule, TestCopy1) {
     Eval eval(0, 0, 0);
 
     /* grandParent(?, ?) :- */
-    CachedRule rule(NUM_GRANDPARENT, 2, cache, tabuMap, *kb);
+    CachedRule rule(NUM_GRANDPARENT, 2, cache, tabuMap, *kb, nullptr);
     EXPECT_STREQ("grandParent(?,?):-", rule.toDumpString(kb->getRelationNames()).c_str());
     eval = Eval(3, 16 * 16, 0);
     EXPECT_EQ(eval, rule.getEval());
@@ -2710,7 +2710,7 @@ TEST_F(TestCachedRule, TestCopy2) {
     Eval eval(0, 0, 0);
 
     /* parent(?, ?) :- */
-    CachedRule rule1(NUM_PARENT, 2, cache, tabuMap, *kb);
+    CachedRule rule1(NUM_PARENT, 2, cache, tabuMap, *kb, nullptr);
     EXPECT_STREQ("parent(?,?):-", rule1.toDumpString(kb->getRelationNames()).c_str());
     eval = Eval(9, 16 * 16, 0);
     EXPECT_EQ(eval, rule1.getEval());
@@ -2780,7 +2780,7 @@ TEST_F(TestCachedRule, TestValidity1) {
     SimpleKb* kb = kbFamily();
 
     /* father(?,?):- */
-    CachedRule rule(NUM_FATHER, 2, cache, tabuMap, *kb);
+    CachedRule rule(NUM_FATHER, 2, cache, tabuMap, *kb, nullptr);
     EXPECT_STREQ("father(?,?):-", rule.toDumpString(kb->getRelationNames()).c_str());
 
     /* #1: father(X,?) :- father(?,X) */
@@ -2808,7 +2808,7 @@ TEST_F(TestCachedRule, TestValidity2) {
     SimpleKb* kb = kbFamily();
 
     /* father(?,?):- */
-    CachedRule rule(NUM_FATHER, 2, cache, tabuMap, *kb);
+    CachedRule rule(NUM_FATHER, 2, cache, tabuMap, *kb, nullptr);
     rule.updateCacheIndices();
     EXPECT_EQ(UpdateStatus::Normal, rule.specializeCase4(NUM_FATHER, 2, 1, 0, 0));
     EXPECT_STREQ("father(X0,?):-father(?,X0)", rule.toDumpString(kb->getRelationNames()).c_str());
@@ -2832,7 +2832,7 @@ TEST_F(TestCachedRule, TestRcPruning1) {
     SimpleKb* kb = kbFamily();
 
     /* parent(X, ?) :- father(X, ?) */
-    CachedRule rule(NUM_PARENT, 2, cache, tabuMap, *kb);
+    CachedRule rule(NUM_PARENT, 2, cache, tabuMap, *kb, nullptr);
     rule.updateCacheIndices();
     EXPECT_EQ(UpdateStatus::Normal, rule.specializeCase4(NUM_FATHER, 2, 0, 0, 0));
     EXPECT_STREQ("parent(X0,?):-father(X0,?)", rule.toDumpString(kb->getRelationNames()).c_str());
@@ -2852,7 +2852,7 @@ TEST_F(TestCachedRule, TestRcPruning2) {
     public:
         CachedRule4Test(
             int const headPredSymbol, int const arity, fingerprintCacheType& fingerprintCache, tabuMapType& category2TabuSetMap, SimpleKb& _kb
-        ) : CachedRule(headPredSymbol, arity, fingerprintCache, category2TabuSetMap, _kb) {}
+        ) : CachedRule(headPredSymbol, arity, fingerprintCache, category2TabuSetMap, _kb, nullptr) {}
         using CachedRule::recordCoverage;
     };
 
@@ -2899,7 +2899,7 @@ TEST_F(TestCachedRule, TestAnyRule1) {
     SimpleRelation& rel_h = *(kb.getRelation("h"));
 
     /* h(X, X, Y, Y) :- p(X, Y, +) */
-    CachedRule rule(rel_h.id, 4, cache, tabuMap, kb);
+    CachedRule rule(rel_h.id, 4, cache, tabuMap, kb, nullptr);
     rule.updateCacheIndices();
     EXPECT_EQ(UpdateStatus::Normal, rule.specializeCase4(rel_p.id, 3, 0, 0, 0));
     rule.updateCacheIndices();
@@ -2966,7 +2966,7 @@ TEST_F(TestCachedRule, TestAnyRule2) {
     SimpleRelation& rel_h = *(kb.getRelation("h"));
 
     /* h(X) :- p(X, X), q(X) */
-    CachedRule rule(rel_h.id, 1, cache, tabuMap, kb);
+    CachedRule rule(rel_h.id, 1, cache, tabuMap, kb, nullptr);
     rule.updateCacheIndices();
     EXPECT_EQ(UpdateStatus::Normal, rule.specializeCase4(rel_p.id, 2, 0, 0, 0));
     rule.updateCacheIndices();
@@ -3023,7 +3023,7 @@ TEST_F(TestCachedRule, TestAnyRule3) {
     SimpleRelation& rel_h = *(kb.getRelation("h"));
 
     /* h(X, X) :- */
-    CachedRule rule(rel_h.id, 2, cache, tabuMap, kb);
+    CachedRule rule(rel_h.id, 2, cache, tabuMap, kb, nullptr);
     rule.updateCacheIndices();
     EXPECT_EQ(UpdateStatus::Normal, rule.specializeCase3(0, 0, 0, 1));
     EXPECT_STREQ("h(X0,X0):-", rule.toDumpString(kb.getRelationNames()).c_str());
@@ -3077,7 +3077,7 @@ TEST_F(TestCachedRule, TestAnyRule4) {
     SimpleRelation& rel_h = *(kb.getRelation("h"));
 
     /* h(X, X, ?) :- */
-    CachedRule rule(rel_h.id, 3, cache, tabuMap, kb);
+    CachedRule rule(rel_h.id, 3, cache, tabuMap, kb, nullptr);
     rule.updateCacheIndices();
     EXPECT_EQ(UpdateStatus::Normal, rule.specializeCase3(0, 0, 0, 1));
     EXPECT_STREQ("h(X0,X0,?):-", rule.toDumpString(kb.getRelationNames()).c_str());

@@ -109,6 +109,7 @@ void RelationMiner::run() {
     Rule* rule;
     int covered_facts = 0;
     int const total_facts = kb.getRelation(targetRelation)->getTotalRows();
+    BaseMonitor monitor;    // use its formatter method
     while (shouldContinue && (covered_facts < total_facts) && (nullptr != (rule = findRule()))) {
         hypothesis.push_back(rule);
         covered_facts += updateKbAndDependencyGraph(*rule);
@@ -118,6 +119,11 @@ void RelationMiner::run() {
                 rule->toDumpString(kb.getRelationNames()).c_str()
         );
         logger.flush();
+
+        /* Log memory usage */
+        rusage usage;
+        getrusage(RUSAGE_SELF, &usage);
+        logger << "Max Mem:" << monitor.formatMemorySize(usage.ru_maxrss) << std::endl;
     }
     logger << "Done" << std::endl;
 }
@@ -692,8 +698,8 @@ void SInC::compress() {
             relation_miner = nullptr;
         }
     } catch (std::exception const& e) {
-        std::cerr << e.what() << std::endl;
         logError("Relation Miner failed. Interrupt");
+        (*logger) << e.what() << std::endl;
         if (nullptr != relation_miner) {
             relation_miner->discontinue();
         }

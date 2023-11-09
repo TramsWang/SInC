@@ -733,7 +733,7 @@ namespace sinc {
          */
         CachedRule(
             int const headPredSymbol, int const arity, fingerprintCacheType& fingerprintCache, tabuMapType& category2TabuSetMap,
-            SimpleKb& kb
+            SimpleKb& kb, std::unordered_set<Record> const* counterexamples
         );
 
         CachedRule(const CachedRule& another);
@@ -748,12 +748,15 @@ namespace sinc {
         uint64_t getPosCacheUpdateTime() const;
         // uint64_t getEntCacheUpdateTime() const;
         uint64_t getAllCacheUpdateTime() const;
+        uint64_t getCegCacheUpdateTime() const;
         uint64_t getPosCacheIndexingTime() const;
         // uint64_t getEntCacheIndexingTime() const;
         uint64_t getAllCacheIndexingTime() const;
+        uint64_t getCegCacheIndexingTime() const;
         const CacheFragment& getPosCache() const;
         // const CacheFragment& getEntCache() const;
         const std::vector<CacheFragment*>& getAllCache() const;
+        const CacheFragment& getCegCache() const;
 
     protected:
         /** The original KB */
@@ -768,6 +771,8 @@ namespace sinc {
          *  a linked component of the rule body. The first relation should not be included, as the head should be removed
          *  from E-cache */
         std::vector<CacheFragment*>* allCache;
+        /* This cache is for the entailment of existing counterexamples (C-cache) */
+        CacheFragment*  cegCache;
         /** This list is a mapping from predicate indices in the rule structure to fragment and table indices in the E-cache.
          *  The array indices are predicate indices. */
         std::vector<TabInfo> predIdx2AllCacheTableInfo;
@@ -777,15 +782,19 @@ namespace sinc {
         // bool maintainEntCache;
         /** Whether the pointer `allCache` and pointers within the vector should be maintained by this object */
         bool maintainAllCache;
+        /** Whether the pointer `cegCache` should be maintained by this object */
+        bool maintainCegCache;
 
         /* Monitoring info. The time (in nanoseconds) refers to the corresponding time consumption in the last update of the rule */
         uint64_t copyTime = 0;
         uint64_t posCacheUpdateTime = 0;
         // uint64_t entCacheUpdateTime = 0;
         uint64_t allCacheUpdateTime = 0;
+        uint64_t cegCacheUpdateTime = 0;
         uint64_t posCacheIndexingTime = 0;
         // uint64_t entCacheIndexingTime = 0;
         uint64_t allCacheIndexingTime = 0;
+        uint64_t cegCacheIndexingTime = 0;
 
         /** If this object does not maintain the E+-cache, get a copy of the cache */
         void obtainPosCache();
@@ -795,6 +804,9 @@ namespace sinc {
 
         /** If this object does not maintain the E-cache, get a copy of the cache */
         void obtainAllCache();
+
+        /** If this object does not maintain the C-cache, get a copy of the cache */
+        void obtainCegCache();
 
         double recordCoverage() override;
 
