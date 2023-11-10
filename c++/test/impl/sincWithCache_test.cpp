@@ -6,6 +6,52 @@
 
 using namespace sinc;
 
+TEST(TestCompliedBlock, TestMatchSlicesTwoCB) {
+    CompliedBlock::clearPool();
+
+    int** rows1 = new int*[1] {new int[2]{1, 2}};
+    int** rows2 = new int*[1] {new int[1]{1}};
+    int** rows3 = new int*[1] {new int[1]{4}};
+    int** rows4 = new int*[1] {new int[2]{3, 4}};
+
+    CompliedBlock* cb1 = CompliedBlock::create(rows1, 1, 2, true);
+    CompliedBlock* cb2 = CompliedBlock::create(rows2, 1, 1, true);
+    CompliedBlock* cb3 = CompliedBlock::create(rows3, 1, 1, true);
+    CompliedBlock* cb4 = CompliedBlock::create(rows4, 1, 2, true);
+    cb1->buildIndices();
+    cb2->buildIndices();
+    cb3->buildIndices();
+    cb4->buildIndices();
+    EXPECT_EQ(cb1->getId(), 0);
+    EXPECT_EQ(cb2->getId(), 1);
+    EXPECT_EQ(cb3->getId(), 2);
+    EXPECT_EQ(cb4->getId(), 3);
+
+    MatchedSubCbs const* match1 = CompliedBlock::matchSlices(*cb1, 0, *cb2, 0);
+    EXPECT_EQ(match1->cbs1.size(), 1);
+    EXPECT_EQ(match1->cbs1[0]->getTotalCols(), 2);
+    EXPECT_EQ(match1->cbs2[0]->getTotalCols(), 1);
+    match1 = CompliedBlock::matchSlices(*cb1, 0, *cb2, 0);
+    EXPECT_EQ(match1->cbs1[0]->getTotalCols(), 2);
+    EXPECT_EQ(match1->cbs2[0]->getTotalCols(), 1);
+    match1 = CompliedBlock::matchSlices(*cb2, 0, *cb1, 0);
+    EXPECT_EQ(match1->cbs1[0]->getTotalCols(), 2);
+    EXPECT_EQ(match1->cbs2[0]->getTotalCols(), 1);
+
+    MatchedSubCbs const* match2 = CompliedBlock::matchSlices(*cb4, 1, *cb3, 0);
+    EXPECT_EQ(match2->cbs1.size(), 1);
+    EXPECT_EQ(match2->cbs1[0]->getTotalCols(), 1);
+    EXPECT_EQ(match2->cbs2[0]->getTotalCols(), 2);
+    match2 = CompliedBlock::matchSlices(*cb3, 0, *cb4, 1);
+    EXPECT_EQ(match2->cbs1[0]->getTotalCols(), 1);
+    EXPECT_EQ(match2->cbs2[0]->getTotalCols(), 2);
+    match2 = CompliedBlock::matchSlices(*cb4, 1, *cb3, 0);
+    EXPECT_EQ(match2->cbs1[0]->getTotalCols(), 1);
+    EXPECT_EQ(match2->cbs2[0]->getTotalCols(), 2);
+
+    CompliedBlock::clearPool();
+}
+
 class TestCacheFragment : public testing::Test {
 protected:
     static int*** relations;
