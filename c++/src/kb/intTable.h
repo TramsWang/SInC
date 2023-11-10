@@ -200,6 +200,7 @@ namespace sinc {
         virtual size_t memoryCost() const;
 
         void showRows() const;
+        void showRows(int col) const;
 
     protected:
         /** Total rows in the table */
@@ -252,5 +253,6 @@ namespace sinc {
 
         MatchedSubTables();
         ~MatchedSubTables();
+        void showSlices(int arity1, int arity2) const;
     };
 }

@@ -110,6 +110,10 @@ public class SimpleKb {
         return relations.toArray(new SimpleRelation[0]);
     }
 
+    /**
+     * @param mappedNames   The length of this array is `c + 1` where `c` is the number of constants in the KB. The names
+     *                      in this array starts from `mappedNames[1]`.
+     */
     public void dump(String basePath, String[] mappedNames) throws IOException {
         /* Check & create dir */
         Path kb_dir = NumeratedKb.getKbPath(name, basePath);

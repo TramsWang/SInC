@@ -222,10 +222,16 @@ const MatchedSubCbs* CompliedBlock::matchSlices(
     std::unordered_map<sinc::CbOprMatchSlicesTwoCbs, sinc::MatchedSubCbs*>::iterator itr = mapMatchSlicesTwoCbs.find(opr);
     if (mapMatchSlicesTwoCbs.end() == itr) {
         MatchedSubTables* slices;
+        int arity1;
+        int arity2;
         if (cb1.id <= cb2.id) {
             slices = IntTable::matchSlices(cb1.getIndices(), col1, cb2.getIndices(), col2);
+            arity1 = cb1.totalCols;
+            arity2 = cb2.totalCols;
         } else {
             slices = IntTable::matchSlices(cb2.getIndices(), col2, cb1.getIndices(), col1);
+            arity1 = cb2.totalCols;
+            arity2 = cb1.totalCols;
         }
         int const num_slices = slices->slices1->size();
         if (0 == num_slices) {
@@ -239,14 +245,14 @@ const MatchedSubCbs* CompliedBlock::matchSlices(
         for (int i = 0; i < num_slices; i++) {
             IntTable::sliceType& slice1 = *(*(slices->slices1))[i];
             CompliedBlock* new_cb1 = new CompliedBlock(
-                pool.size(), toArray<int*>(slice1), slice1.size(), cb1.totalCols, true
+                pool.size(), toArray<int*>(slice1), slice1.size(), arity1, true
             );
             registerCb(new_cb1);
             sub_cbs->cbs1.push_back(new_cb1);
 
             IntTable::sliceType& slice2 = *(*(slices->slices2))[i];
             CompliedBlock* new_cb2 = new CompliedBlock(
-                pool.size(), toArray<int*>(slice2), slice2.size(), cb2.totalCols, true
+                pool.size(), toArray<int*>(slice2), slice2.size(), arity2, true
             );
             registerCb(new_cb2);
             sub_cbs->cbs2.push_back(new_cb2);

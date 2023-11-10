@@ -28,6 +28,33 @@ MatchedSubTables::~MatchedSubTables() {
     IntTable::releaseSlices(slices2);
 }
 
+void MatchedSubTables::showSlices(int arity1, int arity2) const {
+    std::cout << "Slices1:\n";
+    for (IntTable::sliceType* const& slice: *slices1) {
+        std::cout << '<';
+        for (int* row: *slice) {
+            std::cout << '[';
+            for (int i = 0; i < arity1; i++) {
+                std::cout << row[i] << ',';
+            }
+            std::cout << "]\n";
+        }
+        std::cout << ">" << std::endl;
+    }
+    std::cout << "Slices2:\n";
+    for (IntTable::sliceType* const& slice: *slices2) {
+        std::cout << '<';
+        for (int* row: *slice) {
+            std::cout << '[';
+            for (int i = 0; i < arity2; i++) {
+                std::cout << row[i] << ',';
+            }
+            std::cout << "]\n";
+        }
+        std::cout << ">" << std::endl;
+    }
+}
+
 IntTable::IntTable(int** rows, int const _totalRows, int const _totalCols) : 
     totalRows(_totalRows), totalCols(_totalCols),
     sortedRowsByCols(new int**[_totalCols]), valuesByCols(new int*[_totalCols]), startOffsetsByCols(new int*[_totalCols]),
@@ -355,6 +382,20 @@ size_t IntTable::memoryCost() const {
 
 void IntTable::showRows() const {
     int** rows = sortedRowsByCols[0];
+    std::cout << '{';
+    for (int i = 0; i < totalRows; i++) {
+        std::cout << '[';
+        for (int j = 0; j < totalCols; j++) {
+            std::cout << rows[i][j] << ',';
+        }
+        std::cout << ']';
+        std::cout << std::endl;
+    }
+    std::cout << '}' << std::endl;
+}
+
+void IntTable::showRows(int col) const {
+    int** rows = sortedRowsByCols[col];
     std::cout << '{';
     for (int i = 0; i < totalRows; i++) {
         std::cout << '[';
