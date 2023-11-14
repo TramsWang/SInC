@@ -854,7 +854,7 @@ namespace sinc {
          * @param idx             The index of `validFragmentIndices`
          */
         void generateHeadTemplates(
-            std::unordered_set<Record>& headTempaltes, std::unordered_set<Record>** const bindingsInFragments,
+            std::unordered_set<Record>& headTemplates, std::unordered_set<Record>** const bindingsInFragments,
             std::vector<std::vector<int>>* const headArgIdxLists, int* const argTemplate,
             std::vector<int> const& validFragmentIndices, int const headArity, int const fragIdx
         ) const;

@@ -64,12 +64,12 @@ int MultiSet<T>::remove(const T& element) {
 }
 
 template<class T>
-int MultiSet<T>::getSize() {
+int MultiSet<T>::getSize() const {
     return size;
 }
 
 template<class T>
-int MultiSet<T>::differentValues() {
+int MultiSet<T>::differentValues() const {
     return cntMap.size();
 }
 
@@ -88,23 +88,23 @@ bool MultiSet<T>::subsetOf(const MultiSet<T>& another) {
 }
 
 template<class T>
-int MultiSet<T>::itemCount(const T& element) {
-    typename std::unordered_map<T, int>::iterator itr = cntMap.find(element);
+int MultiSet<T>::itemCount(const T& element) const {
+    typename std::unordered_map<T, int>::const_iterator itr = cntMap.find(element);
     return (itr != cntMap.end()) ? itr->second : 0;
 }
 
 template<class T>
-int MultiSet<T>::itemCount(T* const elements, int const length) {
+int MultiSet<T>::itemCount(T* const elements, int const length) const {
     int total = 0;
     for (int i = 0; i < length; i++) {
-        typename std::unordered_map<T, int>::iterator itr = cntMap.find(elements[i]);
+        typename std::unordered_map<T, int>::const_iterator itr = cntMap.find(elements[i]);
         total += (itr != cntMap.end()) ? itr->second : 0;
     }
     return total;
 }
 
 template<class T>
-const typename MultiSet<T>::maptype& MultiSet<T>::getCntMap() {
+const typename MultiSet<T>::maptype& MultiSet<T>::getCntMap() const {
     return cntMap;
 }
 

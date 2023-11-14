@@ -41,12 +41,12 @@ namespace sinc {
         /**
          * Return the number of total elements in the set.
          */
-        int getSize();
+        int getSize() const;
 
         /**
          * Return the number of different values in this set.
          */
-        int differentValues();
+        int differentValues() const;
 
         /**
          * Check whether this set is a subset of another.
@@ -56,17 +56,17 @@ namespace sinc {
         /**
          * Return the number of elements that are equivalent to the given one.
          */
-        int itemCount(const T& element);
+        int itemCount(const T& element) const;
 
         /**
          * Return the total number of elements that are equivalent to one of those in the array
          */
-        int itemCount(T* const elements, int const length);
+        int itemCount(T* const elements, int const length) const;
 
         /**
          * Get the map of the numbers of elements in this set
          */
-        const maptype& getCntMap();
+        const maptype& getCntMap() const;
 
         bool operator==(const MultiSet &another) const;
         size_t hash() const;

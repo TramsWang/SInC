@@ -1,5 +1,5 @@
 # Make this sub-directory as a library
-add_library(impl sincWithCache.cpp app.cpp)
+add_library(impl sincWithCache.cpp app.cpp sincWithEstimation.cpp)
 
 target_link_libraries(impl PRIVATE kb)
 target_link_libraries(impl PRIVATE util)

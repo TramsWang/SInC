@@ -962,3 +962,118 @@ UpdateStatus BareRule::generalizeHandlerPrePruning(int const predIdx, int const 
 UpdateStatus BareRule::generalizeHandlerPostPruning(int const predIdx, int const argIdx) {
     return generalizationPostPruningStatus;
 }
+
+/**
+ * SpecOpr
+ */
+using sinc::SpecOpr;
+using sinc::SpecOprCase;
+SpecOpr::SpecOpr(SpecOprCase _specCase): specCase(_specCase) {}
+
+SpecOprCase SpecOpr::getSpecCase() const {
+    return specCase;
+}
+
+using sinc::SpecOprCase1;
+
+SpecOprCase1::SpecOprCase1(int _predIdx, int _argIdx, int _varId) : SpecOpr(Case1), predIdx(_predIdx), argIdx(_argIdx), varId(_varId) {}
+
+SpecOprCase1::SpecOprCase1(SpecOprCase1 const& another) : SpecOpr(Case1), predIdx(another.predIdx), argIdx(another.argIdx),
+    varId(another.varId) {}
+
+SpecOprCase1::SpecOprCase1(SpecOprCase1&& another) : SpecOpr(Case1), predIdx(another.predIdx), argIdx(another.argIdx),
+    varId(another.varId) {}
+
+UpdateStatus SpecOprCase1::specialize(Rule& rule) const {
+    return rule.specializeCase1(predIdx, argIdx, varId);
+}
+
+std::string SpecOprCase1::toString() const {
+    std::stringstream ss;
+    ss << "Spec#1(" << predIdx << '[' << argIdx << "],X" << varId << ')';
+    return ss.str();
+}
+
+using sinc::SpecOprCase2;
+
+SpecOprCase2::SpecOprCase2(int _functor, int _arity, int _argIdx, int _varId) : SpecOpr(Case2), functor(_functor), arity(_arity),
+    argIdx(_argIdx), varId(_varId) {}
+
+SpecOprCase2::SpecOprCase2(SpecOprCase2 const& another) : SpecOpr(Case2), functor(another.functor), arity(another.arity),
+    argIdx(another.argIdx), varId(another.varId) {}
+
+SpecOprCase2::SpecOprCase2(SpecOprCase2&& another) : SpecOpr(Case2), functor(another.functor), arity(another.arity),
+    argIdx(another.argIdx), varId(another.varId) {}
+
+UpdateStatus SpecOprCase2::specialize(Rule& rule) const {
+    return rule.specializeCase2(functor, arity, argIdx, varId);
+}
+
+std::string SpecOprCase2::toString() const {
+    std::stringstream ss;
+    ss << "Spec#2(p" << functor << '[' << argIdx << "],X" << varId << ')';
+    return ss.str();
+}
+
+using sinc::SpecOprCase3;
+
+SpecOprCase3::SpecOprCase3(int _predIdx1, int _argIdx1, int _predIdx2, int _argIdx2) : SpecOpr(Case3), predIdx1(_predIdx1),
+    argIdx1(_argIdx1), predIdx2(_predIdx2), argIdx2(_argIdx2) {}
+
+SpecOprCase3::SpecOprCase3(SpecOprCase3 const& another) : SpecOpr(Case3), predIdx1(another.predIdx1), argIdx1(another.argIdx1),
+    predIdx2(another.predIdx2), argIdx2(another.argIdx2) {}
+
+SpecOprCase3::SpecOprCase3(SpecOprCase3&& another) : SpecOpr(Case3), predIdx1(another.predIdx1), argIdx1(another.argIdx1),
+    predIdx2(another.predIdx2), argIdx2(another.argIdx2) {}
+
+UpdateStatus SpecOprCase3::specialize(Rule& rule) const {
+    return rule.specializeCase3(predIdx1, argIdx1, predIdx2, argIdx2);
+}
+
+std::string SpecOprCase3::toString() const {
+    std::stringstream ss;
+    ss << "Spec#3(" << predIdx1 << '[' << argIdx1 << "]," << predIdx2 << '[' << argIdx2 << "])";
+    return ss.str();
+}
+
+using sinc::SpecOprCase4;
+
+SpecOprCase4::SpecOprCase4(int _functor, int _arity, int _argIdx1, int _predIdx2, int _argIdx2) : SpecOpr(Case4), functor(_functor),
+    arity(_arity), argIdx1(_argIdx1), predIdx2(_predIdx2), argIdx2(_argIdx2) {}
+
+SpecOprCase4::SpecOprCase4(SpecOprCase4 const& another) : SpecOpr(Case4), functor(another.functor), arity(another.arity),
+    argIdx1(another.argIdx1), predIdx2(another.predIdx2), argIdx2(another.argIdx2) {}
+
+SpecOprCase4::SpecOprCase4(SpecOprCase4&& another) : SpecOpr(Case4), functor(another.functor), arity(another.arity),
+    argIdx1(another.argIdx1), predIdx2(another.predIdx2), argIdx2(another.argIdx2) {}
+
+UpdateStatus SpecOprCase4::specialize(Rule& rule) const {
+    return rule.specializeCase4(functor, arity, argIdx1, predIdx2, argIdx2);
+}
+
+std::string SpecOprCase4::toString() const {
+    std::stringstream ss;
+    ss << "Spec#4(p" << functor << '[' << argIdx1 << "]," << predIdx2 << '[' << argIdx2 << "])";
+    return ss.str();
+}
+
+using sinc::SpecOprCase5;
+
+SpecOprCase5::SpecOprCase5(int _predIdx, int _argIdx, int _constant) : SpecOpr(Case5), predIdx(_predIdx), argIdx(_argIdx), 
+    constant(_constant) {}
+
+SpecOprCase5::SpecOprCase5(SpecOprCase5 const& another) : SpecOpr(Case5), predIdx(another.predIdx), argIdx(another.argIdx),
+    constant(another.constant) {}
+
+SpecOprCase5::SpecOprCase5(SpecOprCase5&& another) : SpecOpr(Case5), predIdx(another.predIdx), argIdx(another.argIdx),
+    constant(another.constant) {}
+
+UpdateStatus SpecOprCase5::specialize(Rule& rule) const {
+    return rule.specializeCase5(predIdx, argIdx, constant);
+}
+
+std::string SpecOprCase5::toString() const {
+    std::stringstream ss;
+    ss << "Spec#5(" << predIdx << '[' << argIdx << "]=" << constant << ')';
+    return ss.str();
+}

@@ -49,6 +49,10 @@ TEST(TestCompliedBlock, TestMatchSlicesTwoCB) {
     EXPECT_EQ(match2->cbs1[0]->getTotalCols(), 1);
     EXPECT_EQ(match2->cbs2[0]->getTotalCols(), 2);
 
+    delete[] rows1[0];
+    delete[] rows2[0];
+    delete[] rows3[0];
+    delete[] rows4[0];
     CompliedBlock::clearPool();
 }
 

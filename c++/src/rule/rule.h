@@ -468,4 +468,136 @@ namespace sinc {
         UpdateStatus generalizeHandlerPrePruning(int const predIdx, int const argIdx) override;
         UpdateStatus generalizeHandlerPostPruning(int const predIdx, int const argIdx) override;
     };
+
+    /**
+     * The five cases of specialization operations
+     *
+     * @since 2.0
+     */
+    enum SpecOprCase {
+        Case1, Case2, Case3, Case4, Case5
+    };
+
+    class Rule;
+    /**
+     * The base class of the five specialization operations, in the numerated form.
+     *
+     * @since 2.0
+     */
+    class SpecOpr {
+    public:
+        SpecOpr(SpecOprCase specCase);
+
+        SpecOprCase getSpecCase() const;
+
+        /**
+         * Apply the specialization operation on the rule
+         *
+         * @param rule The rule that is going to be specialized
+         */
+        virtual UpdateStatus specialize(Rule& rule) const = 0;
+
+    protected:
+        /** The case of the specialization operation */
+        SpecOprCase specCase;
+    };
+
+    /**
+     * The case 1 specialization operation, in the numerated form.
+     *
+     * @since 2.0
+     */
+    class SpecOprCase1 : public SpecOpr {
+    public:
+        int predIdx;
+        int argIdx;
+        int varId;
+
+        SpecOprCase1(int predIdx, int argIdx, int varId);
+        SpecOprCase1(SpecOprCase1 const& another);
+        SpecOprCase1(SpecOprCase1&& another);
+
+        UpdateStatus specialize(Rule& rule) const override;
+        std::string toString() const;
+    };
+
+    /**
+     * The case 2 specialization operation, in the numerated form.
+     *
+     * @since 2.0
+     */
+    class SpecOprCase2 : public SpecOpr {
+    public:
+        int functor;
+        int arity;
+        int argIdx;
+        int varId;
+
+        SpecOprCase2(int functor, int arity, int argIdx, int varId);
+        SpecOprCase2(SpecOprCase2 const& another);
+        SpecOprCase2(SpecOprCase2&& another);
+
+        UpdateStatus specialize(Rule& rule) const override;
+        std::string toString() const;
+    };
+
+    /**
+     * The case 3 specialization operation, in the numerated form.
+     *
+     * @since 2.0
+     */
+    class SpecOprCase3 : public SpecOpr {
+    public:
+        int predIdx1;
+        int argIdx1;
+        int predIdx2;
+        int argIdx2;
+
+        SpecOprCase3(int predIdx1, int argIdx1, int predIdx2, int argIdx2);
+        SpecOprCase3(SpecOprCase3 const& another);
+        SpecOprCase3(SpecOprCase3&& another);
+
+        UpdateStatus specialize(Rule& rule) const override;
+        std::string toString() const;
+    };
+
+    /**
+     * The case 4 specialization operation, in the numerated form.
+     *
+     * @since 2.0
+     */
+    class SpecOprCase4 : public SpecOpr {
+    public:
+        int functor;
+        int arity;
+        int argIdx1;
+        int predIdx2;
+        int argIdx2;
+
+        SpecOprCase4(int functor, int arity, int argIdx1, int predIdx2, int argIdx2);
+        SpecOprCase4(SpecOprCase4 const& another);
+        SpecOprCase4(SpecOprCase4&& another);
+
+        UpdateStatus specialize(Rule& rule) const override;
+        std::string toString() const;
+    };
+
+    /**
+     * The case 5 specialization operation, in the numerated form.
+     *
+     * @since 2.0
+     */
+    class SpecOprCase5 : public SpecOpr {
+    public:
+        int predIdx;
+        int argIdx;
+        int constant;
+
+        SpecOprCase5(int predIdx, int argIdx, int constant);
+        SpecOprCase5(SpecOprCase5 const& another);
+        SpecOprCase5(SpecOprCase5&& another);
+
+        UpdateStatus specialize(Rule& rule) const override;
+        std::string toString() const;
+    };
 }

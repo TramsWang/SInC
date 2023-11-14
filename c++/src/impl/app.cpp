@@ -1,5 +1,6 @@
 #include "app.h"
 #include "sincWithCache.h"
+#include "sincWithEstimation.h"
 #include <gflags/gflags.h>  // Todo: gflags may not release all resource it used. Replace by parsing it manually
 
 /**
@@ -172,7 +173,12 @@ SincConfig* Main::parseConfig(int argc, char** argv) {
 
 void Main::sincMain(int argc, char** argv) {
     SincConfig* config = parseConfig(argc, argv);
-    SInC* sinc = new SincWithCache(config);
+    SInC* sinc = nullptr;
+    if (1.0 > FLAGS_o) {
+        sinc = new SincWithCache(config);
+    } else {
+        sinc = new SincWithEstimation(config);
+    }
     sinc->run();
     delete sinc;
 }
