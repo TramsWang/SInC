@@ -136,6 +136,11 @@ size_t MultiSet<T>::hash() const {
 }
 
 template<class T>
+size_t MultiSet<T>::getMemoryCost() const {
+    return sizeof(MultiSet<T>) + sizeof(std::pair<T, int>) * cntMap.bucket_count() * std::max(1.0f, cntMap.max_load_factor());
+}
+
+template<class T>
 size_t std::hash<MultiSet<T>>::operator()(const MultiSet<T>& r) const {
     return r.hash();
 }

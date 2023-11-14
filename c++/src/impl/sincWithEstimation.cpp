@@ -659,15 +659,16 @@ void EstSincPerfMonitor::show(std::ostream& os) {
     );
 
     os << "--- Memory Cost ---\n";
-    printf(os, "%10s %10s %10s\n", "#CB", "CB", "CB(%)");
+    printf(os, "%10s %10s %10s %10s %10s\n", "#CB", "CB", "CB(%)", "Est.Idx", "Est.Idx(%)");
     rusage usage;
     if (0 != getrusage(RUSAGE_SELF, &usage)) {
         std::cerr << "Failed to get `rusage`" << std::endl;
         usage.ru_maxrss = 1024 * 1024 * 1024;   // set to 1T
     }
     printf(
-        os, "%10d %10s %10.2f\n\n",
-        CompliedBlock::totalNumCbs(), formatMemorySize(cbMemCost).c_str(), ((double) cbMemCost) / usage.ru_maxrss * 100.0
+        os, "%10d %10s %10.2f %10s %10.2f\n\n",
+        CompliedBlock::totalNumCbs(), formatMemorySize(cbMemCost).c_str(), ((double) cbMemCost) / usage.ru_maxrss * 100.0,
+        formatMemorySize(maxEstIdxCost).c_str(), ((double) maxEstIdxCost) / usage.ru_maxrss * 100.0
     );
 
     os << "--- CB Statistics ---\n";
@@ -794,7 +795,7 @@ EstRule* EstRule::clone() const {
     return rule;
 }
 
-std::vector<SpecOprWithScore*>* EstRule::estimateSpecializations() const {
+std::vector<SpecOprWithScore*>* EstRule::estimateSpecializations() {
     /* Gather values in columns */
     std::vector<MultiSet<int>*> column_values_in_pos_cache;
     std::vector<MultiSet<int>*> column_values_in_ent_cache;
@@ -1339,7 +1340,14 @@ std::vector<SpecOprWithScore*>* EstRule::estimateSpecializations() const {
         }
     }
 
+    estIdxMemCost += (sizeof(std::vector<MultiSet<int>*>) + sizeof(MultiSet<int>*) * column_values_in_pos_cache.capacity()) * 3;
     for (int pred_idx = HEAD_PRED_IDX; pred_idx < structure.size(); pred_idx++) {
+        Predicate const& predicate = getPredicate(pred_idx);
+        for (int arg_idx = 0; arg_idx < predicate.getArity(); arg_idx++) {
+        estIdxMemCost += column_values_in_pos_cache[pred_idx][arg_idx].getMemoryCost() + 
+            column_values_in_ent_cache[pred_idx][arg_idx].getMemoryCost() +
+            column_values_in_all_cache[pred_idx][arg_idx].getMemoryCost();
+        }
         delete[] column_values_in_pos_cache[pred_idx];
         delete[] column_values_in_ent_cache[pred_idx];
         delete[] column_values_in_all_cache[pred_idx];
@@ -1637,6 +1645,10 @@ const CacheFragment& EstRule::getEntCache() const {
 
 const std::vector<CacheFragment*>& EstRule::getAllCache() const {
     return *allCache;
+}
+
+size_t EstRule::getEstIdxMemCost() const {
+    return estIdxMemCost;
 }
 
 void EstRule::obtainPosCache() {
@@ -2124,6 +2136,7 @@ Rule* EstRelationMiner::findRule() {
                 }
             );
             estimated_spec_lists[i] = estimated_specs;
+            monitor.maxEstIdxCost = std::max(monitor.maxEstIdxCost, ((EstRule*)r)->getEstIdxMemCost());
         }
         findEstimatedSpecializations(beams, estimated_spec_lists, top_candidates);
         for (int i = 0; i < beamwidth && nullptr != beams[i]; i++) {
@@ -2330,6 +2343,7 @@ void SincWithEstimation::finalizeRelationMiner(RelationMiner* miner) {
     monitor.allCacheEntriesMax = std::max(monitor.allCacheEntriesMax, rel_miner->monitor.allCacheEntriesMax);
     monitor.totalGeneratedRules += rel_miner->monitor.totalGeneratedRules;
     monitor.copyTime += rel_miner->monitor.copyTime;
+    monitor.maxEstIdxCost = std::max(monitor.maxEstIdxCost, rel_miner->monitor.maxEstIdxCost);
     CompliedBlock::clearPool();
 
     /* Log memory usage */
@@ -2343,6 +2357,7 @@ void SincWithEstimation::showMonitor() {
 
     /* Calculate memory cost */
     monitor.cbMemCost = CompliedBlock::totalCbMemoryCost() / 1024;
+    monitor.maxEstIdxCost /= 1024;
 
     monitor.show(*logger);
 }

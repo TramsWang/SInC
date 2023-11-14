@@ -71,6 +71,8 @@ namespace sinc {
         bool operator==(const MultiSet &another) const;
         size_t hash() const;
 
+        size_t getMemoryCost() const;
+
     private:
         maptype cntMap;
         int size;

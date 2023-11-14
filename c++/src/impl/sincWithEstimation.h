@@ -328,6 +328,7 @@ namespace sinc {
 
         /* Memory cost (KB) */
         size_t cbMemCost = 0;
+        size_t maxEstIdxCost = 0;
 
         void show(std::ostream& os) override;
     };
@@ -354,7 +355,7 @@ namespace sinc {
         /**
          * Enumerate specializations of this rule and calculate corresponding estimation scores
          */
-        std::vector<SpecOprWithScore*>* estimateSpecializations() const;
+        std::vector<SpecOprWithScore*>* estimateSpecializations();
 
         /* The followings are methods in `CachedRule` */
         void updateCacheIndices();
@@ -371,9 +372,11 @@ namespace sinc {
         const CacheFragment& getPosCache() const;
         const CacheFragment& getEntCache() const;
         const std::vector<CacheFragment*>& getAllCache() const;
+        size_t getEstIdxMemCost() const;
 
     protected:
         BodyVarLinkManager bodyVarLinkManager;
+        size_t estIdxMemCost = 0;
 
         /* Followings are members in `CachedRule` */
         SimpleKb& kb;
