@@ -831,3 +831,13 @@ TEST_F(TestBodyVarLinkManager, assumeShortestPathCase3Test3) {
     delete actual_path2;
     releaseRuleArgs(rule);
 }
+
+TEST(TestSpecOprWithScore, TestPushingIntoVector) {
+    std::vector<SpecOprWithScore> *v = new std::vector<SpecOprWithScore>();
+    v->emplace_back(new SpecOprCase1(0, 0, 0), Eval(0, 0, 0));
+    v->emplace_back(new SpecOprCase2(0, 0, 0, 0), Eval(0, 0, 0));
+    v->emplace_back(new SpecOprCase3(0, 0, 0, 0), Eval(0, 0, 0));
+    v->emplace_back(new SpecOprCase4(0, 0, 0, 0, 0), Eval(0, 0, 0));
+    v->emplace_back(new SpecOprCase5(0, 0, 0), Eval(0, 0, 0));
+    delete v;
+}

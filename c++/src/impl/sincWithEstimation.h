@@ -296,7 +296,10 @@ namespace sinc {
          * @param opr NOTE: This pointer SHOULD be maintained by the object
          */
         SpecOprWithScore(SpecOpr const* opr, const Eval& eval);
+        SpecOprWithScore(SpecOprWithScore&& another);
         ~SpecOprWithScore();
+
+        SpecOprWithScore& operator=(SpecOprWithScore&& another);
     };
 
     /**
@@ -341,8 +344,7 @@ namespace sinc {
     class EstRule : public Rule {
     public:
         EstRule(
-            int const headPredSymbol, int const arity, fingerprintCacheType& fingerprintCache, tabuMapType& category2TabuSetMap,
-            SimpleKb& kb, std::unordered_set<Record> const* counterexamples
+            int const headPredSymbol, int const arity, fingerprintCacheType& fingerprintCache, tabuMapType& category2TabuSetMap, SimpleKb& kb
         );
 
         EstRule(const EstRule& another);
@@ -352,7 +354,7 @@ namespace sinc {
         /**
          * Enumerate specializations of this rule and calculate corresponding estimation scores
          */
-        std::vector<SpecOprWithScore>* estimateSpecializations() const;
+        std::vector<SpecOprWithScore*>* estimateSpecializations() const;
 
         /* The followings are methods in `CachedRule` */
         void updateCacheIndices();
@@ -484,7 +486,7 @@ namespace sinc {
 
         Rule* findRule() override;
 
-        void findEstimatedSpecializations(Rule** beams, std::vector<SpecOprWithScore>** estimatedSpecLists, Rule** topCandidates);
+        void findEstimatedSpecializations(Rule** beams, std::vector<SpecOprWithScore*>** estimatedSpecLists, Rule** topCandidates);
 
         /**
          * Record monitoring information compared to the super implementation

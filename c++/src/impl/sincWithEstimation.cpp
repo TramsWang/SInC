@@ -618,8 +618,23 @@ std::vector<VarLink>* BodyVarLinkManager::assumeShortestPathHandler(
 using sinc::SpecOprWithScore;
 SpecOprWithScore::SpecOprWithScore(SpecOpr const* _opr, Eval const& _eval) : opr(_opr), estEval(_eval) {}
 
+SpecOprWithScore::SpecOprWithScore(SpecOprWithScore&& another) : opr(another.opr), estEval(another.estEval) {
+    another.opr = nullptr;
+}
+
+SpecOprWithScore& SpecOprWithScore::operator=(SpecOprWithScore&& another) {
+    if (nullptr != opr) {
+        delete opr;
+    }
+    opr = another.opr;
+    another.opr = nullptr;
+    return *this;
+}
+
 SpecOprWithScore::~SpecOprWithScore() {
-    delete opr;
+    if (nullptr != opr) {
+        delete opr;
+    }
 }
 
 /**
@@ -708,8 +723,7 @@ void EstSincPerfMonitor::show(std::ostream& os) {
 using sinc::EstRule;
 
 EstRule::EstRule(
-    int const headPredSymbol, int const arity, fingerprintCacheType& fingerprintCache, tabuMapType& category2TabuSetMap,
-    SimpleKb& _kb, std::unordered_set<Record> const* counterexamples
+    int const headPredSymbol, int const arity, fingerprintCacheType& fingerprintCache, tabuMapType& category2TabuSetMap, SimpleKb& _kb
 ) : Rule(headPredSymbol, arity, fingerprintCache, category2TabuSetMap), kb(_kb), bodyVarLinkManager(&structure, 0)
 {
     /* Initialize the E+-cache & T-cache */
@@ -780,7 +794,7 @@ EstRule* EstRule::clone() const {
     return rule;
 }
 
-std::vector<SpecOprWithScore>* EstRule::estimateSpecializations() const {
+std::vector<SpecOprWithScore*>* EstRule::estimateSpecializations() const {
     /* Gather values in columns */
     std::vector<MultiSet<int>*> column_values_in_pos_cache;
     std::vector<MultiSet<int>*> column_values_in_ent_cache;
@@ -865,7 +879,7 @@ std::vector<SpecOprWithScore>* EstRule::estimateSpecializations() const {
     }
 
     /* Estimate case 1 & 2 */
-    std::vector<SpecOprWithScore>* results = new std::vector<SpecOprWithScore>();
+    std::vector<SpecOprWithScore*>* results = new std::vector<SpecOprWithScore*>();
     for (int var_id = 0; var_id < usedLimitedVars(); var_id++) {
         std::vector<ArgLocation> const& var_arg_locs = *(limitedVarArgs[var_id]);
         int const var_arg = ARG_VARIABLE(var_id);
@@ -1027,10 +1041,10 @@ std::vector<SpecOprWithScore>* EstRule::estimateSpecializations() const {
                     }   // Else: the newly added LV must be included in some newly linked pairs and handled by the previous loop
                 }
             }
-            results->emplace_back(
+            results->push_back(new SpecOprWithScore(
                 new SpecOprCase1(vacant.predIdx, vacant.argIdx, var_id),
                 Eval(est_pos_ent, est_all_ent - est_already_ent, length + 1)
-            );
+            ));
         }
 
         /* Case 2 */
@@ -1078,10 +1092,10 @@ std::vector<SpecOprWithScore>* EstRule::estimateSpecializations() const {
                     }
                     est_all_ent = estimateRatiosInAllCache(est_all_ratios, var_arg_locs_in_body.size()) * eval.getAllEtls();
                 }
-                results->emplace_back(
+                results->push_back(new SpecOprWithScore(
                         new SpecOprCase2(relation->id, relation->getTotalCols(), arg_idx, var_id),
                         Eval(est_pos_ent, est_all_ent - est_already_ent, length + 1)
-                );
+                ));
             }
         }
     }
@@ -1211,10 +1225,10 @@ std::vector<SpecOprWithScore>* EstRule::estimateSpecializations() const {
                     est_all_ent *= estimateRatiosInAllCache(_all_ratios, 2);
                 }
             }
-            results->emplace_back(
+            results->push_back(new SpecOprWithScore(
                 new SpecOprCase3(empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx, empty_arg_loc_2.predIdx, empty_arg_loc_2.argIdx),
                 Eval(est_pos_ent, est_all_ent - est_already_ent, length + 1)
-            );
+            ));
         }
 
         /* Case 4 */
@@ -1226,10 +1240,10 @@ std::vector<SpecOprWithScore>* EstRule::estimateSpecializations() const {
                         int const num_relation_column_values = relation->numValuesInColumn(arg_idx);
                         double est_pos_ent = eval.getPosEtls() / empty_arg1_pos_column_values.getSize() * empty_arg1_pos_column_values.itemCount(relation_column_values, num_relation_column_values);
                         double est_all_ent = eval.getAllEtls() / kb.totalConstants() * num_relation_column_values;
-                        results->emplace_back(
+                        results->push_back(new SpecOprWithScore(
                             new SpecOprCase4(relation->id, relation->getTotalCols(), arg_idx, empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx),
                             Eval(est_pos_ent, est_all_ent, length + 1)
-                        );
+                        ));
                     }
                 }
             } else {
@@ -1240,10 +1254,10 @@ std::vector<SpecOprWithScore>* EstRule::estimateSpecializations() const {
                         double est_pos_ent = eval.getPosEtls() / empty_arg1_pos_column_values.getSize() * empty_arg1_pos_column_values.itemCount(relation_column_values, num_relation_column_values);
                         double est_already_ent = entailed_record_cnt / empty_arg1_ent_column_values.getSize() * empty_arg1_ent_column_values.itemCount(relation_column_values, num_relation_column_values);
                         double est_all_ent = eval.getAllEtls() / kb.totalConstants() * num_relation_column_values;
-                        results->emplace_back(
+                        results->push_back(new SpecOprWithScore(
                             new SpecOprCase4(relation->id, relation->getTotalCols(), arg_idx, empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx),
                             Eval(est_pos_ent, est_all_ent - est_already_ent, length + 1)
-                        );
+                        ));
                     }
                 }
             }
@@ -1255,10 +1269,10 @@ std::vector<SpecOprWithScore>* EstRule::estimateSpecializations() const {
                         int const num_relation_column_values = relation->numValuesInColumn(arg_idx);
                         double est_pos_ent = eval.getPosEtls() / empty_arg1_pos_column_values.getSize() * empty_arg1_pos_column_values.itemCount(relation_column_values, num_relation_column_values);
                         double est_all_ent = eval.getAllEtls() / empty_arg1_all_column_values.getSize() * empty_arg1_all_column_values.itemCount(relation_column_values, num_relation_column_values);
-                        results->emplace_back(
+                        results->push_back(new SpecOprWithScore(
                             new SpecOprCase4(relation->id, relation->getTotalCols(), arg_idx, empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx),
                             Eval(est_pos_ent, est_all_ent, length + 1)
-                        );
+                        ));
                     }
                 }
             } else {
@@ -1269,10 +1283,10 @@ std::vector<SpecOprWithScore>* EstRule::estimateSpecializations() const {
                         double est_pos_ent = eval.getPosEtls() / empty_arg1_pos_column_values.getSize() * empty_arg1_pos_column_values.itemCount(relation_column_values, num_relation_column_values);
                         double est_already_ent = entailed_record_cnt / empty_arg1_ent_column_values.getSize() * empty_arg1_ent_column_values.itemCount(relation_column_values, num_relation_column_values);
                         double est_all_ent = eval.getAllEtls() / empty_arg1_all_column_values.getSize() * empty_arg1_all_column_values.itemCount(relation_column_values, num_relation_column_values);
-                        results->emplace_back(
+                        results->push_back(new SpecOprWithScore(
                             new SpecOprCase4(relation->id, relation->getTotalCols(), arg_idx, empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx),
                             Eval(est_pos_ent, est_all_ent - est_already_ent, length + 1)
-                        );
+                        ));
                     }
                 }
             }
@@ -1286,19 +1300,19 @@ std::vector<SpecOprWithScore>* EstRule::estimateSpecializations() const {
             if (0 == entailed_record_cnt) {
                 for (int constant : *const_list) {
                     double est_pos_ent = eval.getPosEtls() / empty_arg1_pos_column_values.getSize() * empty_arg1_pos_column_values.itemCount(constant);
-                    results->emplace_back(
+                    results->push_back(new SpecOprWithScore(
                         new SpecOprCase5(empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx, constant),
                         Eval(est_pos_ent, est_all_ent, length + 1)
-                    );
+                    ));
                 }
             } else {
                 for (int constant : *const_list) {
                     double est_pos_ent = eval.getPosEtls() / empty_arg1_pos_column_values.getSize() * empty_arg1_pos_column_values.itemCount(constant);
                     double est_already_ent = entailed_record_cnt / empty_arg1_ent_column_values.getSize() * empty_arg1_ent_column_values.itemCount(constant);
-                    results->emplace_back(
+                    results->push_back(new SpecOprWithScore(
                         new SpecOprCase5(empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx, constant),
                         Eval(est_pos_ent, est_all_ent - est_already_ent, length + 1)
-                    );
+                    ));
                 }
             }
         } else {
@@ -1306,20 +1320,20 @@ std::vector<SpecOprWithScore>* EstRule::estimateSpecializations() const {
                 for (int constant : *const_list) {
                     double est_pos_ent = eval.getPosEtls() / empty_arg1_pos_column_values.getSize() * empty_arg1_pos_column_values.itemCount(constant);
                     double est_all_ent = eval.getAllEtls() / empty_arg1_all_column_values.getSize() * empty_arg1_all_column_values.itemCount(constant);
-                    results->emplace_back(
+                    results->push_back(new SpecOprWithScore(
                         new SpecOprCase5(empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx, constant),
                         Eval(est_pos_ent, est_all_ent, length + 1)
-                    );
+                    ));
                 }
             } else {
                 for (int constant : *const_list) {
                     double est_pos_ent = eval.getPosEtls() / empty_arg1_pos_column_values.getSize() * empty_arg1_pos_column_values.itemCount(constant);
                     double est_already_ent = entailed_record_cnt / empty_arg1_ent_column_values.getSize() * empty_arg1_ent_column_values.itemCount(constant);
                     double est_all_ent = eval.getAllEtls() / empty_arg1_all_column_values.getSize() * empty_arg1_all_column_values.itemCount(constant);
-                    results->emplace_back(
+                    results->push_back(new SpecOprWithScore(
                         new SpecOprCase5(empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx, constant),
                         Eval(est_pos_ent, est_all_ent - est_already_ent, length + 1)
-                    );
+                    ));
                 }
             }
         }
@@ -2075,7 +2089,7 @@ using sinc::Rule;
 Rule* EstRelationMiner::getStartRule() {
     Rule::fingerprintCacheType* cache = new Rule::fingerprintCacheType();
     fingerprintCaches.push_back(cache);
-    return new EstRule(targetRelation, kb.getRelation(targetRelation)->getTotalCols(), *cache, tabuMap, kb, &counterexamples);
+    return new EstRule(targetRelation, kb.getRelation(targetRelation)->getTotalCols(), *cache, tabuMap, kb);
 }
 
 void EstRelationMiner::selectAsBeam(Rule* r) {
@@ -2090,29 +2104,35 @@ Rule* EstRelationMiner::findRule() {
     /* Create the beams */
     Rule** beams = new Rule*[beamwidth]{};
     beams[0] = getStartRule();
-    // Rule* best_local_optimum = nullptr;
 
     /* Find a local optimum (there is certainly a local optimum in the search routine) */
     while (true) {
         /* Find the candidates in the next round according to current beams */
         Rule** top_candidates = new Rule*[beamwidth]{};
-        std::vector<SpecOprWithScore>** estimated_spec_lists = new std::vector<SpecOprWithScore>*[beamwidth]{};
+        std::vector<SpecOprWithScore*>** estimated_spec_lists = new std::vector<SpecOprWithScore*>*[beamwidth]{};
         for (int i = 0; i < beamwidth && nullptr != beams[i]; i++) {
             Rule* const r = beams[i];
             selectAsBeam(r);
             logFormatter.printf("Extend: %s\n", r->toString(kb.getRelationNames()).c_str());
             logger.flush();
 
-            std::vector<SpecOprWithScore>* estimated_specs = ((EstRule*)r)->estimateSpecializations();
+            std::vector<SpecOprWithScore*>* estimated_specs = ((EstRule*)r)->estimateSpecializations();
             std::sort(
                 estimated_specs->begin(), estimated_specs->end(),
-                [this](SpecOprWithScore const& a, SpecOprWithScore const& b) -> bool {
-                    return a.estEval.value(evalMetric) > b.estEval.value(evalMetric);
+                [this](SpecOprWithScore* const& a, SpecOprWithScore* const& b) -> bool {
+                    return a->estEval.value(evalMetric) > b->estEval.value(evalMetric);
                 }
             );
             estimated_spec_lists[i] = estimated_specs;
         }
         findEstimatedSpecializations(beams, estimated_spec_lists, top_candidates);
+        for (int i = 0; i < beamwidth && nullptr != beams[i]; i++) {
+            for (SpecOprWithScore* const& s: *(estimated_spec_lists[i])) {
+                delete s;
+            }
+            delete estimated_spec_lists[i];
+        }
+        delete[] estimated_spec_lists;
 
         if (!shouldContinue) {
             /* Stop the finding procedure at the current stage and return the best rule */
@@ -2205,20 +2225,20 @@ Rule* EstRelationMiner::findRule() {
 }
 
 void EstRelationMiner::findEstimatedSpecializations(
-    Rule** beams, std::vector<SpecOprWithScore>** estimatedSpecLists, Rule** topCandidates
+    Rule** beams, std::vector<SpecOprWithScore*>** estimatedSpecLists, Rule** topCandidates
 ) {
     int observations = (int) std::round(beamwidth * observationRatio);
     int num_beams = 1;  // at least 1 beam in the "beams" array
     for (; num_beams < beamwidth && nullptr != beams[num_beams]; num_beams++); // find the exact number of beams in the array
-    int idxs[num_beams];
+    int idxs[num_beams]{};
     for (int i = 0; i < observations; i++) {
         int best_rule_idx = -1;
         double best_score = -std::numeric_limits<double>::infinity();
         for (int rule_idx = 0; rule_idx < num_beams; rule_idx++) {
-            std::vector<SpecOprWithScore>& est_spec_list = *(estimatedSpecLists[rule_idx]);
+            std::vector<SpecOprWithScore*>& est_spec_list = *(estimatedSpecLists[rule_idx]);
             int idx = idxs[rule_idx];
             if (idx < est_spec_list.size()) {
-                double score = est_spec_list[idx].estEval.value(evalMetric);
+                double score = est_spec_list[idx]->estEval.value(evalMetric);
                 if (best_score < score) {
                     best_score = score;
                     best_rule_idx = rule_idx;
@@ -2229,10 +2249,10 @@ void EstRelationMiner::findEstimatedSpecializations(
             /* No more option to compare */
             break;
         }
-        SpecOprWithScore& best_spec = (*(estimatedSpecLists[best_rule_idx]))[idxs[best_rule_idx]];
+        SpecOprWithScore* best_spec = (*(estimatedSpecLists[best_rule_idx]))[idxs[best_rule_idx]];
         idxs[best_rule_idx]++;
         Rule* copy = beams[best_rule_idx]->clone();
-        UpdateStatus status = best_spec.opr->specialize(*copy);
+        UpdateStatus status = best_spec->opr->specialize(*copy);
         checkThenAddRule(status, copy, *(beams[best_rule_idx]), topCandidates);
     }
 }
