@@ -4,6 +4,7 @@
 #include <stdarg.h>
 #include "../util/util.h"
 #include <sys/resource.h>
+#include <csignal>
 
 /**
  * SincConfig
@@ -660,7 +661,15 @@ void SInC::showHypothesis() const {
     (*logger) << '\n';
 }
 
+void SInC::sigIntHandler(int signum) {
+    std::cout << "\n<<< Interrupted >>>" << std::endl;
+    throw InterruptionSignal("Interrupted by signal");
+}
+
 void SInC::compress() {
+    /* Register signal handler */
+    signal(SIGINT, SInC::sigIntHandler);
+
     showConfig();
 
     /* Load KB */

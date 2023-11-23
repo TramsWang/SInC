@@ -431,5 +431,11 @@ namespace sinc {
         void logInfo(std::string const& msg) const;
         void logError(const char* msg) const;
         void logError(std::string const& msg) const;
+
+    private:
+        /**
+         * This method captures SIGINT and throws an `InterruptionSignal`
+         */
+        static void sigIntHandler(int signum);
     };
 }
