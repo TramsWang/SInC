@@ -558,15 +558,21 @@ void CachedSincPerfMonitor::show(std::ostream& os) {
     );
 
     os << "--- Memory Cost ---\n";
-    printf(os, "%10s %10s %10s\n", "#CB", "CB", "CB(%)");
+    printf(
+        os, "%10s %10s %10s %10s %10s %10s %10s %10s %10s\n",
+        "#CB", "CB", "CB(%)", "CE", "CE(%)", "FpC", "FpC(%)", "TbM", "TbM(%)"
+    );
     rusage usage;
     if (0 != getrusage(RUSAGE_SELF, &usage)) {
         std::cerr << "Failed to get `rusage`" << std::endl;
         usage.ru_maxrss = 1024 * 1024 * 1024;   // set to 1T
     }
     printf(
-        os, "%10d %10s %10.2f\n\n",
-        CompliedBlock::totalNumCbs(), formatMemorySize(cbMemCost).c_str(), ((double) cbMemCost) / usage.ru_maxrss * 100.0
+        os, "%10d %10s %10.2f %10s %10.2f %10s %10.2f %10s %10.2f\n\n",
+        CompliedBlock::totalNumCbs(), formatMemorySize(cbMemCost).c_str(), ((double) cbMemCost) / usage.ru_maxrss * 100.0,
+        formatMemorySize(cacheEntryMemCost).c_str(), ((double) cacheEntryMemCost) / usage.ru_maxrss * 100.0,
+        formatMemorySize(fingerprintCacheMemCost).c_str(), ((double) fingerprintCacheMemCost) / usage.ru_maxrss * 100.0,
+        formatMemorySize(tabuMapMemCost).c_str(), ((double) tabuMapMemCost) / usage.ru_maxrss * 100.0
     );
 
     os << "--- CB Statistics ---\n";
@@ -1118,6 +1124,17 @@ std::vector<VarInfo> const& CacheFragment::getVarInfoList() const {
     return varInfoList;
 }
 
+size_t CacheFragment::getMemoryCost() const {
+    size_t size = sizeof(CacheFragment) + sizeof(Predicate) * partAssignedRule.capacity() + sizeof(VarInfo) * varInfoList.capacity();
+    size += sizeof(entriesType) + sizeof(entryType*) * entries->capacity() + sizeof(entryType) * entries->size();
+    size_t total_capacity = 0;
+    for (entryType* entry: *entries) {
+        total_capacity += entry->capacity();
+    }
+    size += total_capacity * sizeof(CompliedBlock*);
+    return size;
+}
+
 void CacheFragment::showEntry(entryType const& entry) {
     std::cout << "+++\n";
     for (CompliedBlock* const& cb: entry) {
@@ -1482,6 +1499,7 @@ bool TabInfo::operator==(const TabInfo &another) const {
  * CachedRule
  */
 using sinc::CachedRule;
+size_t CachedRule::cumulatedCacheEntryMemoryCost = 0;
 
 CachedRule::CachedRule(
     int const headPredSymbol, int const arity, fingerprintCacheType& fingerprintCache, tabuMapType& category2TabuSetMap, SimpleKb& _kb,
@@ -1523,24 +1541,24 @@ CachedRule::CachedRule(
     predIdx2AllCacheTableInfo.emplace_back(-1, -1);    // head is not mapped to any fragment
     maintainAllCache = true;
 
-    /* Initialize the C-cache */
-    int already_ceg = 0;
-    if (nullptr == counterexamples || counterexamples->empty()) {
-        cegCache = new CacheFragment(headPredSymbol, arity);
-    } else {
-        already_ceg = counterexamples->size();
-        int** existing_cegs = new int*[already_ceg];
-        int i = 0;
-        for (Record const& record: *counterexamples) {
-            existing_cegs[i] = record.getArgs();
-            i++;
-        }
-        IntTable* ceg_records = new IntTable(existing_cegs, already_ceg, arity);
-        cegCache = new CacheFragment(
-            CompliedBlock::create(existing_cegs, already_ceg, arity, ceg_records, true, true), headPredSymbol
-        );
-    }
-    maintainCegCache = true;
+    // /* Initialize the C-cache */
+    // int already_ceg = 0;
+    // if (nullptr == counterexamples || counterexamples->empty()) {
+    //     cegCache = new CacheFragment(headPredSymbol, arity);
+    // } else {
+    //     already_ceg = counterexamples->size();
+    //     int** existing_cegs = new int*[already_ceg];
+    //     int i = 0;
+    //     for (Record const& record: *counterexamples) {
+    //         existing_cegs[i] = record.getArgs();
+    //         i++;
+    //     }
+    //     IntTable* ceg_records = new IntTable(existing_cegs, already_ceg, arity);
+    //     cegCache = new CacheFragment(
+    //         CompliedBlock::create(existing_cegs, already_ceg, arity, ceg_records, true, true), headPredSymbol
+    //     );
+    // }
+    // maintainCegCache = true;
 
     /* Initial evaluation */
     // int pos_ent = non_entailed_record_vector.size();
@@ -1548,17 +1566,20 @@ CachedRule::CachedRule(
     int already_ent = head_relation->totalEntailedRecords();
     int pos_ent = head_relation->getTotalRows() - already_ent;
     double all_ent = pow(kb.totalConstants(), arity);
-    eval = Eval(pos_ent, all_ent - already_ent - already_ceg, length);
+    eval = Eval(pos_ent, all_ent - already_ent, length);
+    // eval = Eval(pos_ent, all_ent - already_ent - already_ceg, length);
     // delete split_records;
 }
 
 CachedRule::CachedRule(const CachedRule& another) : Rule(another), kb(another.kb), posCache(another.posCache), maintainPosCache(false),
     // entCache(another.entCache), maintainEntCache(false), 
-    allCache(another.allCache), maintainAllCache(false), cegCache(another.cegCache), maintainCegCache(false),
+    allCache(another.allCache), maintainAllCache(false),
+    // cegCache(another.cegCache), maintainCegCache(false),
     predIdx2AllCacheTableInfo(another.predIdx2AllCacheTableInfo)
 {}
 
 CachedRule::~CachedRule() {
+    cumulatedCacheEntryMemoryCost -= getCacheEntryMemoryCost();
     if (maintainPosCache) {
         delete posCache;
     }
@@ -1571,9 +1592,9 @@ CachedRule::~CachedRule() {
         }
         delete allCache;
     }
-    if (maintainCegCache) {
-        delete cegCache;
-    }
+    // if (maintainCegCache) {
+    //     delete cegCache;
+    // }
 }
 
 CachedRule* CachedRule::clone() const {
@@ -1593,13 +1614,13 @@ void CachedRule::updateCacheIndices() {
         fragment->buildIndices();
     }
     uint64_t time_all_done = currentTimeInNano();
-    cegCache->buildIndices();
-    uint64_t time_ceg_done = currentTimeInNano();
+    // cegCache->buildIndices();
+    // uint64_t time_ceg_done = currentTimeInNano();
     posCacheIndexingTime = time_pos_done - time_start;
     // entCacheIndexingTime = time_ent_done - time_pos_done;
     // allCacheIndexingTime = time_all_done - time_ent_done;
     allCacheIndexingTime = time_all_done - time_pos_done;
-    cegCacheIndexingTime = time_ceg_done - time_all_done;
+    // cegCacheIndexingTime = time_ceg_done - time_all_done;
 }
 
 sinc::EvidenceBatch* CachedRule::getEvidenceAndMarkEntailment() {
@@ -1770,6 +1791,7 @@ std::unordered_set<sinc::Record>* CachedRule::getCounterexamples() const {
 }
 
 void CachedRule::releaseMemory() {
+    cumulatedCacheEntryMemoryCost -= getCacheEntryMemoryCost();
     if (maintainPosCache) {
         delete posCache;
         maintainPosCache = false;
@@ -1785,10 +1807,10 @@ void CachedRule::releaseMemory() {
         delete allCache;
         maintainAllCache = false;
     }
-    if (maintainCegCache) {
-        delete cegCache;
-        maintainCegCache = false;
-    }
+    // if (maintainCegCache) {
+    //     delete cegCache;
+    //     maintainCegCache = false;
+    // }
 }
 
 uint64_t CachedRule::getCopyTime() const {
@@ -1807,9 +1829,9 @@ uint64_t CachedRule::getAllCacheUpdateTime() const {
     return allCacheUpdateTime;
 }
 
-uint64_t CachedRule::getCegCacheUpdateTime() const {
-    return cegCacheUpdateTime;
-}
+// uint64_t CachedRule::getCegCacheUpdateTime() const {
+//     return cegCacheUpdateTime;
+// }
 
 uint64_t CachedRule::getPosCacheIndexingTime() const {
     return posCacheIndexingTime;
@@ -1823,9 +1845,9 @@ uint64_t CachedRule::getAllCacheIndexingTime() const {
     return allCacheIndexingTime;
 }
 
-uint64_t CachedRule::getCegCacheIndexingTime() const {
-    return cegCacheIndexingTime;
-}
+// uint64_t CachedRule::getCegCacheIndexingTime() const {
+//     return cegCacheIndexingTime;
+// }
 
 const CacheFragment& CachedRule::getPosCache() const {
     return *posCache;
@@ -1839,8 +1861,38 @@ const std::vector<CacheFragment*>& CachedRule::getAllCache() const {
     return *allCache;
 }
 
-const CacheFragment& CachedRule::getCegCache() const {
-    return *cegCache;
+// const CacheFragment& CachedRule::getCegCache() const {
+//     return *cegCache;
+// }
+
+size_t CachedRule::getCacheEntryMemoryCost() {
+    if (0 != cacheEntryMemoryCost) {
+        return cacheEntryMemoryCost;
+    }
+    if (maintainPosCache) {
+        cacheEntryMemoryCost += posCache->getMemoryCost();
+    }
+    // if (maintainEntCache) {
+    //     cacheEntryMemoryCost += entCache->getMemoryCost();
+    // }
+    if (maintainAllCache) {
+        for (CacheFragment* const& cf: *allCache) {
+            cacheEntryMemoryCost += cf->getMemoryCost();
+        }
+    }
+    // if (maintainCegCache) {
+    //     cacheEntryMemoryCost += cegCache->getMemoryCost();
+    // }
+    return cacheEntryMemoryCost;
+}
+
+size_t CachedRule::addCumulatedCacheEntryMemoryCost(CachedRule* rule) {
+    cumulatedCacheEntryMemoryCost += rule->getCacheEntryMemoryCost();
+    return cumulatedCacheEntryMemoryCost;
+}
+
+size_t CachedRule::getCumulatedCacheEntryMemoryCost() {
+    return cumulatedCacheEntryMemoryCost;
 }
 
 void CachedRule::obtainPosCache() {
@@ -1869,12 +1921,12 @@ void CachedRule::obtainAllCache() {
     }
 }
 
-void CachedRule::obtainCegCache() {
-    if (!maintainCegCache) {
-        cegCache = new CacheFragment(*cegCache);
-        maintainCegCache = true;
-    }
-}
+// void CachedRule::obtainCegCache() {
+//     if (!maintainCegCache) {
+//         cegCache = new CacheFragment(*cegCache);
+//         maintainCegCache = true;
+//     }
+// }
 
 double CachedRule::recordCoverage() {
     int new_pos_ent = 0;
@@ -1963,14 +2015,18 @@ sinc::Eval CachedRule::calculateEval() const {
             }
         }
     }
-    int already_ceg = cegCache->countTableSize(HEAD_PRED_IDX);
+    // int already_ceg = cegCache->countTableSize(HEAD_PRED_IDX);
 
     /* Update evaluation score */
     /* Those already proved should be excluded from the entire entailment set. Otherwise, they are counted as negative ones */
     return Eval(
-        new_pos_ent, all_ent - already_ent - already_ceg, length, 
+        new_pos_ent, all_ent - already_ent, length, 
         eval.value(EvalMetric::Value::CompressionRatio), eval.value(EvalMetric::Value::InfoGain)
     );
+    // return Eval(
+    //     new_pos_ent, all_ent - already_ent - already_ceg, length, 
+    //     eval.value(EvalMetric::Value::CompressionRatio), eval.value(EvalMetric::Value::InfoGain)
+    // );
 }
 
 sinc::UpdateStatus CachedRule::specCase1HandlerPrePruning(int const predIdx, int const argIdx, int const varId) {
@@ -1987,9 +2043,9 @@ sinc::UpdateStatus CachedRule::specCase1HandlerPostPruning(int const predIdx, in
     // obtainEntCache();
     // entCache->updateCase1a(predIdx, argIdx, varId);
     // uint64_t time_ent_done = currentTimeInNano();
-    obtainCegCache();
-    cegCache->updateCase1a(predIdx, argIdx, varId);
-    uint64_t time_ceg_done = currentTimeInNano();
+    // obtainCegCache();
+    // cegCache->updateCase1a(predIdx, argIdx, varId);
+    // uint64_t time_ceg_done = currentTimeInNano();
 
     obtainAllCache();
     if (HEAD_PRED_IDX != predIdx) { // No need to update the E-cache if the update is in the head
@@ -2029,9 +2085,9 @@ sinc::UpdateStatus CachedRule::specCase1HandlerPostPruning(int const predIdx, in
         }
     }
     uint64_t time_all_done = currentTimeInNano();
-    cegCacheUpdateTime = time_ceg_done - time_start;
+    // cegCacheUpdateTime = time_ceg_done - time_start;
     // entCacheUpdateTime = time_ent_done - time_start;
-    allCacheUpdateTime = time_all_done - time_ceg_done;
+    allCacheUpdateTime = time_all_done - time_start;
 
     return UpdateStatus::Normal;
 }
@@ -2052,9 +2108,9 @@ sinc::UpdateStatus CachedRule::specCase2HandlerPostPruning(int const predSymbol,
     SimpleRelation* new_relation = kb.getRelation(predSymbol);
     // entCache->updateCase1b(new_relation, predSymbol, argIdx, varId);
     // uint64_t time_ent_done = currentTimeInNano();
-    obtainCegCache();
-    cegCache->updateCase1b(new_relation, predSymbol, argIdx, varId);
-    uint64_t time_ceg_done = currentTimeInNano();
+    // obtainCegCache();
+    // cegCache->updateCase1b(new_relation, predSymbol, argIdx, varId);
+    // uint64_t time_ceg_done = currentTimeInNano();
 
     obtainAllCache();
     CacheFragment* updated_fragment = nullptr;
@@ -2081,9 +2137,9 @@ sinc::UpdateStatus CachedRule::specCase2HandlerPostPruning(int const predSymbol,
         }
     }
     uint64_t time_all_done = currentTimeInNano();
-    cegCacheUpdateTime = time_ceg_done - time_start;
+    // cegCacheUpdateTime = time_ceg_done - time_start;
     // entCacheUpdateTime = time_ent_done - time_start;
-    allCacheUpdateTime = time_all_done - time_ceg_done;
+    allCacheUpdateTime = time_all_done - time_start;
 
     return UpdateStatus::Normal;
 }
@@ -2103,9 +2159,9 @@ sinc::UpdateStatus CachedRule::specCase3HandlerPostPruning(int const predIdx1, i
     int new_vid = usedLimitedVars() - 1;
     // entCache->updateCase2a(predIdx1, argIdx1, predIdx2, argIdx2, new_vid);
     // uint64_t time_ent_done = currentTimeInNano();
-    obtainCegCache();
-    cegCache->updateCase2a(predIdx1, argIdx1, predIdx2, argIdx2, new_vid);
-    uint64_t time_ceg_done = currentTimeInNano();
+    // obtainCegCache();
+    // cegCache->updateCase2a(predIdx1, argIdx1, predIdx2, argIdx2, new_vid);
+    // uint64_t time_ceg_done = currentTimeInNano();
 
     obtainAllCache();
     TabInfo const& tab_info1 = predIdx2AllCacheTableInfo[predIdx1];
@@ -2145,9 +2201,9 @@ sinc::UpdateStatus CachedRule::specCase3HandlerPostPruning(int const predIdx1, i
         }
     }
     uint64_t time_all_done = currentTimeInNano();
-    cegCacheUpdateTime = time_ceg_done - time_start;
+    // cegCacheUpdateTime = time_ceg_done - time_start;
     // entCacheUpdateTime = time_ent_done - time_start;
-    allCacheUpdateTime = time_all_done - time_ceg_done;
+    allCacheUpdateTime = time_all_done - time_start;
 
     return UpdateStatus::Normal;
 }
@@ -2173,9 +2229,9 @@ sinc::UpdateStatus CachedRule::specCase4HandlerPostPruning(
     int new_vid = usedLimitedVars() - 1;
     // entCache->updateCase2b(new_relation, predSymbol, argIdx1, predIdx2, argIdx2, new_vid);
     // uint64_t time_ent_done = currentTimeInNano();
-    obtainCegCache();
-    cegCache->updateCase2b(new_relation, predSymbol, argIdx1, predIdx2, argIdx2, new_vid);
-    uint64_t time_ceg_done = currentTimeInNano();
+    // obtainCegCache();
+    // cegCache->updateCase2b(new_relation, predSymbol, argIdx1, predIdx2, argIdx2, new_vid);
+    // uint64_t time_ceg_done = currentTimeInNano();
 
     obtainAllCache();
     if (HEAD_PRED_IDX == predIdx2) {   // One is the head and the other is not
@@ -2195,9 +2251,9 @@ sinc::UpdateStatus CachedRule::specCase4HandlerPostPruning(
         }
     }
     uint64_t time_all_done = currentTimeInNano();
-    cegCacheUpdateTime = time_ceg_done - time_start;
+    // cegCacheUpdateTime = time_ceg_done - time_start;
     // entCacheUpdateTime = time_ent_done - time_start;
-    allCacheUpdateTime = time_all_done - time_ceg_done;
+    allCacheUpdateTime = time_all_done - time_start;
 
     return UpdateStatus::Normal;
 }
@@ -2216,9 +2272,9 @@ sinc::UpdateStatus CachedRule::specCase5HandlerPostPruning(int const predIdx, in
     // obtainEntCache();
     // entCache->updateCase3(predIdx, argIdx, constant);
     // uint64_t time_ent_done = currentTimeInNano();
-    obtainCegCache();
-    cegCache->updateCase3(predIdx, argIdx, constant);
-    uint64_t time_ceg_done = currentTimeInNano();
+    // obtainCegCache();
+    // cegCache->updateCase3(predIdx, argIdx, constant);
+    // uint64_t time_ceg_done = currentTimeInNano();
 
     obtainAllCache();
     if (HEAD_PRED_IDX != predIdx) { // No need to update the E-cache if the update is in the head
@@ -2232,9 +2288,9 @@ sinc::UpdateStatus CachedRule::specCase5HandlerPostPruning(int const predIdx, in
         }
     }
     uint64_t time_all_done = currentTimeInNano();
-    cegCacheUpdateTime = time_ceg_done - time_start;
+    // cegCacheUpdateTime = time_ceg_done - time_start;
     // entCacheUpdateTime = time_ent_done - time_start;
-    allCacheUpdateTime = time_all_done - time_ceg_done;
+    allCacheUpdateTime = time_all_done - time_start;
 
     return UpdateStatus::Normal;
 }
@@ -2360,10 +2416,35 @@ RelationMinerWithCachedRule::~RelationMinerWithCachedRule() {
     }
 }
 
+size_t RelationMinerWithCachedRule::getFingerprintCacheMemCost() const {
+    size_t size = sizeof(fingerprintCaches) + sizeof(Rule::fingerprintCacheType*) * fingerprintCaches.capacity() +
+        sizeof(Rule::fingerprintCacheType) * fingerprintCaches.size();
+    for (Rule::fingerprintCacheType* const& cache: fingerprintCaches) {
+        size += sizeof(Fingerprint*) * cache->bucket_count() * std::max(1.0f, cache->max_load_factor());
+        for (const Fingerprint* const& fp: *cache) {
+            size += fp->getMemCost();
+        }
+    }
+    return size;
+}
+
+size_t RelationMinerWithCachedRule::getTabuMapMemCost() const {
+    size_t size = sizeof(Rule::tabuMapType) + 
+        (sizeof(std::pair<MultiSet<int>*, Rule::fingerprintCacheType*>) + sizeof(MultiSet<int>) + sizeof(Rule::fingerprintCacheType)) * 
+        tabuMap.bucket_count() * std::max(1.0f, tabuMap.max_load_factor());
+    for (std::pair<MultiSet<int>*, Rule::fingerprintCacheType*> const& kv: tabuMap) {
+        size += sizeof(std::pair<int, int>) * kv.first->getCntMap().bucket_count() * std::max(1.0f, kv.first->getCntMap().max_load_factor());
+        size += sizeof(Fingerprint*) * kv.second->bucket_count() * std::max(1.0f, kv.second->max_load_factor());
+    }
+    return size;
+}
+
 sinc::Rule* RelationMinerWithCachedRule::getStartRule() {
     Rule::fingerprintCacheType* cache = new Rule::fingerprintCacheType();
     fingerprintCaches.push_back(cache);
-    return new CachedRule(targetRelation, kb.getRelation(targetRelation)->getTotalCols(), *cache, tabuMap, kb, &counterexamples);
+    CachedRule* rule =  new CachedRule(targetRelation, kb.getRelation(targetRelation)->getTotalCols(), *cache, tabuMap, kb, &counterexamples);
+    monitor.cacheEntryMemCost = std::max(monitor.cacheEntryMemCost, CachedRule::addCumulatedCacheEntryMemoryCost(rule));
+    return rule;
 }
 
 void RelationMinerWithCachedRule::selectAsBeam(Rule* r) {
@@ -2400,6 +2481,7 @@ int RelationMinerWithCachedRule::checkThenAddRule(
         monitor.prunedPosCacheUpdateTime += rule->getPosCacheUpdateTime();
     }
     monitor.copyTime += rule->getCopyTime();
+    monitor.cacheEntryMemCost = std::max(monitor.cacheEntryMemCost, CachedRule::addCumulatedCacheEntryMemoryCost(rule));
 
     return RelationMiner::checkThenAddRule(updateStatus, updatedRule, originalRule, candidates);
 }
@@ -2447,6 +2529,9 @@ void SincWithCache::finalizeRelationMiner(RelationMiner* miner) {
     monitor.allCacheEntriesMax = std::max(monitor.allCacheEntriesMax, rel_miner->monitor.allCacheEntriesMax);
     monitor.totalGeneratedRules += rel_miner->monitor.totalGeneratedRules;
     monitor.copyTime += rel_miner->monitor.copyTime;
+    monitor.cacheEntryMemCost = std::max(monitor.cacheEntryMemCost, rel_miner->monitor.cacheEntryMemCost);
+    monitor.fingerprintCacheMemCost = std::max(monitor.fingerprintCacheMemCost, rel_miner->getFingerprintCacheMemCost());
+    monitor.tabuMapMemCost = std::max(monitor.tabuMapMemCost, rel_miner->getTabuMapMemCost());
     CompliedBlock::clearPool();
 
     /* Log memory usage */
@@ -2461,6 +2546,9 @@ void SincWithCache::showMonitor() {
 
     /* Calculate memory cost */
     monitor.cbMemCost = CompliedBlock::totalCbMemoryCost() / 1024;
+    monitor.cacheEntryMemCost /= 1024;
+    monitor.fingerprintCacheMemCost /= 1024;
+    monitor.tabuMapMemCost /= 1024;
 
     monitor.show(*logger);
 }
