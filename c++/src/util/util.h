@@ -67,10 +67,11 @@ namespace sinc {
         /**
          * Get the map of the numbers of elements in this set
          */
-        const maptype& getCntMap();
+        const maptype& getCntMap() const;
 
         bool operator==(const MultiSet &another) const;
         size_t hash() const;
+        size_t getMemCost() const;
 
     private:
         maptype cntMap;

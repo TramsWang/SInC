@@ -120,6 +120,9 @@ namespace sinc {
 
         /* Memory cost (KB) */
         size_t cbMemCost = 0;
+        size_t cacheEntryMemCost = 0;
+        size_t fingerprintCacheMemCost = 0;
+        size_t tabuMapMemCost = 0;
 
         void show(std::ostream& os) override;
     };
@@ -278,6 +281,15 @@ namespace sinc {
         const entriesType& getPosCache() const;
         const entriesType& getEntCache() const;
         const entriesType& getAllCache() const;
+        size_t getCacheEntryMemoryCost();
+
+        /**
+         * This method add the cache entry memory cost of `rule` into the cumulated monitor.
+         * 
+         * @return The updated amount of memory
+         */
+        static size_t addCumulatedCacheEntryMemoryCost(CachedRule* rule);
+        static size_t getCumulatedCacheEntryMemoryCost();
 
     protected:
         /** The original KB */
@@ -309,6 +321,8 @@ namespace sinc {
         uint64_t posCacheIndexingTime = 0;
         uint64_t entCacheIndexingTime = 0;
         uint64_t allCacheIndexingTime = 0;
+        size_t cacheMemoryCost = 0;
+        static size_t cumulatedCacheEntryMemoryCost;
 
         /** If this object does not maintain the E+-cache, get a copy of the cache */
         void obtainPosCache();
@@ -454,8 +468,11 @@ namespace sinc {
 
         ~RelationMinerWithCachedRule();
 
+        size_t getFingerprintCacheMemCost() const;
+        size_t getTabuMapMemCost() const;
+
     protected:
-        std::vector<Rule::fingerprintCacheType*> fingerprintCaches;
+        std::vector<Rule::fingerprintCacheType*> fingerprintCaches; // Todo: This may be moved to the basic `SInC` class
 
         /**
          * Create a rule with compact caching and tabu set.

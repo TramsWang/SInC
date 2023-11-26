@@ -170,6 +170,7 @@ namespace sinc {
 
         bool operator==(const PredicateWithClass &another) const;
         size_t hash() const;
+        size_t getMemCost() const;
     };
 }
 
@@ -257,6 +258,7 @@ namespace sinc {
         bool operator==(const Fingerprint &another) const;
         size_t hash() const;
         static void releaseEquivalenceClass(equivalenceClassType* equivalenceClass);
+        size_t getMemCost() const;
 
     protected:
         /** The equivalence classes in this fingerprint */

@@ -210,6 +210,10 @@ size_t PredicateWithClass::hash() const {
     return h;
 }
 
+size_t PredicateWithClass::getMemCost() const {
+    return sizeof(PredicateWithClass) + sizeof(equivalenceClassType*) * arity;
+}
+
 size_t std::hash<PredicateWithClass>::operator()(const PredicateWithClass& r) const {
     return r.hash();
 }
@@ -360,6 +364,19 @@ void Fingerprint::releaseEquivalenceClass(equivalenceClassType* eqc) {
         delete kv.first;
     }
     delete eqc;
+}
+
+size_t Fingerprint::getMemCost() const {
+    size_t size = sizeof(Fingerprint) + equivalenceClasses.getMemCost() +
+        sizeof(equivalenceClassType*) * equivalenceClassPtrs.capacity() + 
+        sizeof(Predicate) * rule.capacity();
+    for (std::pair<equivalenceClassType*, int> const& kv: equivalenceClasses.getCntMap()) {
+        size += kv.first->getMemCost() + sizeof(ArgIndicator) * kv.first->differentValues();
+    }
+    for (PredicateWithClass const& pc: classedStructure) {
+        size += pc.getMemCost();
+    }
+    return size;
 }
 
 bool Fingerprint::generalizationOf(const PredicateWithClass& predicate, const PredicateWithClass& specializedPredicate) {

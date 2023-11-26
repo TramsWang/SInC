@@ -104,7 +104,7 @@ int MultiSet<T>::itemCount(T* const elements, int const length) {
 }
 
 template<class T>
-const typename MultiSet<T>::maptype& MultiSet<T>::getCntMap() {
+const typename MultiSet<T>::maptype& MultiSet<T>::getCntMap() const {
     return cntMap;
 }
 
@@ -133,6 +133,11 @@ size_t MultiSet<T>::hash() const {
     }
     h = h * 31 + _h;
     return h;
+}
+
+template<class T>
+size_t MultiSet<T>::getMemCost() const {
+    return sizeof(MultiSet<T>) + sizeof(std::pair<T, int>) * cntMap.bucket_count() * std::max(1.0f, cntMap.max_load_factor());
 }
 
 template<class T>

@@ -197,15 +197,21 @@ void CachedSincPerfMonitor::show(std::ostream& os) {
     );
 
     os << "--- Memory Cost ---\n";
-    printf(os, "%10s %10s %10s\n", "#CB", "CB", "CB(%)");
+    printf(
+        os, "%10s %10s %10s %10s %10s %10s %10s %10s %10s\n",
+        "#CB", "CB", "CB(%)", "CE", "CE(%)", "FpC", "FpC(%)", "TbM", "TbM(%)"
+    );
     rusage usage;
     if (0 != getrusage(RUSAGE_SELF, &usage)) {
         std::cerr << "Failed to get `rusage`" << std::endl;
         usage.ru_maxrss = 1024 * 1024 * 1024;   // set to 1T
     }
     printf(
-        os, "%10d %10s %10.2f\n\n",
-        CompliedBlock::totalNumCbs(), formatMemorySize(cbMemCost).c_str(), ((double) cbMemCost) / usage.ru_maxrss * 100.0
+        os, "%10d %10s %10.2f %10s %10.2f %10s %10.2f %10s %10.2f\n\n",
+        CompliedBlock::totalNumCbs(), formatMemorySize(cbMemCost).c_str(), ((double) cbMemCost) / usage.ru_maxrss * 100.0,
+        formatMemorySize(cacheEntryMemCost).c_str(), ((double) cacheEntryMemCost) / usage.ru_maxrss * 100.0,
+        formatMemorySize(fingerprintCacheMemCost).c_str(), ((double) fingerprintCacheMemCost) / usage.ru_maxrss * 100.0,
+        formatMemorySize(tabuMapMemCost).c_str(), ((double) tabuMapMemCost) / usage.ru_maxrss * 100.0
     );
 
     os << "--- Statistics ---\n";
@@ -318,6 +324,7 @@ void PlvLoc::setEmpty() {
  * CachedRule
  */
 using sinc::CachedRule;
+size_t CachedRule::cumulatedCacheEntryMemoryCost = 0;
 
 CachedRule::CachedRule(
     int const headPredSymbol, int const arity, fingerprintCacheType& fingerprintCache, tabuMapType& category2TabuSetMap, SimpleKb& _kb
@@ -383,6 +390,7 @@ CachedRule::CachedRule(const CachedRule& another) : Rule(another), kb(another.kb
 {}
 
 CachedRule::~CachedRule() {
+    cumulatedCacheEntryMemoryCost -= getCacheEntryMemoryCost();
     if (maintainPosCache) {
         for (entryType* const& entry: *posCache) {
             delete entry;
@@ -653,6 +661,7 @@ std::unordered_set<sinc::Record>* CachedRule::getCounterexamples() const {
 }
 
 void CachedRule::releaseMemory() {
+    cumulatedCacheEntryMemoryCost -= getCacheEntryMemoryCost();
     if (maintainPosCache) {
         for (entryType* const& entry: *posCache) {
             delete entry;
@@ -714,6 +723,46 @@ const CachedRule::entriesType& CachedRule::getEntCache() const {
 
 const CachedRule::entriesType& CachedRule::getAllCache() const {
     return *allCache;
+}
+
+size_t CachedRule::getCacheEntryMemoryCost() {
+    if (0 != cacheMemoryCost) {
+        return cacheMemoryCost;
+    }
+    if (maintainPosCache) {
+        cacheMemoryCost += sizeof(entriesType) + sizeof(entryType*) * posCache->capacity() + sizeof(entryType) * posCache->size();
+        size_t total_capacity = 0;
+        for (entryType* entry: *posCache) {
+            total_capacity += entry->capacity();
+        }
+        cacheMemoryCost += total_capacity * sizeof(CompliedBlock*);
+    }
+    if (maintainEntCache) {
+        cacheMemoryCost += sizeof(entriesType) + sizeof(entryType*) * entCache->capacity() + sizeof(entryType) * entCache->size();
+        size_t total_capacity = 0;
+        for (entryType* entry: *entCache) {
+            total_capacity += entry->capacity();
+        }
+        cacheMemoryCost += total_capacity * sizeof(CompliedBlock*);
+    }
+    if (maintainAllCache) {
+        cacheMemoryCost += sizeof(entriesType) + sizeof(entryType*) * allCache->capacity() + sizeof(entryType) * allCache->size();
+        size_t total_capacity = 0;
+        for (entryType* entry: *allCache) {
+            total_capacity += entry->capacity();
+        }
+        cacheMemoryCost += total_capacity * sizeof(CompliedBlock*);
+    }
+    return cacheMemoryCost;
+}
+
+size_t CachedRule::addCumulatedCacheEntryMemoryCost(CachedRule* rule) {
+    cumulatedCacheEntryMemoryCost += rule->getCacheEntryMemoryCost();
+    return cumulatedCacheEntryMemoryCost;
+}
+
+size_t CachedRule::getCumulatedCacheEntryMemoryCost() {
+    return cumulatedCacheEntryMemoryCost;
 }
 
 void CachedRule::obtainPosCache() {
@@ -1392,10 +1441,35 @@ RelationMinerWithCachedRule::~RelationMinerWithCachedRule() {
     }
 }
 
+size_t RelationMinerWithCachedRule::getFingerprintCacheMemCost() const {
+    size_t size = sizeof(fingerprintCaches) + sizeof(Rule::fingerprintCacheType*) * fingerprintCaches.capacity() +
+        sizeof(Rule::fingerprintCacheType) * fingerprintCaches.size();
+    for (Rule::fingerprintCacheType* const& cache: fingerprintCaches) {
+        size += sizeof(Fingerprint*) * cache->bucket_count() * std::max(1.0f, cache->max_load_factor());
+        for (const Fingerprint* const& fp: *cache) {
+            size += fp->getMemCost();
+        }
+    }
+    return size;
+}
+
+size_t RelationMinerWithCachedRule::getTabuMapMemCost() const {
+    size_t size = sizeof(Rule::tabuMapType) + 
+        (sizeof(std::pair<MultiSet<int>*, Rule::fingerprintCacheType*>) + sizeof(MultiSet<int>) + sizeof(Rule::fingerprintCacheType)) * 
+        tabuMap.bucket_count() * std::max(1.0f, tabuMap.max_load_factor());
+    for (std::pair<MultiSet<int>*, Rule::fingerprintCacheType*> const& kv: tabuMap) {
+        size += sizeof(std::pair<int, int>) * kv.first->getCntMap().bucket_count() * std::max(1.0f, kv.first->getCntMap().max_load_factor());
+        size += sizeof(Fingerprint*) * kv.second->bucket_count() * std::max(1.0f, kv.second->max_load_factor());
+    }
+    return size;
+}
+
 sinc::Rule* RelationMinerWithCachedRule::getStartRule() {
     Rule::fingerprintCacheType* cache = new Rule::fingerprintCacheType();
     fingerprintCaches.push_back(cache);
-    return new CachedRule(targetRelation, kb.getRelation(targetRelation)->getTotalCols(), *cache, tabuMap, kb);
+    CachedRule* rule = new CachedRule(targetRelation, kb.getRelation(targetRelation)->getTotalCols(), *cache, tabuMap, kb);
+    monitor.cacheEntryMemCost = std::max(monitor.cacheEntryMemCost, CachedRule::addCumulatedCacheEntryMemoryCost(rule));
+    return rule;
 }
 
 void RelationMinerWithCachedRule::selectAsBeam(Rule* r) {
@@ -1425,6 +1499,7 @@ int RelationMinerWithCachedRule::checkThenAddRule(
         monitor.prunedPosCacheUpdateTime += rule->getPosCacheUpdateTime();
     }
     monitor.copyTime += rule->getCopyTime();
+    monitor.cacheEntryMemCost = std::max(monitor.cacheEntryMemCost, CachedRule::addCumulatedCacheEntryMemoryCost(rule));
 
     return RelationMiner::checkThenAddRule(updateStatus, updatedRule, originalRule, candidates);
 }
@@ -1467,6 +1542,9 @@ void SincWithCache::finalizeRelationMiner(RelationMiner* miner) {
     monitor.allCacheEntriesMax = std::max(monitor.allCacheEntriesMax, rel_miner->monitor.allCacheEntriesMax);
     monitor.totalGeneratedRules += rel_miner->monitor.totalGeneratedRules;
     monitor.copyTime += rel_miner->monitor.copyTime;
+    monitor.cacheEntryMemCost = std::max(monitor.cacheEntryMemCost, rel_miner->monitor.cacheEntryMemCost);
+    monitor.fingerprintCacheMemCost = std::max(monitor.fingerprintCacheMemCost, rel_miner->getFingerprintCacheMemCost());
+    monitor.tabuMapMemCost = std::max(monitor.tabuMapMemCost, rel_miner->getTabuMapMemCost());
 }
 
 void SincWithCache::showMonitor() {
@@ -1474,6 +1552,9 @@ void SincWithCache::showMonitor() {
 
     /* Calculate memory cost */
     monitor.cbMemCost = CompliedBlock::totalCbMemoryCost() / 1024;
+    monitor.cacheEntryMemCost /= 1024;
+    monitor.fingerprintCacheMemCost /= 1024;
+    monitor.tabuMapMemCost /= 1024;
 
     monitor.show(*logger);
 }
