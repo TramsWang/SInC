@@ -210,6 +210,8 @@ namespace sinc {
         bool operator==(const Rule &another) const;
         size_t hash() const;
 
+        virtual size_t memoryCost() const;
+
     protected:
         /** The cache of all used fingerprints */
         fingerprintCacheType& fingerprintCache;
@@ -292,7 +294,7 @@ namespace sinc {
         /**
          * Calculate the evaluation of the rule.
          */
-        virtual Eval calculateEval() const = 0;
+        virtual Eval calculateEval() = 0;
 
         void updateEval();
 
@@ -452,7 +454,7 @@ namespace sinc {
 
     protected:
         double recordCoverage() override;
-        Eval calculateEval() const override;
+        Eval calculateEval() override;
         UpdateStatus specCase1HandlerPrePruning(int const predIdx, int const argIdx, int const varId) override;
         UpdateStatus specCase1HandlerPostPruning(int const predIdx, int const argIdx, int const varId) override;
         UpdateStatus specCase2HandlerPrePruning(int const predSymbol, int const arity, int const argIdx, int const varId) override;

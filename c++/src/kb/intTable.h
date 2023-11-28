@@ -197,7 +197,7 @@ namespace sinc {
         /**
          * Return the memory occupation of this object
          */
-        size_t memoryCost() const;
+        virtual size_t memoryCost() const;
 
         void showRows() const;
 

@@ -112,6 +112,12 @@ namespace sinc {
         int allCacheEntriesMax = 0;
         int totalGeneratedRules = 0;
 
+        /* Memory cost (KB) */
+        size_t cacheEntryMemCost = 0;
+        size_t fingerprintCacheMemCost = 0;
+        size_t tabuMapMemCost = 0;
+        size_t maxEvalMemCost = 0;
+
         void show(std::ostream& os) override;
     };
 
@@ -311,6 +317,8 @@ namespace sinc {
 
         std::vector<VarInfo> const& getVarInfoList() const;
 
+        size_t getMemoryCost() const;
+
         static void showEntry(entryType const& entry);
 
         static void showEntries(entriesType const& entries);
@@ -489,6 +497,18 @@ namespace sinc {
         const CacheFragment& getEntCache() const;
         const std::vector<CacheFragment*>& getAllCache() const;
 
+        size_t getCacheEntryMemoryCost();
+
+        /**
+         * This method add the cache entry memory cost of `rule` into the cumulated monitor.
+         * 
+         * @return The updated amount of memory
+         */
+        static size_t addCumulatedCacheEntryMemoryCost(CachedRule* rule);
+        static size_t getCumulatedCacheEntryMemoryCost();
+
+        size_t getEvaluationMemoryCost() const;
+
     protected:
         /** The original KB */
         SimpleKb& kb;
@@ -520,6 +540,9 @@ namespace sinc {
         uint64_t posCacheIndexingTime = 0;
         uint64_t entCacheIndexingTime = 0;
         uint64_t allCacheIndexingTime = 0;
+        size_t cacheEntryMemoryCost = 0;
+        size_t evaluationMemoryCost = 0;
+        static size_t cumulatedCacheEntryMemoryCost;
 
         /** If this object does not maintain the E+-cache, get a copy of the cache */
         void obtainPosCache();
@@ -532,7 +555,7 @@ namespace sinc {
 
         double recordCoverage() override;
 
-        Eval calculateEval() const override;
+        Eval calculateEval() override;
         UpdateStatus specCase1HandlerPrePruning(int const predIdx, int const argIdx, int const varId) override;
         UpdateStatus specCase1HandlerPostPruning(int const predIdx, int const argIdx, int const varId) override;
         UpdateStatus specCase2HandlerPrePruning(int const predSymbol, int const arity, int const argIdx, int const varId) override;
@@ -627,6 +650,9 @@ namespace sinc {
         );
 
         ~RelationMinerWithCachedRule();
+
+        size_t getFingerprintCacheMemCost() const;
+        size_t getTabuMapMemCost() const;
 
     protected:
         std::vector<Rule::fingerprintCacheType*> fingerprintCaches;

@@ -4,6 +4,9 @@
 #include <algorithm>
 #include <sys/resource.h>
 
+/** This var is used for calculating the maximum memory cost during evaluation */
+static size_t _evaluation_memory_cost = 0;
+
 /**
  * CompliedBlock
  */
@@ -94,7 +97,7 @@ int CompliedBlock::getTotalCols() const {
 size_t CompliedBlock::memoryCost() const {
     size_t size = sizeof(CompliedBlock);
     if (mainTainComplianceSet) {
-        size += sizeof(int*) * totalRows;
+        size += sizeof(int*) * totalRows + sizeof(int);
     }
     if (maintainIndices) {
         size += indices->memoryCost();
@@ -133,16 +136,23 @@ void CachedSincPerfMonitor::show(std::ostream& os) {
     );
 
     os << "--- Memory Cost ---\n";
-    printf(os, "%10s %10s %10s\n", "#CB", "CB", "CB(%)");
+    printf(
+        os, "%10s %10s %10s %10s %10s %10s %10s %10s %10s %10s %10s\n",
+        "#CB", "CB", "CB(%)", "CE", "CE(%)", "FpC", "FpC(%)", "TbM", "TbM(%)", "Eval", "Eval(%)"
+    );
     rusage usage;
     if (0 != getrusage(RUSAGE_SELF, &usage)) {
         std::cerr << "Failed to get `rusage`" << std::endl;
-        usage.ru_maxrss = 0;
+        usage.ru_maxrss = 1024 * 1024 * 1024;   // set to 1T
     }
     size_t cb_mem_cost = CompliedBlock::totalCbMemoryCost() / 1024;
     printf(
-        os, "%10d %10s %10.2f\n\n",
-        CompliedBlock::totalNumCbs(), formatMemorySize(cb_mem_cost).c_str(), ((double) cb_mem_cost) / usage.ru_maxrss * 100.0
+        os, "%10d %10s %10.2f %10s %10.2f %10s %10.2f %10s %10.2f %10s %10.2f\n\n",
+        CompliedBlock::totalNumCbs(), formatMemorySize(cb_mem_cost).c_str(), ((double) cb_mem_cost) / usage.ru_maxrss * 100.0,
+        formatMemorySize(cacheEntryMemCost).c_str(), ((double) cacheEntryMemCost) / usage.ru_maxrss * 100.0,
+        formatMemorySize(fingerprintCacheMemCost).c_str(), ((double) fingerprintCacheMemCost) / usage.ru_maxrss * 100.0,
+        formatMemorySize(tabuMapMemCost).c_str(), ((double) tabuMapMemCost) / usage.ru_maxrss * 100.0,
+        formatMemorySize(maxEvalMemCost).c_str(), ((double) maxEvalMemCost) / usage.ru_maxrss * 100.0
     );
 
     os << "--- Statistics ---\n";
@@ -430,6 +440,11 @@ int CacheFragment::countCombinations(std::vector<int> const& vids) const {
             lvs.push_back(var_info);
         }
     }
+    _evaluation_memory_cost += sizeof(lvs) + sizeof(VarInfo) * lvs.capacity() + sizeof(plv_col_index_lists) + 
+        sizeof(tab_idxs_with_plvs ) + sizeof(int) * tab_idxs_with_plvs.capacity();
+    for (int i = 0; i < partAssignedRule.size(); i++) {
+        _evaluation_memory_cost += sizeof(int) * plv_col_index_lists[i].capacity();
+    }
 
     int const total_plvs = vids.size() - lvs.size();
     int total_unique_bindings = 0;
@@ -448,6 +463,9 @@ int CacheFragment::countCombinations(std::vector<int> const& vids) const {
             }
         }
         total_unique_bindings = lv_bindings.size();
+        _evaluation_memory_cost += sizeOfUnorderedSet(
+            lv_bindings.bucket_count(), lv_bindings.max_load_factor(), sizeof(Record), sizeof(lv_bindings)
+        ) + (sizeof(int) * lvs.size() + sizeof(int)) * total_unique_bindings;
         for (Record const& r: lv_bindings) {
             delete[] r.getArgs();
         }
@@ -455,6 +473,8 @@ int CacheFragment::countCombinations(std::vector<int> const& vids) const {
         std::unordered_map<Record, std::unordered_set<Record>*> lv_bindings_2_plv_bindings;
         lv_bindings_2_plv_bindings.reserve(entries->size());
         std::unordered_set<Record> plv_bindings_within_tab_sets[tab_idxs_with_plvs.size()];
+        _evaluation_memory_cost += sizeof(plv_bindings_within_tab_sets);
+        size_t _max_mem_cost_plv_bindings_within_tab_sets = 0;
         for (entryType* const& cache_entry: *entries) {
             /* Find LV binding first */
             int* lv_binding = new int[lvs.size()];
@@ -493,14 +513,19 @@ int CacheFragment::countCombinations(std::vector<int> const& vids) const {
                 }
             }
 
+            size_t _current_mem_cost_plv_bindings_within_tab_sets = 0;
             if (1 == tab_idxs_with_plvs.size()) {
                 /* No need to perform Cartesian product */
-                for (Record const& r: plv_bindings_within_tab_sets[0]) {
+                std::unordered_set<Record>& set = plv_bindings_within_tab_sets[0];
+                _current_mem_cost_plv_bindings_within_tab_sets += sizeOfUnorderedSet(
+                    set.bucket_count(), set.max_load_factor(), sizeof(Record), sizeof(set)
+                ) + (sizeof(int) * set.begin()->getArity() + sizeof(int)) * set.size();
+                for (Record const& r: set) {
                     if (!complete_plv_bindings->insert(r).second) {
                         delete[] r.getArgs();
                     }
                 }
-                plv_bindings_within_tab_sets[0].clear();
+                set.clear();
             } else {
                 /* Cartesian product required */
                 int arg_template[total_plvs]{};
@@ -510,17 +535,32 @@ int CacheFragment::countCombinations(std::vector<int> const& vids) const {
 
                 /* Release Cartesian product resources */
                 for (int i = 0; i < tab_idxs_with_plvs.size(); i++) {
-                    for (Record const& r: plv_bindings_within_tab_sets[i]) {
+                    std::unordered_set<Record>& set = plv_bindings_within_tab_sets[i];
+                    _current_mem_cost_plv_bindings_within_tab_sets += sizeOfUnorderedSet(
+                        set.bucket_count(), set.max_load_factor(), sizeof(Record), sizeof(set)
+                    ) + (sizeof(int) * set.begin()->getArity() + sizeof(int)) * set.size();
+                    for (Record const& r: set) {
                         delete[] r.getArgs();
                     }
-                    plv_bindings_within_tab_sets[i].clear();
+                    set.clear();
                 }
             }
+            _max_mem_cost_plv_bindings_within_tab_sets = std::max(
+                _max_mem_cost_plv_bindings_within_tab_sets, _current_mem_cost_plv_bindings_within_tab_sets
+            );
         }
+        _evaluation_memory_cost += _max_mem_cost_plv_bindings_within_tab_sets + sizeOfUnorderedMap(
+            lv_bindings_2_plv_bindings.bucket_count(), lv_bindings_2_plv_bindings.max_load_factor(),
+            sizeof(std::pair<Record, std::unordered_set<Record>*>), sizeof(lv_bindings_2_plv_bindings)
+        );
         for (std::pair<const Record, std::unordered_set<Record>*> const& kv: lv_bindings_2_plv_bindings) {
-            total_unique_bindings += kv.second->size();
+            std::unordered_set<Record>& set = *(kv.second);
+            _evaluation_memory_cost += sizeOfUnorderedSet(
+                set.bucket_count(), set.max_load_factor(), sizeof(Record), sizeof(set)
+            ) + (sizeof(int) * set.begin()->getArity() + sizeof(int)) * set.size();
+            total_unique_bindings += set.size();
             delete[] kv.first.getArgs();
-            for (Record const& r: *(kv.second)) {
+            for (Record const& r: set) {
                 delete[] r.getArgs();
             }
             delete kv.second;
@@ -659,6 +699,17 @@ std::vector<sinc::Predicate> const& CacheFragment::getPartAssignedRule() const {
 
 std::vector<VarInfo> const& CacheFragment::getVarInfoList() const {
     return varInfoList;
+}
+
+size_t CacheFragment::getMemoryCost() const {
+    size_t size = sizeof(CacheFragment) + sizeof(Predicate) * partAssignedRule.capacity() + sizeof(VarInfo) * varInfoList.capacity();
+    size += sizeof(entriesType) + sizeof(entryType*) * entries->capacity() + sizeof(entryType) * entries->size();
+    size_t total_capacity = 0;
+    for (entryType* entry: *entries) {
+        total_capacity += entry->capacity();
+    }
+    size += total_capacity * sizeof(CompliedBlock*);
+    return size;
 }
 
 void CacheFragment::showEntry(entryType const& entry) {
@@ -1028,6 +1079,7 @@ bool TabInfo::operator==(const TabInfo &another) const {
  * CachedRule
  */
 using sinc::CachedRule;
+size_t CachedRule::cumulatedCacheEntryMemoryCost = 0;
 
 CachedRule::CachedRule(
     int const headPredSymbol, int const arity, fingerprintCacheType& fingerprintCache, tabuMapType& category2TabuSetMap, SimpleKb& _kb
@@ -1081,6 +1133,7 @@ CachedRule::CachedRule(const CachedRule& another) : Rule(another), kb(another.kb
 {}
 
 CachedRule::~CachedRule() {
+    cumulatedCacheEntryMemoryCost -= getCacheEntryMemoryCost();
     if (maintainPosCache) {
         delete posCache;
     }
@@ -1285,6 +1338,7 @@ std::unordered_set<sinc::Record>* CachedRule::getCounterexamples() const {
 }
 
 void CachedRule::releaseMemory() {
+    cumulatedCacheEntryMemoryCost -= getCacheEntryMemoryCost();
     if (maintainPosCache) {
         delete posCache;
         maintainPosCache = false;
@@ -1342,6 +1396,37 @@ const std::vector<CacheFragment*>& CachedRule::getAllCache() const {
     return *allCache;
 }
 
+size_t CachedRule::getCacheEntryMemoryCost() {
+    if (0 != cacheEntryMemoryCost) {
+        return cacheEntryMemoryCost;
+    }
+    if (maintainPosCache) {
+        cacheEntryMemoryCost += posCache->getMemoryCost();
+    }
+    if (maintainEntCache) {
+        cacheEntryMemoryCost += entCache->getMemoryCost();
+    }
+    if (maintainAllCache) {
+        for (CacheFragment* const& cf: *allCache) {
+            cacheEntryMemoryCost += cf->getMemoryCost();
+        }
+    }
+    return cacheEntryMemoryCost;
+}
+
+size_t CachedRule::addCumulatedCacheEntryMemoryCost(CachedRule* rule) {
+    cumulatedCacheEntryMemoryCost += rule->getCacheEntryMemoryCost();
+    return cumulatedCacheEntryMemoryCost;
+}
+
+size_t CachedRule::getCumulatedCacheEntryMemoryCost() {
+    return cumulatedCacheEntryMemoryCost;
+}
+
+size_t CachedRule::getEvaluationMemoryCost() const {
+    return evaluationMemoryCost;
+}
+
 void CachedRule::obtainPosCache() {
     if (!maintainPosCache) {
         posCache = new CacheFragment(*posCache);
@@ -1372,7 +1457,10 @@ double CachedRule::recordCoverage() {
     return ((double) posCache->countTableSize(HEAD_PRED_IDX)) / kb.getRelation(getHead().getPredSymbol())->getTotalRows();
 }
 
-sinc::Eval CachedRule::calculateEval() const {
+sinc::Eval CachedRule::calculateEval() {
+    _evaluation_memory_cost = 0;
+    evaluationMemoryCost = 0;
+
     /* Find all variables in the head */
     std::unordered_set<int> head_only_lvs;  // For the head only LVs
     int head_uv_cnt = 0;
@@ -1385,6 +1473,9 @@ sinc::Eval CachedRule::calculateEval() const {
             head_only_lvs.insert(ARG_DECODE(argument));    // The GVs will be removed later
         }
     }
+    _evaluation_memory_cost += sizeOfUnorderedSet(
+        head_only_lvs.bucket_count(), head_only_lvs.max_load_factor(), sizeof(int), sizeof(head_only_lvs)
+    );
 
     /* Locate and remove GVs */
     std::vector<int> gvs_in_all_cache_fragments[allCache->size()];
@@ -1404,18 +1495,24 @@ sinc::Eval CachedRule::calculateEval() const {
             itr++;
         }
     }
+    _evaluation_memory_cost += sizeof(gvs_in_all_cache_fragments);
 
     /* Count the number of entailments */
     double all_ent = pow(kb.totalConstants(), head_uv_cnt + head_only_lvs.size());
     for (int i = 0; i < allCache->size(); i++) {
         std::vector<int> const& vids = gvs_in_all_cache_fragments[i];
+        _evaluation_memory_cost += sizeof(int) * vids.capacity();
+        // size_t _cost = _evaluation_memory_cost;
         if (!vids.empty()) {
             CacheFragment const& fragment = *(*allCache)[i];
             all_ent *= fragment.countCombinations(vids);
+            evaluationMemoryCost = std::max(evaluationMemoryCost, _evaluation_memory_cost);
+            // _evaluation_memory_cost = _cost;
         }
     }
     int new_pos_ent = posCache->countTableSize(HEAD_PRED_IDX);
     int already_ent = entCache->countTableSize(HEAD_PRED_IDX);
+    evaluationMemoryCost = std::max(evaluationMemoryCost, _evaluation_memory_cost);
 
     /* Update evaluation score */
     /* Those already proved should be excluded from the entire entailment set. Otherwise, they are counted as negative ones */
@@ -1789,10 +1886,37 @@ RelationMinerWithCachedRule::~RelationMinerWithCachedRule() {
     }
 }
 
+size_t RelationMinerWithCachedRule::getFingerprintCacheMemCost() const {
+    size_t size = sizeof(fingerprintCaches) + sizeof(Rule::fingerprintCacheType*) * fingerprintCaches.capacity();
+    for (Rule::fingerprintCacheType* const& cache: fingerprintCaches) {
+        size += sizeOfUnorderedSet(
+            cache->bucket_count(), cache->max_load_factor(), sizeof(Fingerprint*), sizeof(Rule::fingerprintCacheType)
+        );
+        for (const Fingerprint* const& fp: *cache) {
+            size += fp->getMemCost();
+        }
+    }
+    return size;
+}
+
+size_t RelationMinerWithCachedRule::getTabuMapMemCost() const {
+    size_t size = sizeof(Rule::tabuMapType) + sizeOfUnorderedMap(
+        tabuMap.bucket_count(), tabuMap.max_load_factor(), sizeof(std::pair<MultiSet<int>*, Rule::fingerprintCacheType*>), sizeof(tabuMap)
+    );
+    for (std::pair<MultiSet<int>*, Rule::fingerprintCacheType*> const& kv: tabuMap) {
+        size += kv.first->getMemoryCost();
+        Rule::fingerprintCacheType const& cache = *(kv.second);
+        size += sizeOfUnorderedSet(cache.bucket_count(), cache.max_load_factor(), sizeof(Fingerprint*), sizeof(cache));
+    }
+    return size;
+}
+
 sinc::Rule* RelationMinerWithCachedRule::getStartRule() {
     Rule::fingerprintCacheType* cache = new Rule::fingerprintCacheType();
     fingerprintCaches.push_back(cache);
-    return new CachedRule(targetRelation, kb.getRelation(targetRelation)->getTotalCols(), *cache, tabuMap, kb);
+    CachedRule* rule =  new CachedRule(targetRelation, kb.getRelation(targetRelation)->getTotalCols(), *cache, tabuMap, kb);
+    monitor.cacheEntryMemCost = std::max(monitor.cacheEntryMemCost, CachedRule::addCumulatedCacheEntryMemoryCost(rule));
+    return rule;
 }
 
 void RelationMinerWithCachedRule::selectAsBeam(Rule* r) {
@@ -1829,6 +1953,8 @@ int RelationMinerWithCachedRule::checkThenAddRule(
         monitor.prunedPosCacheUpdateTime += rule->getPosCacheUpdateTime();
     }
     monitor.copyTime += rule->getCopyTime();
+    monitor.cacheEntryMemCost = std::max(monitor.cacheEntryMemCost, CachedRule::addCumulatedCacheEntryMemoryCost(rule));
+    monitor.maxEvalMemCost = std::max(monitor.maxEvalMemCost, rule->getEvaluationMemoryCost());
 
     return RelationMiner::checkThenAddRule(updateStatus, updatedRule, originalRule, candidates);
 }
@@ -1871,10 +1997,21 @@ void SincWithCache::finalizeRelationMiner(RelationMiner* miner) {
     monitor.allCacheEntriesMax = std::max(monitor.allCacheEntriesMax, rel_miner->monitor.allCacheEntriesMax);
     monitor.totalGeneratedRules += rel_miner->monitor.totalGeneratedRules;
     monitor.copyTime += rel_miner->monitor.copyTime;
+    monitor.cacheEntryMemCost = std::max(monitor.cacheEntryMemCost, rel_miner->monitor.cacheEntryMemCost);
+    monitor.fingerprintCacheMemCost = std::max(monitor.fingerprintCacheMemCost, rel_miner->getFingerprintCacheMemCost());
+    monitor.tabuMapMemCost = std::max(monitor.tabuMapMemCost, rel_miner->getTabuMapMemCost());
+    monitor.maxEvalMemCost = std::max(monitor.maxEvalMemCost, rel_miner->monitor.maxEvalMemCost);
 }
 
 void SincWithCache::showMonitor() {
     SInC::showMonitor();
+
+    /* Calculate memory cost */
+    monitor.cacheEntryMemCost /= 1024;
+    monitor.fingerprintCacheMemCost /= 1024;
+    monitor.tabuMapMemCost /= 1024;
+    monitor.maxEvalMemCost /= 1024;
+
     monitor.show(*logger);
 }
 

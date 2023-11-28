@@ -341,15 +341,16 @@ void IntTable::releaseSlicesArray(slicesType** slicesArray, int const length) {
 size_t IntTable::memoryCost() const {
     size_t size = sizeof(IntTable);
     size += (
-        sizeof(int**) + sizeof(int*) * totalRows +  // `sortedRowsByCols`
+        sizeof(int**) + sizeof(int*) * totalRows + sizeof(int) + // `sortedRowsByCols`
         sizeof(int) // `valuesByColsLength
     ) * totalCols; 
     for (int i = 0; i < totalCols; i++) {
         int length = valuesByColsLengths[i];
         size += (
-            sizeof(int*) + sizeof(int) * length // `valuesByCols`
+            sizeof(int*) + sizeof(int) * length + sizeof(int) // `valuesByCols`
         ) * 2 + sizeof(int);    // `startOffsetsByCOls``
     }
+    size += 4 * sizeof(int);    // memory allocation overhead of the four arrays in `IntTable`
     return size;
 }
 

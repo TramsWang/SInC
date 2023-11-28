@@ -64,12 +64,12 @@ int MultiSet<T>::remove(const T& element) {
 }
 
 template<class T>
-int MultiSet<T>::getSize() {
+int MultiSet<T>::getSize() const {
     return size;
 }
 
 template<class T>
-int MultiSet<T>::differentValues() {
+int MultiSet<T>::differentValues() const {
     return cntMap.size();
 }
 
@@ -88,23 +88,23 @@ bool MultiSet<T>::subsetOf(const MultiSet<T>& another) {
 }
 
 template<class T>
-int MultiSet<T>::itemCount(const T& element) {
-    typename std::unordered_map<T, int>::iterator itr = cntMap.find(element);
+int MultiSet<T>::itemCount(const T& element) const {
+    typename std::unordered_map<T, int>::const_iterator itr = cntMap.find(element);
     return (itr != cntMap.end()) ? itr->second : 0;
 }
 
 template<class T>
-int MultiSet<T>::itemCount(T* const elements, int const length) {
+int MultiSet<T>::itemCount(T* const elements, int const length) const {
     int total = 0;
     for (int i = 0; i < length; i++) {
-        typename std::unordered_map<T, int>::iterator itr = cntMap.find(elements[i]);
+        typename std::unordered_map<T, int>::const_iterator itr = cntMap.find(elements[i]);
         total += (itr != cntMap.end()) ? itr->second : 0;
     }
     return total;
 }
 
 template<class T>
-const typename MultiSet<T>::maptype& MultiSet<T>::getCntMap() {
+const typename MultiSet<T>::maptype& MultiSet<T>::getCntMap() const {
     return cntMap;
 }
 
@@ -133,6 +133,13 @@ size_t MultiSet<T>::hash() const {
     }
     h = h * 31 + _h;
     return h;
+}
+
+template<class T>
+size_t MultiSet<T>::getMemoryCost() const {
+    return sizeof(MultiSet<T>) + sizeOfUnorderedMap(
+        cntMap.bucket_count(), cntMap.max_load_factor(), sizeof(std::pair<T, int>), 0   // `sizeof(cntMap)` has already been included in `sizeof(MultiSet<T>)`
+    );
 }
 
 template<class T>
@@ -394,4 +401,21 @@ std::string PerformanceMonitor::formatMemorySize(double sizeKb) {
     }
     sprintf(buf, "%.2fG", sizeKb);
     return std::string(buf);
+}
+
+/**
+ * Map and set size calculation
+ */
+size_t sinc::sizeOfUnorderedMap(size_t bucketCount, float maxLoadFactor, size_t sizeOfValueType, size_t sizeOfObject) {
+    return sizeOfObject + (bucketCount * std::max(1.0f, maxLoadFactor) * (sizeOfValueType + sizeof(void*)) + // data list
+        bucketCount * (sizeof(void*) + sizeof(size_t))) // bucket index
+    // * 1.5 // estimated allocation overheads
+    ;
+}
+
+size_t sinc::sizeOfUnorderedSet(size_t bucketCount, float maxLoadFactor, size_t sizeOfValueType, size_t sizeOfObject) {
+    return sizeOfObject + (bucketCount * std::max(1.0f, maxLoadFactor) * (sizeOfValueType + sizeof(void*)) + // data list
+        bucketCount * (sizeof(void*) + sizeof(size_t))) // bucket index
+    // * 1.5 // estimated allocation overheads
+    ;
 }

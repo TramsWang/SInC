@@ -4,6 +4,7 @@
 #include <stdarg.h>
 #include "../util/util.h"
 #include <sys/resource.h>
+#include <csignal>
 
 /**
  * SincConfig
@@ -51,10 +52,17 @@ void BaseMonitor::show(std::ostream& os) {
     rusage usage;
     if (0 != getrusage(RUSAGE_SELF, &usage)) {
         std::cerr << "Failed to get `rusage`" << std::endl;
-    } else {
-        os << "--- Basic Memory Cost ---\n";
-        os << "Peak RAM: " << formatMemorySize(usage.ru_maxrss) << '(' << usage.ru_maxrss << "K)\n\n";
+        usage.ru_maxrss = 1024 * 1024 * 1024;   // set to 1T
     }
+    os << "--- Basic Memory Cost ---\n";
+    printf(os, "%10s %10s %10s %10s %10s %10s %10s\n", "KB", "KB(%)", "Dep.G", "Dep.G(%)", "CKB", "CKB(%)", "Peak");
+    printf(
+        os, "%10s %10.2f %10s %10.2f %10s %10.2f %10s\n\n",
+        formatMemorySize(kbMemCost).c_str(), ((double) kbMemCost) / usage.ru_maxrss * 100.0,
+        formatMemorySize(dependencyGraphMemCost).c_str(), ((double) dependencyGraphMemCost) / usage.ru_maxrss * 100.0,
+        formatMemorySize(ckbMemCost).c_str(), ((double) ckbMemCost) / usage.ru_maxrss * 100.0,
+        formatMemorySize(usage.ru_maxrss).c_str()
+    );
 
     os << "--- Statistics ---\n";
     printf(
@@ -102,6 +110,7 @@ void RelationMiner::run() {
     Rule* rule;
     int covered_facts = 0;
     int const total_facts = kb.getRelation(targetRelation)->getTotalRows();
+    BaseMonitor monitor; // use its formatter method
     while (shouldContinue && (covered_facts < total_facts) && (nullptr != (rule = findRule()))) {
         hypothesis.push_back(rule);
         covered_facts += updateKbAndDependencyGraph(*rule);
@@ -111,6 +120,11 @@ void RelationMiner::run() {
                 rule->toDumpString(kb.getRelationNames()).c_str()
         );
         logger.flush();
+
+        /* Log memory usage */
+        rusage usage;
+        getrusage(RUSAGE_SELF, &usage);
+        logger << "Max Mem:" << monitor.formatMemorySize(usage.ru_maxrss) << std::endl;
     }
     logger << "Done" << std::endl;
 }
@@ -142,10 +156,8 @@ Rule* RelationMiner::findRule() {
         for (int i = 0; i < beamwidth && nullptr != beams[i]; i++) {
             Rule* const r = beams[i];
             selectAsBeam(r);
-            #if DEBUG_LEVEL >= DEBUG_VERBOSE
-                logFormatter.printf("Extend: %s\n", r.toString(kb.getRelationNames()));
-                logger.flush();
-            #endif
+            logFormatter.printf("Extend: %s\n", r->toString(kb.getRelationNames()).c_str());
+            logger.flush();
 
             /* Find the specializations and generalizations of rule 'r' */
             int specializations_cnt = findSpecializations(*r, top_candidates);
@@ -610,6 +622,25 @@ void SInC::dumpCompressedKb() {
 }
 
 void SInC::showMonitor() {
+    /* Calculate memory cost */
+    monitor.kbMemCost = kb->memoryCost() / 1024;
+    monitor.ckbMemCost = compressedKb->memoryCost() / 1024;
+    monitor.dependencyGraphMemCost += sizeOfUnorderedMap(
+        predicate2NodeMap.bucket_count(), predicate2NodeMap.max_load_factor(), sizeof(std::pair<Predicate*, RelationMiner::nodeType*>),
+        sizeof(predicate2NodeMap)
+    ) + (sizeof(Predicate) + sizeof(RelationMiner::nodeType)) * predicate2NodeMap.size();   // `predicate2NodeMap`
+    monitor.dependencyGraphMemCost += sizeOfUnorderedMap(
+        dependencyGraph.bucket_count(), dependencyGraph.max_load_factor(),
+        sizeof(std::pair<RelationMiner::nodeType*, std::unordered_set<RelationMiner::nodeType*>*>), sizeof(dependencyGraph)
+    );
+    for (std::pair<RelationMiner::nodeType*, std::unordered_set<RelationMiner::nodeType*>*> const& kv: dependencyGraph) {
+        std::unordered_set<RelationMiner::nodeType*> const& set = *(kv.second);
+        monitor.dependencyGraphMemCost += sizeOfUnorderedSet(
+            set.bucket_count(), set.max_load_factor(), sizeof(RelationMiner::nodeType*), sizeof(set)
+        );
+    }
+    monitor.dependencyGraphMemCost /= 1024;
+
     monitor.show(*logger);
 }
 
@@ -636,7 +667,15 @@ void SInC::showHypothesis() const {
     (*logger) << '\n';
 }
 
+void SInC::sigIntHandler(int signum) {
+    std::cout << "\n<<< Interrupted >>>" << std::endl;
+    throw InterruptionSignal("Interrupted by signal");
+}
+
 void SInC::compress() {
+    /* Register signal handler */
+    signal(SIGINT, SInC::sigIntHandler);
+
     showConfig();
 
     /* Load KB */
@@ -674,8 +713,8 @@ void SInC::compress() {
             relation_miner = nullptr;
         }
     } catch (std::exception const& e) {
-        std::cerr << e.what() << std::endl;
         logError("Relation Miner failed. Interrupt");
+        (*logger) << e.what() << std::endl;
         if (nullptr != relation_miner) {
             relation_miner->discontinue();
         }
