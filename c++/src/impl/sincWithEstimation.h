@@ -411,7 +411,7 @@ namespace sinc {
         void obtainEntCache();
         void obtainAllCache();
         double recordCoverage() override;
-        Eval calculateEval() const override;
+        Eval calculateEval() override;
         UpdateStatus specCase1HandlerPrePruning(int const predIdx, int const argIdx, int const varId) override;
         UpdateStatus specCase1HandlerPostPruning(int const predIdx, int const argIdx, int const varId) override;
         UpdateStatus specCase2HandlerPrePruning(int const predSymbol, int const arity, int const argIdx, int const varId) override;

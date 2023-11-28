@@ -337,4 +337,24 @@ namespace sinc {
          */
         std::ostream& printf(std::ostream& os, const char* format, ...);
     };
+
+    /**
+     * Calculate the sizeof an `std::unordered_map`
+     * 
+     * @param bucketCount The return value of `bucket_count()` of the map
+     * @param maxLoadFactor The return value of `max_load_factor()` of the map
+     * @param sizeOfValueType The size of the `valueType` of the map
+     * @param sizeOfObject The shallow size of the map object, i.e., `sizeof(map)`
+     */
+    size_t sizeOfUnorderedMap(size_t bucketCount, float maxLoadFactor, size_t sizeOfValueType, size_t sizeOfObject);
+
+    /**
+     * Calculate the sizeof an `std::unordered_set`
+     * 
+     * @param bucketCount The return value of `bucket_count()` of the set
+     * @param maxLoadFactor The return value of `max_load_factor()` of the set
+     * @param sizeOfValueType The size of the `valueType` of the set
+     * @param sizeOfObject The shallow size of the set object, i.e., `sizeof(set)`
+     */
+    size_t sizeOfUnorderedSet(size_t bucketCount, float maxLoadFactor, size_t sizeOfValueType, size_t sizeOfObject);
 }

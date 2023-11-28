@@ -193,7 +193,7 @@ namespace sinc {
          *
          * @throws KbException When KB operation fails
          */
-        void run();
+        virtual void run();
 
         /**
          * Interrupt mining and discontinue the iteration in `run()`

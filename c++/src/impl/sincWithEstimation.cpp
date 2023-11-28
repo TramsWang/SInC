@@ -1681,7 +1681,7 @@ double EstRule::recordCoverage() {
     return ((double) posCache->countTableSize(HEAD_PRED_IDX)) / kb.getRelation(getHead().getPredSymbol())->getTotalRows();
 }
 
-sinc::Eval EstRule::calculateEval() const {
+sinc::Eval EstRule::calculateEval() {
     /* Find all variables in the head */
     std::unordered_set<int> head_only_lvs;  // For the head only LVs
     int head_uv_cnt = 0;

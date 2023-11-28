@@ -625,13 +625,19 @@ void SInC::showMonitor() {
     /* Calculate memory cost */
     monitor.kbMemCost = kb->memoryCost() / 1024;
     monitor.ckbMemCost = compressedKb->memoryCost() / 1024;
-    monitor.dependencyGraphMemCost += (
-        sizeof(std::pair<Predicate*, RelationMiner::nodeType*>) + sizeof(Predicate) + sizeof(RelationMiner::nodeType)
-    ) * predicate2NodeMap.size();
-    monitor.dependencyGraphMemCost += sizeof(std::pair<RelationMiner::nodeType*, std::unordered_set<RelationMiner::nodeType*>*>) * dependencyGraph.size();
+    monitor.dependencyGraphMemCost += sizeOfUnorderedMap(
+        predicate2NodeMap.bucket_count(), predicate2NodeMap.max_load_factor(), sizeof(std::pair<Predicate*, RelationMiner::nodeType*>),
+        sizeof(predicate2NodeMap)
+    ) + (sizeof(Predicate) + sizeof(RelationMiner::nodeType)) * predicate2NodeMap.size();   // `predicate2NodeMap`
+    monitor.dependencyGraphMemCost += sizeOfUnorderedMap(
+        dependencyGraph.bucket_count(), dependencyGraph.max_load_factor(),
+        sizeof(std::pair<RelationMiner::nodeType*, std::unordered_set<RelationMiner::nodeType*>*>), sizeof(dependencyGraph)
+    );
     for (std::pair<RelationMiner::nodeType*, std::unordered_set<RelationMiner::nodeType*>*> const& kv: dependencyGraph) {
-        monitor.dependencyGraphMemCost += sizeof(std::unordered_set<RelationMiner::nodeType*>) + 
-        sizeof(RelationMiner::nodeType*) * kv.second->size();
+        std::unordered_set<RelationMiner::nodeType*> const& set = *(kv.second);
+        monitor.dependencyGraphMemCost += sizeOfUnorderedSet(
+            set.bucket_count(), set.max_load_factor(), sizeof(RelationMiner::nodeType*), sizeof(set)
+        );
     }
     monitor.dependencyGraphMemCost /= 1024;
 

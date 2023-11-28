@@ -137,7 +137,9 @@ size_t MultiSet<T>::hash() const {
 
 template<class T>
 size_t MultiSet<T>::getMemoryCost() const {
-    return sizeof(MultiSet<T>) + sizeof(std::pair<T, int>) * cntMap.bucket_count() * std::max(1.0f, cntMap.max_load_factor());
+    return sizeof(MultiSet<T>) + sizeOfUnorderedMap(
+        cntMap.bucket_count(), cntMap.max_load_factor(), sizeof(std::pair<T, int>), 0   // `sizeof(cntMap)` has already been included in `sizeof(MultiSet<T>)`
+    );
 }
 
 template<class T>
@@ -399,4 +401,21 @@ std::string PerformanceMonitor::formatMemorySize(double sizeKb) {
     }
     sprintf(buf, "%.2fG", sizeKb);
     return std::string(buf);
+}
+
+/**
+ * Map and set size calculation
+ */
+size_t sinc::sizeOfUnorderedMap(size_t bucketCount, float maxLoadFactor, size_t sizeOfValueType, size_t sizeOfObject) {
+    return sizeOfObject + (bucketCount * std::max(1.0f, maxLoadFactor) * (sizeOfValueType + sizeof(void*)) + // data list
+        bucketCount * (sizeof(void*) + sizeof(size_t))) // bucket index
+    // * 1.5 // estimated allocation overheads
+    ;
+}
+
+size_t sinc::sizeOfUnorderedSet(size_t bucketCount, float maxLoadFactor, size_t sizeOfValueType, size_t sizeOfObject) {
+    return sizeOfObject + (bucketCount * std::max(1.0f, maxLoadFactor) * (sizeOfValueType + sizeof(void*)) + // data list
+        bucketCount * (sizeof(void*) + sizeof(size_t))) // bucket index
+    // * 1.5 // estimated allocation overheads
+    ;
 }
