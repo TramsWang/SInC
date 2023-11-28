@@ -46,7 +46,7 @@ size_t CompliedBlock::totalNumCbs() {
 }
 
 size_t CompliedBlock::totalCbMemoryCost() {
-    size_t size = sizeof(pool);
+    size_t size = sizeof(pool) + sizeof(CompliedBlock*) * pool.capacity();
     for (CompliedBlock* const& cb: pool) {
         size += cb->memoryCost();
     }
