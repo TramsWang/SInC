@@ -377,6 +377,8 @@ namespace sinc {
 
         /* Memory cost (KB) */
         size_t cbMemCost = 0;
+        size_t maxCbPoolSize = 0;
+        size_t maxCbPoolIdxSize = 0;
         size_t cacheEntryMemCost = 0;
         size_t fingerprintCacheMemCost = 0;
         size_t tabuMapMemCost = 0;

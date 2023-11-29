@@ -580,7 +580,7 @@ void CachedSincPerfMonitor::show(std::ostream& os) {
     }
     printf(
         os, "%10d %10s %10.2f %10s %10.2f %10s %10.2f %10s %10.2f %10s %10.2f\n\n",
-        CompliedBlock::totalNumCbs(), formatMemorySize(cbMemCost).c_str(), ((double) cbMemCost) / usage.ru_maxrss * 100.0,
+        maxCbPoolSize, formatMemorySize(cbMemCost).c_str(), ((double) cbMemCost) / usage.ru_maxrss * 100.0,
         formatMemorySize(cacheEntryMemCost).c_str(), ((double) cacheEntryMemCost) / usage.ru_maxrss * 100.0,
         formatMemorySize(fingerprintCacheMemCost).c_str(), ((double) fingerprintCacheMemCost) / usage.ru_maxrss * 100.0,
         formatMemorySize(tabuMapMemCost).c_str(), ((double) tabuMapMemCost) / usage.ru_maxrss * 100.0,
@@ -596,7 +596,7 @@ void CachedSincPerfMonitor::show(std::ostream& os) {
     size_t total_hit = CompliedBlock::getNumCreationHit() + CompliedBlock::getNumGetSliceHit() + CompliedBlock::getNumSplitSlicesHit() + CompliedBlock::getNumMatchSlices1Hit() + CompliedBlock::getNumMatchSlices2Hit();
     printf(
         os, "  %10d %10d %10d %10.2f %10d %10d %10.2f %10d %10d %10.2f %10d %10d %10.2f %10d %10d %10.2f %10d %10d %10.2f\n\n",
-        CompliedBlock::totalNumCbs(),
+        maxCbPoolSize,
         CompliedBlock::getNumCreation(), CompliedBlock::getNumCreationHit(), ((double)CompliedBlock::getNumCreationHit() / CompliedBlock::getNumCreation()) * 100.0,
         CompliedBlock::getNumGetSlice(), CompliedBlock::getNumGetSliceHit(), ((double)CompliedBlock::getNumGetSliceHit() / CompliedBlock::getNumGetSlice()) * 100.0,
         CompliedBlock::getNumSplitSlices(), CompliedBlock::getNumSplitSlicesHit(), ((double)CompliedBlock::getNumSplitSlicesHit() / CompliedBlock::getNumSplitSlices()) * 100.0,
@@ -609,7 +609,6 @@ void CachedSincPerfMonitor::show(std::ostream& os) {
         os, "# %10s %10s %10s %10s %10s %10s\n",
         "Crt.Idx", "Get.Idx", "Spl.Idx", "Mt1.Idx", "Mt2.Idx", "Total.Idx"
     );
-    size_t total_idx = CompliedBlock::getNumCreationIndices() + CompliedBlock::getNumGetSliceIndices() + CompliedBlock::getNumSplitSlicesIndices() + CompliedBlock::getNumMatchSlices1Indices() + CompliedBlock::getNumMatchSlices2Indices();
     printf(
         os, "  %10d %10d %10d %10d %10d %10d\n\n",
         CompliedBlock::getNumCreationIndices(),
@@ -617,7 +616,7 @@ void CachedSincPerfMonitor::show(std::ostream& os) {
         CompliedBlock::getNumSplitSlicesIndices(),
         CompliedBlock::getNumMatchSlices1Indices(),
         CompliedBlock::getNumMatchSlices2Indices(),
-        total_idx
+        maxCbPoolIdxSize
     );
 
     os << "--- Cache Statistics ---\n";
@@ -2599,6 +2598,9 @@ void SincWithCache::finalizeRelationMiner(RelationMiner* miner) {
     monitor.fingerprintCacheMemCost = std::max(monitor.fingerprintCacheMemCost, rel_miner->getFingerprintCacheMemCost());
     monitor.tabuMapMemCost = std::max(monitor.tabuMapMemCost, rel_miner->getTabuMapMemCost());
     monitor.maxEvalMemCost = std::max(monitor.maxEvalMemCost, rel_miner->monitor.maxEvalMemCost);
+    monitor.maxCbPoolSize = std::max(monitor.maxCbPoolSize, CompliedBlock::totalNumCbs());
+    size_t total_idx = CompliedBlock::getNumCreationIndices() + CompliedBlock::getNumGetSliceIndices() + CompliedBlock::getNumSplitSlicesIndices() + CompliedBlock::getNumMatchSlices1Indices() + CompliedBlock::getNumMatchSlices2Indices();
+    monitor.maxCbPoolIdxSize = std::max(monitor.maxCbPoolIdxSize, total_idx);
     CompliedBlock::clearPool();
 
     /* Log memory usage */
