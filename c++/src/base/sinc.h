@@ -96,7 +96,7 @@ namespace sinc {
      *
      * @since 1.0
      */
-    class BaseMonitor : PerformanceMonitor {
+    class BaseMonitor : public PerformanceMonitor {
     public:
         /* Time Monitors */
         uint64_t kbLoadTime = 0;
@@ -193,7 +193,7 @@ namespace sinc {
          *
          * @throws KbException When KB operation fails
          */
-        void run();
+        virtual void run();
 
         /**
          * Interrupt mining and discontinue the iteration in `run()`
@@ -220,7 +220,7 @@ namespace sinc {
         depGraphType& dependencyGraph;
         /** The hypothesis set, i.e., a list of rules */
         std::vector<Rule*>& hypothesis;
-        /** The set of counterexamples */
+        /** The set of counterexamples when mining this relation */
         std::unordered_set<Record>& counterexamples;
         /** The tabu set */
         Rule::tabuMapType tabuMap;
@@ -431,5 +431,11 @@ namespace sinc {
         void logInfo(std::string const& msg) const;
         void logError(const char* msg) const;
         void logError(std::string const& msg) const;
+
+    private:
+        /**
+         * This method captures SIGINT and throws an `InterruptionSignal`
+         */
+        static void sigIntHandler(int signum);
     };
 }

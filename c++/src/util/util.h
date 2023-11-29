@@ -41,12 +41,12 @@ namespace sinc {
         /**
          * Return the number of total elements in the set.
          */
-        int getSize();
+        int getSize() const;
 
         /**
          * Return the number of different values in this set.
          */
-        int differentValues();
+        int differentValues() const;
 
         /**
          * Check whether this set is a subset of another.
@@ -56,20 +56,22 @@ namespace sinc {
         /**
          * Return the number of elements that are equivalent to the given one.
          */
-        int itemCount(const T& element);
+        int itemCount(const T& element) const;
 
         /**
          * Return the total number of elements that are equivalent to one of those in the array
          */
-        int itemCount(T* const elements, int const length);
+        int itemCount(T* const elements, int const length) const;
 
         /**
          * Get the map of the numbers of elements in this set
          */
-        const maptype& getCntMap();
+        const maptype& getCntMap() const;
 
         bool operator==(const MultiSet &another) const;
         size_t hash() const;
+
+        size_t getMemoryCost() const;
 
     private:
         maptype cntMap;
@@ -319,6 +321,13 @@ namespace sinc {
          */
         virtual void show(std::ostream& os) = 0;
 
+        /**
+         * This method format and output the size of memory usage.
+         * 
+         * @param size  Memory size in KB
+         */
+        std::string formatMemorySize(double sizeKb);
+
     protected:
         /* The buffer is used for formatting the strings */
         char buf[1024];
@@ -327,12 +336,25 @@ namespace sinc {
          * This method help format the strings to `os` as `sprintf`
          */
         std::ostream& printf(std::ostream& os, const char* format, ...);
-
-        /**
-         * This method format and output the size of memory usage.
-         * 
-         * @param size  Memory size in KB
-         */
-        std::string formatMemorySize(double sizeKb);
     };
+
+    /**
+     * Calculate the sizeof an `std::unordered_map`
+     * 
+     * @param bucketCount The return value of `bucket_count()` of the map
+     * @param maxLoadFactor The return value of `max_load_factor()` of the map
+     * @param sizeOfValueType The size of the `valueType` of the map
+     * @param sizeOfObject The shallow size of the map object, i.e., `sizeof(map)`
+     */
+    size_t sizeOfUnorderedMap(size_t bucketCount, float maxLoadFactor, size_t sizeOfValueType, size_t sizeOfObject);
+
+    /**
+     * Calculate the sizeof an `std::unordered_set`
+     * 
+     * @param bucketCount The return value of `bucket_count()` of the set
+     * @param maxLoadFactor The return value of `max_load_factor()` of the set
+     * @param sizeOfValueType The size of the `valueType` of the set
+     * @param sizeOfObject The shallow size of the set object, i.e., `sizeof(set)`
+     */
+    size_t sizeOfUnorderedSet(size_t bucketCount, float maxLoadFactor, size_t sizeOfValueType, size_t sizeOfObject);
 }
