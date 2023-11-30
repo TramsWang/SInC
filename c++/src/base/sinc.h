@@ -55,6 +55,8 @@ namespace sinc {
         int threads;
         /** Whether the compressed KB is recovered to check the correctness */
         bool validation;
+        /** Take first `maxRelations` relations as targets if this is larger than 0 */
+        int maxRelations;
 
         /* Algorithm Strategy Config */
         /** The beamwidth */
@@ -84,7 +86,7 @@ namespace sinc {
 
         SincConfig(
             const char* basePath, const char* kbName, const char* dumpPath, const char* dumpName,
-            int const threads, bool const validation, int const beamwidth, EvalMetric::Value evalMetric,
+            int const threads, bool const validation, int const maxRelations, int const beamwidth, EvalMetric::Value evalMetric,
             double const minFactCoverage, double const minConstantCoverage, double const stopCompressionRatio,
             double const observationRatio, const char* negKbBasePath, const char* negKbName, double const budgetFactor, bool const weightedNegSamples
         );

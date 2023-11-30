@@ -12,11 +12,11 @@
 using sinc::SincConfig;
 SincConfig::SincConfig(
     const char* _basePath, const char* _kbName, const char* _dumpPath, const char* _dumpName,
-    int const _threads, bool const _validation, int const _beamwidth, EvalMetric::Value _evalMetric,
+    int const _threads, bool const _validation, int const _maxRelations, int const _beamwidth, EvalMetric::Value _evalMetric,
     double const _minFactCoverage, double const _minConstantCoverage, double const _stopCompressionRatio,
     double const _observationRatio, const char* _negKbBasePath, const char* _negKbName, double const _budgetFactor, bool const _weightedNegSamples
 ) : basePath(_basePath), kbName(strdup(_kbName)), dumpPath(_dumpPath), dumpName(strdup(_dumpName)),
-    threads(_threads), validation(_validation), beamwidth(_beamwidth), evalMetric(_evalMetric),
+    threads(_threads), validation(_validation), maxRelations(_maxRelations), beamwidth(_beamwidth), evalMetric(_evalMetric),
     minFactCoverage(_minFactCoverage), minConstantCoverage(_minConstantCoverage), stopCompressionRatio(_stopCompressionRatio),
     observationRatio(_observationRatio), negKbBasePath(_negKbBasePath), negKbName(strdup(_negKbName)), budgetFactor(_budgetFactor), weightedNegSamples(_weightedNegSamples)
 {}
@@ -590,7 +590,11 @@ void SInC::loadKb() {
 
 void SInC::getTargetRelations(int* & targetRelationIds, int& numTargets) {
     /* Relation IDs in SimpleKb are from 0 to n-1, where n is the number of relations */
-    numTargets = kb->totalRelations();
+    if (0 < config->maxRelations && kb->totalRelations() >= config->maxRelations) {
+        numTargets = config->maxRelations;
+    } else {
+        numTargets = kb->totalRelations();
+    }
     targetRelationIds = new int[numTargets];
     for (int i = 0; i < numTargets; i++) {
         targetRelationIds[i] = i;
