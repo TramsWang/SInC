@@ -1760,7 +1760,7 @@ TEST_F(TestSincWithCache, TestCompression1) {
     SimpleKb* kb = new SimpleKb("TestSincWithCache", relations, rel_names, arities, total_rows, 2);
 
     SincWithCache sinc(new SincConfig(
-        "", "", MEM_DIR, "TestSincWithCacheComp", 1, false, 5, EvalMetric::Value::CompressionCapacity, 0.05, 0.25, 1.0, 0,
+        "", "", MEM_DIR, "TestSincWithCacheComp", 1, false, 0, 5, EvalMetric::Value::CompressionCapacity, 0.05, 0.25, 1.0, 0,
         "", "", 0, true
     ), kb);
     sinc.run();
