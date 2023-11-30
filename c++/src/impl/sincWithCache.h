@@ -374,6 +374,7 @@ namespace sinc {
         int entCacheEntriesMax = 0;
         int allCacheEntriesMax = 0;
         int totalGeneratedRules = 0;
+        int totalCacheFragmentsInAllCache = 0;
 
         /* Memory cost (KB) */
         size_t cbMemCost = 0;

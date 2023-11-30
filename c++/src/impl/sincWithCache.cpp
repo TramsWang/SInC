@@ -621,15 +621,17 @@ void CachedSincPerfMonitor::show(std::ostream& os) {
 
     os << "--- Cache Statistics ---\n";
     printf(
-        os, "# %10s %10s %10s %10s %10s %10s %10s\n",
-        "E+.Avg", "T.Avg", "E.Avg", "E+.Max", "T.Max", "E.Max", "Rules"
+        os, "# %10s %10s %10s %10s %10s %10s %10s %10s\n",
+        "E+.Avg", "T.Avg", "E.Avg", "E+.Max", "T.Max", "E.Max", "Avg.CF(E)", "Rules"
     );
     printf(
-        os, "  %10.2f %10.2f %10.2f %10d %10d %10d %10d\n\n",
+        os, "  %10.2f %10.2f %10.2f %10d %10d %10d %10.4f %10d\n\n",
         ((double) posCacheEntriesTotal) / totalGeneratedRules,
         ((double) entCacheEntriesTotal) / totalGeneratedRules,
         ((double) allCacheEntriesTotal) / totalGeneratedRules,
-        posCacheEntriesMax, entCacheEntriesMax, allCacheEntriesMax, totalGeneratedRules
+        posCacheEntriesMax, entCacheEntriesMax, allCacheEntriesMax,
+        ((double) totalCacheFragmentsInAllCache) / totalGeneratedRules,
+        totalGeneratedRules
     );
 }
 
@@ -2538,6 +2540,7 @@ int RelationMinerWithCachedRule::checkThenAddRule(
         // monitor.entCacheEntriesMax = std::max(monitor.entCacheEntriesMax, (int)rule->getEntCache().getEntries().size());
         monitor.allCacheEntriesMax = std::max(monitor.allCacheEntriesMax, all_cache_entries);
         monitor.totalGeneratedRules++;
+        monitor.totalCacheFragmentsInAllCache += rule->getAllCache().size();
         monitor.posCacheUpdateTime += rule->getPosCacheUpdateTime();
         // monitor.entCacheUpdateTime += rule->getEntCacheUpdateTime();
         monitor.allCacheUpdateTime += rule->getAllCacheUpdateTime();
@@ -2593,6 +2596,7 @@ void SincWithCache::finalizeRelationMiner(RelationMiner* miner) {
     // monitor.entCacheEntriesMax = std::max(monitor.entCacheEntriesMax, rel_miner->monitor.entCacheEntriesMax);
     monitor.allCacheEntriesMax = std::max(monitor.allCacheEntriesMax, rel_miner->monitor.allCacheEntriesMax);
     monitor.totalGeneratedRules += rel_miner->monitor.totalGeneratedRules;
+    monitor.totalCacheFragmentsInAllCache += rel_miner->monitor.totalCacheFragmentsInAllCache;
     monitor.copyTime += rel_miner->monitor.copyTime;
     monitor.cacheEntryMemCost = std::max(monitor.cacheEntryMemCost, rel_miner->monitor.cacheEntryMemCost);
     monitor.fingerprintCacheMemCost = std::max(monitor.fingerprintCacheMemCost, rel_miner->getFingerprintCacheMemCost());
