@@ -395,7 +395,7 @@ TestKbManager* TestSinc::testKb = nullptr;
 class Sinc4Test : public SInC {
 public:
     Sinc4Test(const char* basePath, const char* kbName) : SInC(new SincConfig(
-        basePath, kbName, MEM_DIR, "Sinc4TestComp", 1, false, 5, EvalMetric::Value::CompressionCapacity, 0.05, 0.25, 1.0, 0,
+        basePath, kbName, MEM_DIR, "Sinc4TestComp", 1, false, 0, 5, EvalMetric::Value::CompressionCapacity, 0.05, 0.25, 1.0, 0,
         "", "", 0, true
     )) {
         // std::cout << "HERE\n";

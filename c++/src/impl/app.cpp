@@ -80,6 +80,7 @@ DEFINE_double(g, 2.0, "The budget factor of negative sampling. (default 2.0)");
 DEFINE_bool(w, false, "Whether negative samples have different weight. This is only affective when negative sampling is turned on. (default true)");
 DEFINE_int32(t, 1, "The number of threads (default 1)");
 DEFINE_bool(v, false, "Validate result after compression (default false)");
+DEFINE_int32(r, 0, "The first `r` relations as targets if r > 0");
 DEFINE_int32(b, 5, "Beam search width (Default 5)");
 DEFINE_string(e, "τ", "Select in the evaluation metrics (default τ). Available options are: τ (Compression Rate), δ (Compression Capacity), h (Information Gain)");
 DEFINE_double(f, 0.05, "Set fact coverage threshold (Default 0.05)");
@@ -145,6 +146,9 @@ SincConfig* Main::parseConfig(int argc, char** argv) {
     if (FLAGS_v) {
         std::cout << "Validation: " << (FLAGS_v ? "yes" : "no") << std::endl;
     }
+    if (FLAGS_r) {
+        std::cout << "Max Number of Relations: " << FLAGS_r << std::endl;
+    }
     if (5 != FLAGS_b) {
         std::cout << "Beamwidth: " << FLAGS_b << std::endl;
     }
@@ -165,7 +169,7 @@ SincConfig* Main::parseConfig(int argc, char** argv) {
     }
 
     return new sinc::SincConfig(
-        input_path.c_str(), input_name.c_str(), output_path.c_str(), output_name.c_str(), FLAGS_t, FLAGS_v, FLAGS_b,
+        input_path.c_str(), input_name.c_str(), output_path.c_str(), output_name.c_str(), FLAGS_t, FLAGS_v, FLAGS_r, FLAGS_b,
         EvalMetric::getBySymbol(FLAGS_e), FLAGS_f, FLAGS_c, FLAGS_p, FLAGS_o, negkb_path.c_str(), negkb_name.c_str(), FLAGS_g, FLAGS_w
     );
 }
