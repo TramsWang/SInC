@@ -77,3 +77,9 @@ gtest_discover_tests(test_sinc)
 # set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 # set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
 # include(CPack)
+
+# Build executables for experiment itmes
+add_executable(exp_int_table_factors src/exp/intTableFactors.cpp)
+target_link_libraries(exp_int_table_factors PRIVATE util)
+target_link_libraries(exp_int_table_factors PRIVATE kb)
+target_link_libraries(exp_int_table_factors PRIVATE impl)
