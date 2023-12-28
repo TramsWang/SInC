@@ -78,3 +78,9 @@ gtest_discover_tests(test_sinc)
 # set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 # set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
 # include(CPack)
+
+# Build executables for experiment itmes
+add_executable(exp_measure_cb_mem src/exp/measureCbMem.cpp)
+target_link_libraries(exp_measure_cb_mem PRIVATE impl)
+add_executable(exp_measure_eval_mem src/exp/measureEvalMem.cpp)
+target_link_libraries(exp_measure_eval_mem PRIVATE impl)

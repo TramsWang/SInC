@@ -4,6 +4,7 @@
 #include <fstream>
 #include <chrono>
 #include <stdarg.h>
+#include <sys/resource.h>
 
 /**
  * MultiSet
@@ -418,4 +419,10 @@ size_t sinc::sizeOfUnorderedSet(size_t bucketCount, float maxLoadFactor, size_t 
         bucketCount * (sizeof(void*) + sizeof(size_t))) // bucket index
     // * 1.5 // estimated allocation overheads
     ;
+}
+
+long sinc::getMaxRss() {
+    rusage usage;
+    getrusage(RUSAGE_SELF, &usage);
+    return usage.ru_maxrss;
 }

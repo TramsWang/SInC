@@ -357,4 +357,6 @@ namespace sinc {
      * @param sizeOfObject The shallow size of the set object, i.e., `sizeof(set)`
      */
     size_t sizeOfUnorderedSet(size_t bucketCount, float maxLoadFactor, size_t sizeOfValueType, size_t sizeOfObject);
+
+    long getMaxRss();
 }

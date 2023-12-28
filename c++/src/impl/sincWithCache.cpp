@@ -6,6 +6,7 @@
 
 /** This var is used for calculating the maximum memory cost during evaluation */
 static size_t _evaluation_memory_cost = 0;
+static double max_gv_bindings = 0;
 
 /**
  * MatchedSubCbs
@@ -633,6 +634,8 @@ void CachedSincPerfMonitor::show(std::ostream& os) {
         ((double) totalCacheFragmentsInAllCache) / totalGeneratedRules,
         totalGeneratedRules
     );
+
+    os << "--- Eval Statistics ---\n" << "Max GV Bindings: " << max_gv_bindings << std::endl;
 }
 
 /**
@@ -2000,6 +2003,7 @@ double CachedRule::recordCoverage() {
 sinc::Eval CachedRule::calculateEval() {
     _evaluation_memory_cost = 0;
     evaluationMemoryCost = 0;
+    long rss_begin = getMaxRss();
 
     /* Find all variables in the head */
     std::unordered_set<int> head_only_lvs;  // For the head only LVs
@@ -2039,17 +2043,21 @@ sinc::Eval CachedRule::calculateEval() {
 
     /* Count the number of entailments */
     double all_ent = pow(kb.totalConstants(), head_uv_cnt + head_only_lvs.size());
+    double _gv_bindings = 1;
     for (int i = 0; i < allCache->size(); i++) {
         std::vector<int> const& vids = gvs_in_all_cache_fragments[i];
         _evaluation_memory_cost += sizeof(int) * vids.capacity();
         size_t _cost = _evaluation_memory_cost;
         if (!vids.empty()) {
             CacheFragment const& fragment = *(*allCache)[i];
-            all_ent *= fragment.countCombinations(vids);
+            int num_combinations = fragment.countCombinations(vids);
+            all_ent *= num_combinations;
+            _gv_bindings *= num_combinations;
             evaluationMemoryCost = std::max(evaluationMemoryCost, _evaluation_memory_cost);
             _evaluation_memory_cost = _cost;
         }
     }
+    max_gv_bindings = std::max(max_gv_bindings, _gv_bindings);
     int new_pos_ent = 0;
     int already_ent = 0;
     SimpleRelation const& head_relation = *kb.getRelation(head_pred.getPredSymbol());
@@ -2078,8 +2086,10 @@ sinc::Eval CachedRule::calculateEval() {
     ) + sizeOfUnorderedSet(
         used_cbs.bucket_count(), used_cbs.max_load_factor(), sizeof(void*), sizeof(used_cbs)
     );
-    evaluationMemoryCost = std::max(evaluationMemoryCost, _evaluation_memory_cost);
+    // evaluationMemoryCost = std::max(evaluationMemoryCost, _evaluation_memory_cost);
     // int already_ceg = cegCache->countTableSize(HEAD_PRED_IDX);
+    long rss_finished = getMaxRss();
+    evaluationMemoryCost = (rss_finished - rss_begin) * 1024;
 
     /* Update evaluation score */
     /* Those already proved should be excluded from the entire entailment set. Otherwise, they are counted as negative ones */
