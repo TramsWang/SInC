@@ -194,22 +194,17 @@ MatchedSubTables* IntTable::matchSlices(const IntTable& tab1, int const col1, co
     int const num_values2 = tab2.valuesByColsLengths[col2];
     MatchedSubTables* result = new MatchedSubTables();
 
-    int idx1 = 0;
-    int idx2 = 0;
-    while (idx1 < num_values1 && idx2 < num_values2) {
-        int val1 = values1[idx1];
-        int val2 = values2[idx2];
-        if (val1 < val2) {
-            idx1 = std::lower_bound(values1 + idx1 + 1, values1 + num_values1, val2) - values1;
-        } else if (val1 > val2) {
-            idx2 = std::lower_bound(values2 + idx2 + 1, values2 + num_values2, val1) - values2;
-        } else {    // val1 == val2
-            int** const begin1 = sorted_rows1 + start_offsets1[idx1];
-            int** const end1 = sorted_rows1 + start_offsets1[++idx1];
+    for (int i = 0; i < num_values1; i++) {
+        int val1 = values1[i];
+        int i2 = std::lower_bound(values2, values2 + num_values2, val1) - values2;
+        int val2 = (i2 < num_values2) ? values2[i2] : -1;
+        if (val1 == val2) {
+            int** const begin1 = sorted_rows1 + start_offsets1[i];
+            int** const end1 = sorted_rows1 + start_offsets1[i+1];
             result->slices1->push_back(new IntTable::sliceType(begin1, end1));
 
-            int** const begin2 = sorted_rows2 + start_offsets2[idx2];
-            int** const end2 = sorted_rows2 + start_offsets2[++idx2];
+            int** const begin2 = sorted_rows2 + start_offsets2[i2];
+            int** const end2 = sorted_rows2 + start_offsets2[i2+1];
             result->slices2->push_back(new IntTable::sliceType(begin2, end2));
         }
     }
