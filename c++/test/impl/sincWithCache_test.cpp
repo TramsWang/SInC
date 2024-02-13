@@ -132,7 +132,7 @@ protected:
             for (CacheFragment::entryType* const& actual_entry: actualFragment.getEntries()) {
                 bool entry_equals = true;
                 for (int i = 0; i < expected_entry->size(); i++) {
-                    if (!tableEqual((*expected_entry)[i]->getIndices(), (*actual_entry)[i]->getIndices())) {
+                    if (!cbEqual(*((*expected_entry)[i]), *((*actual_entry)[i]))) {
                         entry_equals = false;
                         break;
                     }
@@ -144,6 +144,22 @@ protected:
             }
             ASSERT_TRUE(found);
         }
+    }
+
+    bool cbEqual(CompliedBlock const& expectedCb, CompliedBlock const& actualCb) {
+        if (expectedCb.getTotalRows() != actualCb.getTotalRows()) {
+            return false;
+        }
+        if (expectedCb.getTotalCols() != actualCb.getTotalCols()) {
+            return false;
+        }
+        std::unordered_set<Record> expected_rows;
+        std::unordered_set<Record> actual_rows;
+        for (int i = 0; i < expectedCb.getTotalRows(); i++) {
+            expected_rows.emplace(expectedCb.getComplianceSet()[i], expectedCb.getTotalCols());
+            actual_rows.emplace(actualCb.getComplianceSet()[i], actualCb.getTotalCols());
+        }
+        return expected_rows == actual_rows;
     }
 
     bool tableEqual(IntTable const& expectedTable, IntTable const& actualTable) {
@@ -223,7 +239,7 @@ TEST_F(TestCacheFragment, TestCase1aTest1) {
     EXPECT_STREQ("p(X0,?,?)", rule2String(fragment.getPartAssignedRule()).c_str());
     CacheFragment::entriesType expected_entries({
         new CacheFragment::entryType({
-            CompliedBlock::create(rel_p->getAllRows(), rel_p->getTotalRows(), rel_p->getTotalCols(), rel_p, false, false)
+            CompliedBlock::create(rel_p->getAllRows(), rel_p->getTotalRows(), rel_p->getTotalCols(), false)
         })
     });
     checkEntries(expected_entries, fragment);
@@ -281,7 +297,7 @@ TEST_F(TestCacheFragment, case1aTest2) {
     EXPECT_STREQ("p(X0,?,X2)", rule2String(fragment.getPartAssignedRule()).c_str());
     CacheFragment::entriesType expected_entries({
         new CacheFragment::entryType({
-            CompliedBlock::create(rel_p->getAllRows(), rel_p->getTotalRows(), rel_p->getTotalCols(), rel_p, false, false)
+            CompliedBlock::create(rel_p->getAllRows(), rel_p->getTotalRows(), rel_p->getTotalCols(), false)
         })
     });
     checkEntries(expected_entries, fragment);
@@ -401,7 +417,7 @@ TEST_F(TestCacheFragment, case1bTest1) {
     /* frag1 */
     EXPECT_STREQ("p(X0,?,?)", rule2String(fragment.getPartAssignedRule()).c_str());
     expected_entries.push_back(new CacheFragment::entryType({
-            CompliedBlock::create(rel_p->getAllRows(), rel_p->getTotalRows(), rel_p->getTotalCols(), rel_p, false, false)
+            CompliedBlock::create(rel_p->getAllRows(), rel_p->getTotalRows(), rel_p->getTotalCols(), false)
     }));
     checkEntries(expected_entries, fragment);
     clearEntries(expected_entries);

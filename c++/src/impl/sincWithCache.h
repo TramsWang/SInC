@@ -170,18 +170,6 @@ namespace sinc {
         static CompliedBlock* create(int** const complianceSet, int const totalRows, int const totalCols, bool maintainComplianceSet);
 
         /**
-         * Create a new CB and register it to the pool
-         * 
-         * NOTE: Neither `complianceSet` nor `indices` should be `nullptr`
-         * 
-         * NOTE: The pointers `complianceSet` WILL be maintained by this CB object
-         */
-        static CompliedBlock* create(
-            int** const complianceSet, int const totalRows, int const totalCols, IntTable* indices,
-            bool maintainComplianceSet, bool maintainIndices
-        );
-
-        /**
          * This function encapsulates the `getSlice()` function of `IntTable`. It retrieves the results and corresponding CBs if they
          * already exist.
          * 
@@ -280,7 +268,7 @@ namespace sinc {
 
         int getId() const;
         int* const* getComplianceSet() const;
-        const IntTable& getIndices() const;
+        const std::unordered_map<int, std::vector<int*>*>* getIndices() const;
         int getTotalRows() const;
         int getTotalCols() const;
         size_t memoryCost() const;
@@ -323,11 +311,10 @@ namespace sinc {
         /** Unique ID of the CB object. This is the same as the index of this object in the pool. */
         int const id;
         int** const complianceSet;
-        IntTable* indices;
+        std::unordered_map<int, std::vector<int*>*>* indices;
         int const totalRows;
         int const totalCols;
         bool mainTainComplianceSet;
-        bool maintainIndices;
 
         /**
          * Register a pointer to a CB in the static pool
@@ -338,17 +325,6 @@ namespace sinc {
          * NOTE: The pointer `complianceSet` WILL be maintained by this CB object
          */
         CompliedBlock(int const id, int** const complianceSet, int const totalRows, int const totalCols, bool maintainComplianceSet);
-
-        /**
-         * @param complianceSet This parameter shall NOT be `nullptr`
-         * @param indices This parameter shall NOT be `nullptr`
-         * 
-         * NOTE: The pointers `complianceSet` and `indices` WILL be maintained by this CB object
-         */
-        CompliedBlock(
-            int const id, int** const complianceSet, int const totalRows, int const totalCols, IntTable* indices,
-            bool maintainComplianceSet, bool maintainIndices
-        );
     };
 
     /**

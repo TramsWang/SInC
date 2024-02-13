@@ -742,14 +742,14 @@ EstRule::EstRule(
     } else {
         int** non_entailed_records = toArray(non_entailed_record_vector);
         int** entailed_records = toArray(entailed_record_vector);
-        IntTable* non_entailed_record_table = new IntTable(non_entailed_records, non_entailed_record_vector.size(), arity);
-        IntTable* entailed_record_table = new IntTable(entailed_records, entailed_record_vector.size(), arity);
+        // IntTable* non_entailed_record_table = new IntTable(non_entailed_records, non_entailed_record_vector.size(), arity);
+        // IntTable* entailed_record_table = new IntTable(entailed_records, entailed_record_vector.size(), arity);
         posCache = new CacheFragment(
-            CompliedBlock::create(non_entailed_records, non_entailed_record_vector.size(), arity, non_entailed_record_table, true, true), 
+            CompliedBlock::create(non_entailed_records, non_entailed_record_vector.size(), arity, true), 
             headPredSymbol
         );
         entCache = new CacheFragment(
-            CompliedBlock::create(entailed_records, entailed_record_vector.size(), arity, entailed_record_table, true, true),
+            CompliedBlock::create(entailed_records, entailed_record_vector.size(), arity, true),
             headPredSymbol
         );
     }

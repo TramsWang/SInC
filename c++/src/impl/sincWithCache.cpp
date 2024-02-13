@@ -144,38 +144,18 @@ CompliedBlock* CompliedBlock::create(int** const complianceSet, int const totalR
     return cb;
 }
 
-CompliedBlock* CompliedBlock::create(
-    int** _complianceSet, int const _totalRows, int const _totalCols, IntTable* _indices,
-    bool _maintainComplianceSet, bool _maintainIndices
-) {
-    numCreation++;
-    std::unordered_map<void *, sinc::CompliedBlock*>::iterator itr = mapCreation.find(_complianceSet);
-    if (mapCreation.end() == itr) {
-        CompliedBlock* cb = new CompliedBlock(pool.size(), _complianceSet, _totalRows, _totalCols, _indices, _maintainComplianceSet, _maintainIndices);
-        registerCb(cb);
-        mapCreation.emplace(_complianceSet, cb);
-        return cb;
-    } else {
-        numCreationHit++;
-        return itr->second;
-    }
-}
-
 CompliedBlock* CompliedBlock::getSlice(const CompliedBlock& cb, int const col, int const val) {
     numGetSlice++;
     CbOprGetSlice opr(cb.id, col, val);
     std::unordered_map<sinc::CbOprGetSlice, sinc::CompliedBlock*>::iterator itr = mapGetSlice.find(opr);
     if (mapGetSlice.end() == itr) {
-        IntTable::sliceType* slice = cb.getIndices().getSlice(col, val);
-        if (nullptr != slice) { // assertion: must be non-empty
-            CompliedBlock* new_cb = new CompliedBlock(pool.size(), toArray<int*>(*slice), slice->size(), cb.totalCols, true);
-            registerCb(new_cb);
-            mapGetSlice.emplace(opr, new_cb);
-            IntTable::releaseSlice(slice);
-            return new_cb;
-        } else {
-            IntTable::releaseSlice(slice);
+        std::unordered_map<int, std::vector<int*>*>::iterator itr = cb.indices[col].find(val);
+        if (cb.indices[col].end() == itr) {
             return nullptr;
+        } else {
+            CompliedBlock* new_cb = CompliedBlock::create(toArray(*(itr->second)), itr->second->size(), cb.totalCols, true);
+            mapGetSlice.emplace(opr, new_cb);
+            return new_cb;
         }
     } else {
         numGetSliceHit++;
@@ -188,16 +168,12 @@ std::vector<CompliedBlock*> const& CompliedBlock::splitSlices(const CompliedBloc
     CbOprSplitSlices opr(cb.id, col);
     std::unordered_map<sinc::CbOprSplitSlices, std::vector<sinc::CompliedBlock*>*>::iterator itr = mapSplitSlices.find(opr);
     if (mapSplitSlices.end() == itr) {
-        IntTable::slicesType* slices = cb.getIndices().splitSlices(col);
         std::vector<CompliedBlock*>* cbs = new std::vector<CompliedBlock*>();
-        cbs->reserve(slices->size());
-        for (IntTable::sliceType* slice: *slices) {
-            CompliedBlock* new_cb = new CompliedBlock(pool.size(), toArray<int*>(*slice), slice->size(), cb.totalCols, true);
-            registerCb(new_cb);
+        for (std::pair<const int, std::vector<int*>*> const& kv: cb.indices[col]) {
+            CompliedBlock* new_cb = CompliedBlock::create(toArray(*(kv.second)), kv.second->size(), cb.totalCols, true);
             cbs->push_back(new_cb);
         }
         mapSplitSlices.emplace(opr, cbs);
-        IntTable::releaseSlices(slices);
         return *cbs;
     } else {
         numSplitSlicesHit++;
@@ -225,44 +201,37 @@ const MatchedSubCbs* CompliedBlock::matchSlices(
     CbOprMatchSlicesTwoCbs opr(_id1, _col1, _id2, _col2);
     std::unordered_map<sinc::CbOprMatchSlicesTwoCbs, sinc::MatchedSubCbs*>::iterator itr = mapMatchSlicesTwoCbs.find(opr);
     if (mapMatchSlicesTwoCbs.end() == itr) {
-        MatchedSubTables* slices;
+        MatchedSubCbs* sub_cbs = new MatchedSubCbs();
+        std::unordered_map<int, std::vector<int*>*>* map1;
+        std::unordered_map<int, std::vector<int*>*>* map2;
         int arity1;
         int arity2;
         if (cb1.id <= cb2.id) {
-            slices = IntTable::matchSlices(cb1.getIndices(), col1, cb2.getIndices(), col2);
+            map1 = cb1.indices + col1;
+            map2 = cb2.indices + col2;
             arity1 = cb1.totalCols;
             arity2 = cb2.totalCols;
         } else {
-            slices = IntTable::matchSlices(cb2.getIndices(), col2, cb1.getIndices(), col1);
+            map1 = cb2.indices + col2;
+            map2 = cb1.indices + col1;
             arity1 = cb2.totalCols;
             arity2 = cb1.totalCols;
         }
-        int const num_slices = slices->slices1->size();
+        for (std::pair<const int, std::vector<int*>*> const& kv1: *map1) {
+            std::unordered_map<int, std::vector<int*>*>::iterator itr = map2->find(kv1.first);
+            if (map2->end() != itr) {
+                sub_cbs->cbs1.push_back(CompliedBlock::create(toArray(*(kv1.second)), kv1.second->size(), arity1, true));
+                sub_cbs->cbs2.push_back(CompliedBlock::create(toArray(*(itr->second)), itr->second->size(), arity2, true));
+            }
+        }
+
+        int const num_slices = sub_cbs->cbs1.size();
         if (0 == num_slices) {
             mapMatchSlicesTwoCbs.emplace(opr, nullptr);
-            delete slices;
+            delete sub_cbs;
             return nullptr;
         }
-        MatchedSubCbs* sub_cbs = new MatchedSubCbs();
-        sub_cbs->cbs1.reserve(num_slices);
-        sub_cbs->cbs2.reserve(num_slices);
-        for (int i = 0; i < num_slices; i++) {
-            IntTable::sliceType& slice1 = *(*(slices->slices1))[i];
-            CompliedBlock* new_cb1 = new CompliedBlock(
-                pool.size(), toArray<int*>(slice1), slice1.size(), arity1, true
-            );
-            registerCb(new_cb1);
-            sub_cbs->cbs1.push_back(new_cb1);
-
-            IntTable::sliceType& slice2 = *(*(slices->slices2))[i];
-            CompliedBlock* new_cb2 = new CompliedBlock(
-                pool.size(), toArray<int*>(slice2), slice2.size(), arity2, true
-            );
-            registerCb(new_cb2);
-            sub_cbs->cbs2.push_back(new_cb2);
-        }
         mapMatchSlicesTwoCbs.emplace(opr, sub_cbs);
-        delete slices;
         return sub_cbs;
     } else {
         numMatchSlices2Hit++;
@@ -283,21 +252,25 @@ const std::vector<CompliedBlock*>* CompliedBlock::matchSlices(const CompliedBloc
     CbOprMatchSlicesOneCb opr(cb.id, _col1, _col2);
     std::unordered_map<sinc::CbOprMatchSlicesOneCb, std::vector<sinc::CompliedBlock*>*>::iterator itr = mapMatchSlicesOneCb.find(opr);
     if (mapMatchSlicesOneCb.end() == itr) {
-        IntTable::slicesType* slices = cb.getIndices().matchSlices(col1, col2);
-        if (slices->empty()) {
+        std::vector<CompliedBlock*>* sub_cbs = new std::vector<CompliedBlock*>();
+        for (std::pair<const int, std::vector<int*>*> const& kv: cb.indices[col1]) {
+            std::vector<int*> rows;
+            for (int* const& row: *(kv.second)) {
+                if (kv.first == row[col2]) {
+                    rows.push_back(row);
+                }
+            }
+            if (!rows.empty()) {
+                sub_cbs->push_back(CompliedBlock::create(toArray(rows), rows.size(), cb.totalCols, true));
+            }
+        }
+        if (sub_cbs->empty()) {
+            delete sub_cbs;
             mapMatchSlicesOneCb.emplace(opr, nullptr);
-            IntTable::releaseSlices(slices);
             return nullptr;
         }
-        std::vector<CompliedBlock*>* sub_cbs = new std::vector<CompliedBlock*>();
-        sub_cbs->reserve(slices->size());
-        for (IntTable::sliceType* const& slice: *slices) {
-            CompliedBlock* new_cb = new CompliedBlock(pool.size(), toArray<int*>(*slice), slice->size(), cb.totalCols, true);
-            registerCb(new_cb);
-            sub_cbs->push_back(new_cb);
-        }
+
         mapMatchSlicesOneCb.emplace(opr, sub_cbs);
-        IntTable::releaseSlices(slices);
         return sub_cbs;
     } else {
         numMatchSlices1Hit++;
@@ -469,15 +442,35 @@ CompliedBlock::~CompliedBlock() {
     if (mainTainComplianceSet) {
         delete[] complianceSet;
     }
-    if (maintainIndices) {
-        delete indices;
+    if (nullptr != indices) {
+        for (int col_idx = 0; col_idx < totalCols; col_idx++) {
+            for (std::pair<const int, std::vector<int*>*> const& kv: indices[col_idx]) {
+                delete kv.second;
+            }
+        }
+        delete[] indices;
     }
 }
 
 void CompliedBlock::buildIndices() {
     if (nullptr == indices) {
-        indices = new IntTable(complianceSet, totalRows, totalCols);
-        maintainIndices = true;
+        indices = new std::unordered_map<int, std::vector<int*>*>[totalCols];
+        for (int i = 0; i < totalRows; i++) {
+            int* row = complianceSet[i];
+            for (int arg_idx = 0; arg_idx < totalCols; arg_idx++) {
+                std::unordered_map<int, std::vector<int*>*>& map = indices[arg_idx];
+                int const val = row[arg_idx];
+                std::unordered_map<int, std::vector<int*>*>::iterator itr = map.find(val);
+                std::vector<int*>* set;
+                if (map.end() == itr) {
+                    set = new std::vector<int*>();
+                    map.emplace(val, set);
+                } else {
+                    set = itr->second;
+                }
+                set->push_back(row);
+            }
+        }
     }
 }
 
@@ -489,8 +482,8 @@ int* const* CompliedBlock::getComplianceSet() const {
     return complianceSet;
 }
 
-const IntTable& CompliedBlock::getIndices() const {
-    return *indices;
+const std::unordered_map<int, std::vector<int*>*>* CompliedBlock::getIndices() const {
+    return indices;
 }
 
 int CompliedBlock::getTotalRows() const {
@@ -506,8 +499,15 @@ size_t CompliedBlock::memoryCost() const {
     if (mainTainComplianceSet) {
         size += sizeof(int*) * totalRows + sizeof(int);
     }
-    if (maintainIndices) {
-        size += indices->memoryCost();
+    if (nullptr != indices) {
+        size += sizeof(std::unordered_map<int, std::vector<int*>*>*) * totalCols;
+        for (int i = 0; i < totalCols; i++) {
+            std::unordered_map<int, std::vector<int*>*>& map = indices[i];
+            size += sizeof(std::pair<int, std::vector<int*>*>) * map.bucket_count() * std::max(1.0f, map.max_load_factor());
+            for (std::pair<const int, std::vector<int*>*> const& kv: map) {
+                size += sizeof(std::vector<int*>) + sizeof(int*) * kv.second->capacity();
+            }
+        }
     }
     return size;
 }
@@ -531,7 +531,7 @@ void CompliedBlock::showAll() const {
         std::cout << std::endl;
     }
     std::cout << "Indices:\n";
-    indices->showRows();
+    // indices->showRows();
 }
 
 void CompliedBlock::registerCb(CompliedBlock* cb) {
@@ -541,12 +541,7 @@ void CompliedBlock::registerCb(CompliedBlock* cb) {
 CompliedBlock::CompliedBlock(
     int const _id, int** _complianceSet, int const _totalRows, int const _totalCols, bool _maintainComplianceSet
 ): id(_id), complianceSet(_complianceSet), totalRows(_totalRows), totalCols(_totalCols), indices(nullptr),
-    mainTainComplianceSet(_maintainComplianceSet), maintainIndices(false) {}
-
-CompliedBlock::CompliedBlock(int const _id, int** _complianceSet, int const _totalRows, int const _totalCols, IntTable* _indices,
-    bool _maintainComplianceSet, bool _maintainIndices
-) : id(_id), complianceSet(_complianceSet), totalRows(_totalRows), totalCols(_totalCols), indices(_indices),
-    mainTainComplianceSet(_maintainComplianceSet), maintainIndices(_maintainIndices && nullptr != _indices) {}
+    mainTainComplianceSet(_maintainComplianceSet) {}
 
 /**
  * CachedSincPerfMonitor
@@ -711,8 +706,9 @@ CacheFragment::CacheFragment(IntTable* const firstRelation, int const relationSy
     partAssignedRule.emplace_back(relationSymbol, firstRelation->getTotalCols());
     entryType* first_entry = new entryType();
     CompliedBlock* cb = CompliedBlock::create(
-        firstRelation->getAllRows(), firstRelation->getTotalRows(), firstRelation->getTotalCols(), firstRelation, false, false
+        firstRelation->getAllRows(), firstRelation->getTotalRows(), firstRelation->getTotalCols(), false
     );
+    cb->buildIndices();
     first_entry->push_back(cb);
     entries->push_back(first_entry);
 }
@@ -1247,8 +1243,9 @@ void CacheFragment::splitCacheEntries(int const tabIdx1, int const colIdx1, IntT
     for (entryType* const& cache_entry : *entries) {
         CompliedBlock& cb1 = *(*cache_entry)[tabIdx1];
         CompliedBlock& cb2 = *CompliedBlock::create(
-            newRelation->getAllRows(), newRelation->getTotalRows(), newRelation->getTotalCols(), newRelation, false, false
+            newRelation->getAllRows(), newRelation->getTotalRows(), newRelation->getTotalCols(), false
         );
+        cb2.buildIndices();
         const MatchedSubCbs* slices = CompliedBlock::matchSlices(cb1, colIdx1, cb2, colIdx2);
         const std::vector<CompliedBlock*> *cbs1;
         const std::vector<CompliedBlock*> *cbs2;
@@ -1314,8 +1311,9 @@ void CacheFragment::matchCacheEntries(
         CompliedBlock& matched_cb = *(*cache_entry)[matchedTabIdx];
         int const matched_constant = matched_cb.getComplianceSet()[0][matchedColIdx];
         CompliedBlock& new_rel_cb = *CompliedBlock::create(
-            newRelation->getAllRows(), newRelation->getTotalRows(), newRelation->getTotalCols(), newRelation, false, false
+            newRelation->getAllRows(), newRelation->getTotalRows(), newRelation->getTotalCols(), false
         );
+        new_rel_cb.buildIndices();
         CompliedBlock* new_cb = CompliedBlock::getSlice(new_rel_cb, matchingColIdx, matched_constant);
         if (nullptr != new_cb) {
             entryType* new_entry = new entryType(*cache_entry);
