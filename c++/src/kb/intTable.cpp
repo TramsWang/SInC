@@ -285,25 +285,41 @@ IntTable::slicesType** IntTable::matchSlices(IntTable** const tables, int* const
 }
 
 IntTable::slicesType* IntTable::matchSlices(int const col1, int const col2) const {
+    int** const sorted_rows1 = sortedRowsByCols[col1];
+    int* const values1 = valuesByCols[col1];
+    int* const values2 = valuesByCols[col2];
+    int* const start_offsets1 = startOffsetsByCols[col1];
+    int const num_values1 = valuesByColsLengths[col1];
+    int const num_values2 = valuesByColsLengths[col2];
+    int idx1 = 0;
+    int idx2 = 0;
     IntTable::slicesType* slices = new IntTable::slicesType();
-    int** const sorted_rows = sortedRowsByCols[col1];
-    int* const values = valuesByCols[col1];
-    int* const start_offsets = startOffsetsByCols[col1];
-    int const num_values = valuesByColsLengths[col1];
-    for (int i = 0; i < num_values; i++) {
-        int const val = values[i];
-        int** const end = sorted_rows + start_offsets[i + 1];
-        IntTable::sliceType* slice = new IntTable::sliceType();
-        for (int** row_itr = sorted_rows + start_offsets[i]; row_itr != end; row_itr++) {
-            int* const row = *row_itr;
-            if (val == row[col2]) {
-                slice->push_back(row);
+    while (idx1 < num_values1 && idx2 < num_values2) {
+        int val1 = values1[idx1];
+        int val2 = values2[idx2];
+        if (val1 < val2) {
+            idx1 = std::lower_bound(values1 + idx1 + 1, values1 + num_values1, val2) - values1;
+        } else if (val1 > val2) {
+            idx2 = std::lower_bound(values2 + idx2 + 1, values2 + num_values2, val1) - values2;
+        } else {    // val1 == val2
+            int offset_start = start_offsets1[idx1];
+            int offset_end = start_offsets1[++idx1];
+            int** const begin1 = sorted_rows1 + offset_start;
+            int** const end1 = sorted_rows1 + offset_end;
+            idx2++;
+            IntTable::sliceType* slice = new IntTable::sliceType();
+            slice->reserve(offset_end - offset_start);
+            for (int** row_itr = begin1; row_itr != end1; row_itr++) {
+                int* const row = *row_itr;
+                if (val1 == row[col2]) {
+                    slice->push_back(row);
+                }
             }
-        }
-        if (slice->empty()) {
-            delete slice;
-        } else {
-            slices->push_back(slice);
+            if (slice->empty()) {
+                delete slice;
+            } else {
+                slices->push_back(slice);
+            }
         }
     }
     return slices;
