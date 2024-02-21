@@ -200,6 +200,7 @@ namespace sinc {
         virtual size_t memoryCost() const;
 
         void showRows() const;
+        static int getCmpJoin();
 
     protected:
         /** Total rows in the table */

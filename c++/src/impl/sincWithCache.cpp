@@ -110,6 +110,27 @@ size_t CompliedBlock::memoryCost() const {
     return size;
 }
 
+bool CompliedBlock::hasRow(int* row) const {
+    std::unordered_map<int, std::vector<int*>*>& index0 = indices[0];
+    std::unordered_map<int, std::vector<int*>*>::iterator itr = index0.find(row[0]);
+    if (index0.end() == itr) {
+        return false;
+    }
+    for (int* const record: *(itr->second)) {
+        bool found = true;
+        for (int col = 0; col < totalCols; col++) {
+            if (row[col] != record[col]) {
+                found = false;
+                break;
+            }
+        }
+        if (found) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void CompliedBlock::showComplianceSet() const {
     for (int i = 0; i < totalRows; i++) {
         for (int j = 0; j < totalCols; j++) {
@@ -135,15 +156,19 @@ std::vector<CompliedBlock*>* CompliedBlock::splitSlices(const CompliedBlock& cb,
     return vec;
 }
 
+int num_find_in_hash_map_join = 0;
+int num_find_hit_in_hash_map_join = 0;
 const sinc::MatchedSubCbs* CompliedBlock::matchSlices(
     const CompliedBlock& cb1, int const col1, const CompliedBlock& cb2, int const col2
 ) {
     MatchedSubCbs* result = new MatchedSubCbs();
     std::unordered_map<int, std::vector<int*>*> map1 = cb1.indices[col1];
     std::unordered_map<int, std::vector<int*>*> map2 = cb2.indices[col2];
+    num_find_in_hash_map_join += map1.size();
     for (std::pair<const int, std::vector<int*>*> const& kv1: map1) {
         std::unordered_map<int, std::vector<int*>*>::iterator itr = map2.find(kv1.first);
         if (map2.end() != itr) {
+            num_find_hit_in_hash_map_join++;
             result->cbs1.push_back(CompliedBlock::create(toArray(*(kv1.second)), kv1.second->size(), cb1.totalCols, true));
             result->cbs2.push_back(CompliedBlock::create(toArray(*(itr->second)), itr->second->size(), cb2.totalCols, true));
         }

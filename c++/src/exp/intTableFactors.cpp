@@ -13,7 +13,8 @@
 #define IDX_SPLIT 2
 #define IDX_MATCH 3
 #define IDX_JOIN 4
-#define NUM_ITEMS 5
+#define IDX_EXIST 5
+#define NUM_ITEMS 6
 #define FILE_TIME_FACTOR_ROWS "Time(Rows).txt"
 #define FILE_TIME_FACTOR_COLS "Time(Cols).txt"
 #define FILE_TIME_FACTOR_CONSTANTS "Time(Consts).txt"
@@ -26,6 +27,7 @@ using sinc::IntTable;
 using sinc::CompliedBlock;
 
 int** genRecords(int rows, int cols, int constants) {
+    srand(currentTimeInNano());
     int** records = new int*[rows];
     for (int i = 0; i < rows; i++) {
         int* record = new int[cols];
@@ -53,7 +55,8 @@ long getMaxRss() {
 void testTimeFactorRows() {
     int const NUM_COLS = 5;
     std::ofstream ofile(FILE_TIME_FACTOR_ROWS, std::ios::out);
-    for (int num_rows: {10, 50, 100, 500, 1000, 5000, 10000}) {
+    // for (int num_rows: {10, 50, 100, 500, 1000, 5000, 10000}) {
+    for (int num_rows = 100; num_rows < 20000; num_rows *= 2) {
         uint64_t time_it[NUM_ITEMS]{};
         uint64_t time_ht[NUM_ITEMS]{};
         for (int i = 0; i < DUPLICATIONS; i++) {
@@ -98,11 +101,18 @@ void testTimeFactorRows() {
             }
             uint64_t time_join_done = currentTimeInNano();
 
+            for (int row_idx = 0; row_idx < 100; row_idx++) {
+                int* row = records1[row_idx];
+                int _idx = cb1->hasRow(row);
+            }
+            uint64_t time_exist_done = currentTimeInNano();
+
             time_ht[IDX_CONSTRUCTION] += time_constructed - time_start;
             time_ht[IDX_GET] += time_get_done - time_constructed;
             time_ht[IDX_SPLIT] += time_split_done - time_get_done;
             time_ht[IDX_MATCH] += time_match_done - time_split_done;
             time_ht[IDX_JOIN] += time_join_done - time_match_done;
+            time_ht[IDX_EXIST] += time_exist_done - time_join_done;
 
             /* Test IntTables */
             time_start = currentTimeInNano();
@@ -136,11 +146,18 @@ void testTimeFactorRows() {
             }
             time_join_done = currentTimeInNano();
 
+            for (int row_idx = 0; row_idx < 100; row_idx++) {
+                int* row = records1[row_idx];
+                int _idx = it1.hasRow(row);
+            }
+            time_exist_done = currentTimeInNano();
+
             time_it[IDX_CONSTRUCTION] += time_constructed - time_start;
             time_it[IDX_GET] += time_get_done - time_constructed;
             time_it[IDX_SPLIT] += time_split_done - time_get_done;
             time_it[IDX_MATCH] += time_match_done - time_split_done;
             time_it[IDX_JOIN] += time_join_done - time_match_done;
+            time_it[IDX_EXIST] += time_exist_done - time_join_done;
 
             /* Release resources */
             IntTable::releaseSlice(slice1);
@@ -211,11 +228,18 @@ void testTimeFactorCols() {
             }
             uint64_t time_join_done = currentTimeInNano();
 
+            for (int row_idx = 0; row_idx < 100; row_idx++) {
+                int* row = records1[row_idx];
+                int _idx = cb1->hasRow(row);
+            }
+            uint64_t time_exist_done = currentTimeInNano();
+
             time_ht[IDX_CONSTRUCTION] += time_constructed - time_start;
             time_ht[IDX_GET] += time_get_done - time_constructed;
             time_ht[IDX_SPLIT] += time_split_done - time_get_done;
             time_ht[IDX_MATCH] += time_match_done - time_split_done;
             time_ht[IDX_JOIN] += time_join_done - time_match_done;
+            time_ht[IDX_EXIST] += time_exist_done - time_join_done;
 
             /* Test IntTables */
             time_start = currentTimeInNano();
@@ -249,11 +273,18 @@ void testTimeFactorCols() {
             }
             time_join_done = currentTimeInNano();
 
+            for (int row_idx = 0; row_idx < 100; row_idx++) {
+                int* row = records1[row_idx];
+                int _idx = it1.hasRow(row);
+            }
+            time_exist_done = currentTimeInNano();
+
             time_it[IDX_CONSTRUCTION] += time_constructed - time_start;
             time_it[IDX_GET] += time_get_done - time_constructed;
             time_it[IDX_SPLIT] += time_split_done - time_get_done;
             time_it[IDX_MATCH] += time_match_done - time_split_done;
             time_it[IDX_JOIN] += time_join_done - time_match_done;
+            time_it[IDX_EXIST] += time_exist_done - time_join_done;
 
             /* Release resources */
             IntTable::releaseSlice(slice1);
@@ -280,7 +311,7 @@ void testTimeFactorConstants() {
     int const NUM_ROWS = 500;
     int const NUM_COLS = 5;
     std::ofstream ofile(FILE_TIME_FACTOR_CONSTANTS, std::ios::out);
-    for (int num_constants = 100; num_constants < 5000; num_constants *= 2) {
+    for (int num_constants = 200; num_constants < 20000; num_constants *= 2) {
         uint64_t time_it[NUM_ITEMS]{};
         uint64_t time_ht[NUM_ITEMS]{};
         for (int i = 0; i < DUPLICATIONS; i++) {
@@ -325,11 +356,18 @@ void testTimeFactorConstants() {
             }
             uint64_t time_join_done = currentTimeInNano();
 
+            for (int row_idx = 0; row_idx < 100; row_idx++) {
+                int* row = records1[row_idx];
+                int _idx = cb1->hasRow(row);
+            }
+            uint64_t time_exist_done = currentTimeInNano();
+
             time_ht[IDX_CONSTRUCTION] += time_constructed - time_start;
             time_ht[IDX_GET] += time_get_done - time_constructed;
             time_ht[IDX_SPLIT] += time_split_done - time_get_done;
             time_ht[IDX_MATCH] += time_match_done - time_split_done;
             time_ht[IDX_JOIN] += time_join_done - time_match_done;
+            time_ht[IDX_EXIST] += time_exist_done - time_join_done;
 
             /* Test IntTables */
             time_start = currentTimeInNano();
@@ -363,11 +401,18 @@ void testTimeFactorConstants() {
             }
             time_join_done = currentTimeInNano();
 
+            for (int row_idx = 0; row_idx < 100; row_idx++) {
+                int* row = records1[row_idx];
+                int _idx = it1.hasRow(row);
+            }
+            time_exist_done = currentTimeInNano();
+
             time_it[IDX_CONSTRUCTION] += time_constructed - time_start;
             time_it[IDX_GET] += time_get_done - time_constructed;
             time_it[IDX_SPLIT] += time_split_done - time_get_done;
             time_it[IDX_MATCH] += time_match_done - time_split_done;
             time_it[IDX_JOIN] += time_join_done - time_match_done;
+            time_it[IDX_EXIST] += time_exist_done - time_join_done;
 
             /* Release resources */
             IntTable::releaseSlice(slice1);
@@ -392,11 +437,12 @@ void testTimeFactorConstants() {
 
 void testMemFactorRows() {
     int const NUM_COLS = 5;
-    int num_rows_arr[7]{10, 50, 100, 500, 1000, 5000, 10000};
+    // int num_rows_arr[7]{10, 50, 100, 500, 1000, 5000, 10000};
+    int num_rows_arr[8]{100, 200, 400, 800, 1600, 3200, 6400, 12800};
     std::vector<int**> records_ptrs;
     records_ptrs.reserve(DUPLICATIONS * 10 * 7);
-    long mem_original[7]{};
-    for (int i = 0; i < 7; i++) {
+    long mem_original[8]{};
+    for (int i = 0; i < 8; i++) {
         int num_rows = num_rows_arr[i];
         long mem_start = getMaxRss();
         for (int i = 0; i < DUPLICATIONS * 10; i++) {
@@ -407,8 +453,8 @@ void testMemFactorRows() {
 
     /* Test Hash tables */
     std::vector<int**>::iterator itr = records_ptrs.begin();
-    long mem_ht[7]{};
-    for (int i = 0; i < 7; i++) {
+    long mem_ht[8]{};
+    for (int i = 0; i < 8; i++) {
         int num_rows = num_rows_arr[i];
         long mem_start = getMaxRss();
         for (int j = 0; j < DUPLICATIONS * 10; j++) {
@@ -423,10 +469,10 @@ void testMemFactorRows() {
 
     /* Test IntTables */
     itr = records_ptrs.begin();
-    long mem_it[7]{};
+    long mem_it[8]{};
     std::vector<IntTable*> it_ptrs;
     it_ptrs.reserve(records_ptrs.size());
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < 8; i++) {
         int num_rows = num_rows_arr[i];
         long mem_start = getMaxRss();
         for (int j = 0; j < DUPLICATIONS * 10; j++) {
@@ -460,7 +506,7 @@ void testMemFactorRows() {
     /* Release Memory */
     itr = records_ptrs.begin();
     std::vector<IntTable*>::iterator itr_it = it_ptrs.begin();
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < 8; i++) {
         int num_rows = num_rows_arr[i];
         for (int i = 0; i < DUPLICATIONS * 10; i++) {
             releaseRecords(*itr, num_rows);
@@ -555,7 +601,7 @@ void testMemFactorConstants() {
     std::vector<int**> records_ptrs;
     records_ptrs.reserve(DUPLICATIONS * 10 * 9);
     std::vector<long> mem_original;
-    for (int num_constants = 100; num_constants < 5000; num_constants *= 2) {
+    for (int num_constants = 200; num_constants < 20000; num_constants *= 2) {
         long mem_start = getMaxRss();
         for (int i = 0; i < DUPLICATIONS * 10; i++) {
             records_ptrs.push_back(genRecords(NUM_ROWS, NUM_COLS, num_constants));
@@ -566,7 +612,7 @@ void testMemFactorConstants() {
     /* Test Hash tables */
     std::vector<int**>::iterator itr = records_ptrs.begin();
     std::vector<long> mem_ht;
-    for (int num_constants = 100; num_constants < 5000; num_constants *= 2) {
+    for (int num_constants = 200; num_constants < 20000; num_constants *= 2) {
         long mem_start = getMaxRss();
         for (int j = 0; j < DUPLICATIONS * 10; j++) {
             int** const records = *itr;
@@ -583,7 +629,7 @@ void testMemFactorConstants() {
     std::vector<long> mem_it;
     std::vector<IntTable*> it_ptrs;
     it_ptrs.reserve(records_ptrs.size());
-    for (int num_constants = 100; num_constants < 5000; num_constants *= 2) {
+    for (int num_constants = 200; num_constants < 20000; num_constants *= 2) {
         long mem_start = getMaxRss();
         for (int j = 0; j < DUPLICATIONS * 10; j++) {
             int** const records = *itr;
@@ -616,7 +662,7 @@ void testMemFactorConstants() {
     /* Release Memory */
     itr = records_ptrs.begin();
     std::vector<IntTable*>::iterator itr_it = it_ptrs.begin();
-    for (int num_constants = 100; num_constants < 5000; num_constants *= 2) {
+    for (int num_constants = 200; num_constants < 20000; num_constants *= 2) {
         for (int i = 0; i < DUPLICATIONS * 10; i++) {
             releaseRecords(*itr, NUM_ROWS);
             itr++;
@@ -627,12 +673,101 @@ void testMemFactorConstants() {
     CompliedBlock::clearPool();
 }
 
+extern int num_cmps_in_int_table_join;
+extern int num_find_in_hash_map_join;
+extern int num_cmps_hit_in_int_table_join;
+extern int num_find_hit_in_hash_map_join;
+void testJoinEfficiency() {
+    int const NUM_ROWS = 500;
+    int const NUM_COLS = 5;
+    int const NUM_CONSTANTS = 200;
+    uint64_t time_ht = 0;
+    uint64_t time_it = 0;
+    num_cmps_in_int_table_join = 0;
+    num_find_in_hash_map_join = 0;
+    double avg_cmp_ht = 0;
+    double avg_cmp_it = 0;
+    for (int i = 0; i < DUPLICATIONS; i++) {
+        int** const records1 = genRecords(NUM_ROWS, NUM_COLS, NUM_CONSTANTS);
+        int** const records2 = genRecords(NUM_ROWS, NUM_COLS, NUM_CONSTANTS);
+        int const get_col1 = 0;
+        int const get_val1 = records1[0][0];
+        int const get_col2 = 1;
+        int const get_val2 = records2[1][1];
+
+        /* Test Hash tables */
+        uint64_t time_start = currentTimeInNano();
+        CompliedBlock* cb1 = CompliedBlock::create(records1, NUM_ROWS, NUM_COLS, false);
+        cb1->buildIndices();
+        CompliedBlock* cb2 = CompliedBlock::create(records2, NUM_ROWS, NUM_COLS, false);
+        cb2->buildIndices();
+        uint64_t time_constructed = currentTimeInNano();
+
+        for (int col_idx = 0; col_idx < NUM_COLS; col_idx++) {
+            const sinc::MatchedSubCbs* join_result = CompliedBlock::matchSlices(*cb1, col_idx, *cb2, col_idx);
+            delete join_result;
+        }
+        uint64_t time_join_done = currentTimeInNano();
+        time_ht += time_join_done - time_constructed;
+
+        /* Test IntTables */
+        time_start = currentTimeInNano();
+        IntTable it1(records1, NUM_ROWS, NUM_COLS);
+        IntTable it2(records2, NUM_ROWS, NUM_COLS);
+        time_constructed = currentTimeInNano();
+
+        for (int col_idx = 0; col_idx < NUM_COLS; col_idx++) {
+            // num_cmps_in_int_table_join = 0;
+            sinc::MatchedSubTables* join_result = IntTable::matchSlices(it1, col_idx, it2, col_idx);
+            // avg_cmp_it += ((double) num_cmps_in_int_table_join) / it1.numValuesInColumn(col_idx);
+            delete join_result;
+        }
+        time_join_done = currentTimeInNano();
+        time_it += time_join_done - time_constructed;
+
+        /* Release resources */
+        CompliedBlock::clearPool();
+        releaseRecords(records1, NUM_ROWS);
+        releaseRecords(records2, NUM_ROWS);
+    }
+
+    std::cout << "#Cmp. in HT: " << num_find_in_hash_map_join << std::endl;
+    std::cout << "#Cmp. in IT: " << num_cmps_in_int_table_join << std::endl;
+    std::cout << "#Hit. in HT: " << num_find_hit_in_hash_map_join << std::endl;
+    std::cout << "#Hit. in IT: " << num_cmps_hit_in_int_table_join << std::endl;
+    std::cout << "#Avg. Cmp in IT: " << avg_cmp_it / (NUM_COLS * DUPLICATIONS) << std::endl;
+    std::cout << "Time (ns) HT: " << time_ht << std::endl;
+    std::cout << "Time (ns) IT: " << time_it << std::endl;
+}
+
 int main(int argc, char const *argv[]) {
-    testTimeFactorRows();
-    // testTimeFactorCols();
-    // testTimeFactorConstants();
-    // testMemFactorRows();
-    // testMemFactorCols();
-    // testMemFactorConstants();
+    if (1 == argc) {
+        std::cout << "Please indicate test (0 ~ 5)" << std::endl;
+        return 0;
+    }
+    switch (argv[1][0]) {
+        case '0':
+            testTimeFactorRows();
+            break;
+        case '1':
+            testTimeFactorCols();
+            break;
+        case '2':
+            testTimeFactorConstants();
+            break;
+        case '3':
+            testMemFactorRows();
+            break;
+        case '4':
+            testMemFactorCols();
+            break;
+        case '5':
+            testMemFactorConstants();
+            break;
+        case '6':
+        default:
+            testJoinEfficiency();
+            break;
+    }
     return 0;
 }

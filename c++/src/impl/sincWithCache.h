@@ -71,6 +71,7 @@ namespace sinc {
         int getTotalRows() const;
         int getTotalCols() const;
         size_t memoryCost() const;
+        bool hasRow(int* row) const;
 
         void showComplianceSet() const;
 
