@@ -57,6 +57,8 @@ namespace sinc {
         bool validation;
         /** Take first `maxRelations` relations as targets if this is larger than 0 */
         int maxRelations;
+        /** Relations that should not be set as target */
+        const char* blockedRelations;
         /** Restrict the maximum memory limit (KByte) during compression */
         int maxMemGByte;
 
@@ -88,7 +90,7 @@ namespace sinc {
 
         SincConfig(
             const char* basePath, const char* kbName, const char* dumpPath, const char* dumpName,
-            int const threads, bool const validation, int const maxRelations, int const maxMem, int const beamwidth, EvalMetric::Value evalMetric,
+            int const threads, bool const validation, int const maxRelations, const char* blockedRelations, int const maxMem, int const beamwidth, EvalMetric::Value evalMetric,
             double const minFactCoverage, double const minConstantCoverage, double const stopCompressionRatio,
             double const observationRatio, const char* negKbBasePath, const char* negKbName, double const budgetFactor, bool const weightedNegSamples
         );

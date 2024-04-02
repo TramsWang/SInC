@@ -395,7 +395,7 @@ TestKbManager* TestSinc::testKb = nullptr;
 class Sinc4Test : public SInC {
 public:
     Sinc4Test(const char* basePath, const char* kbName) : SInC(new SincConfig(
-        basePath, kbName, MEM_DIR, "Sinc4TestComp", 1, false, 0, 1024, 5, EvalMetric::Value::CompressionCapacity, 0.05, 0.25, 1.0, 0,
+        basePath, kbName, MEM_DIR, "Sinc4TestComp", 1, false, 0, "", 1024, 5, EvalMetric::Value::CompressionCapacity, 0.05, 0.25, 1.0, 0,
         "", "", 0, true
     )) {
         // std::cout << "HERE\n";
@@ -706,4 +706,54 @@ TEST_F(TestSinc, TestCompression) {
     delete[] entailed_records[0];
     delete[] entailed_records[1];
     delete[] entailed_records[2];
+}
+
+TEST(TestParseTarget, TestGetTargets1) {
+    std::stringstream ss("2,4");
+    std::string segment;
+    std::unordered_set<int> block_set;
+    while(std::getline(ss, segment, ',')) {
+        block_set.insert(std::stoi(segment));
+    }
+
+    int cnt = 8;
+    int max_relations = 6;
+    cnt = (cnt > max_relations) ? max_relations : cnt;
+    std::vector<int> target_rels;
+    for (int i = 0; i < cnt; i++) {
+        if (block_set.end() == block_set.find(i)) {
+            target_rels.push_back(i);
+        }
+    }
+    EXPECT_EQ(target_rels.size(), 4);
+    EXPECT_EQ(target_rels[0], 0);
+    EXPECT_EQ(target_rels[1], 1);
+    EXPECT_EQ(target_rels[2], 3);
+    EXPECT_EQ(target_rels[3], 5);
+}
+
+TEST(TestParseTarget, TestGetTargets2) {
+    std::stringstream ss("");
+    std::string segment;
+    std::unordered_set<int> block_set;
+    while(std::getline(ss, segment, ',')) {
+        block_set.insert(std::stoi(segment));
+    }
+
+    int cnt = 8;
+    int max_relations = 6;
+    cnt = (cnt > max_relations) ? max_relations : cnt;
+    std::vector<int> target_rels;
+    for (int i = 0; i < cnt; i++) {
+        if (block_set.end() == block_set.find(i)) {
+            target_rels.push_back(i);
+        }
+    }
+    EXPECT_EQ(target_rels.size(), 6);
+    EXPECT_EQ(target_rels[0], 0);
+    EXPECT_EQ(target_rels[1], 1);
+    EXPECT_EQ(target_rels[2], 2);
+    EXPECT_EQ(target_rels[3], 3);
+    EXPECT_EQ(target_rels[4], 4);
+    EXPECT_EQ(target_rels[5], 5);
 }
