@@ -922,7 +922,7 @@ namespace sinc {
          * @param logger               A logger
          */
         RelationMinerWithCachedRule(
-            SimpleKb& kb, int const targetRelation, EvalMetric::Value evalMetric, int const beamwidth, double const stopCompressionRatio,
+            SimpleKb& kb, int const targetRelation, EvalMetric::Value evalMetric, int const beamwidth, int const maxMemKByte, double const stopCompressionRatio,
             nodeMapType& predicate2NodeMap, depGraphType& dependencyGraph, std::vector<Rule*>& hypothesis,
             std::unordered_set<Record>& counterexamples, std::ostream& logger
         );

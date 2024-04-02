@@ -2080,11 +2080,11 @@ void EstRule::expandHeadUvs4CounterExamples(
  */
 using sinc::EstRelationMiner;
 EstRelationMiner::EstRelationMiner(
-    SimpleKb& kb, int const targetRelation, EvalMetric::Value evalMetric, int const beamwidth, double const _observationRatio,
+    SimpleKb& kb, int const targetRelation, EvalMetric::Value evalMetric, int const beamwidth, int maxMemKByte, double const _observationRatio,
     double const stopCompressionRatio, nodeMapType& predicate2NodeMap, depGraphType& dependencyGraph,
     std::vector<Rule*>& hypothesis, std::unordered_set<Record>& counterexamples, std::ostream& logger
 ) : RelationMiner(
-        kb, targetRelation, evalMetric, beamwidth, stopCompressionRatio, predicate2NodeMap, dependencyGraph, hypothesis,
+        kb, targetRelation, evalMetric, beamwidth, maxMemKByte, stopCompressionRatio, predicate2NodeMap, dependencyGraph, hypothesis,
         counterexamples, logger
 ) , observationRatio(_observationRatio) {}
 
@@ -2267,6 +2267,9 @@ void EstRelationMiner::findEstimatedSpecializations(
         Rule* copy = beams[best_rule_idx]->clone();
         UpdateStatus status = best_spec->opr->specialize(*copy);
         checkThenAddRule(status, copy, *(beams[best_rule_idx]), topCandidates);
+        if (maxMemKByte < getMaxRss()) {
+            return;
+        }
     }
 }
 
@@ -2319,7 +2322,7 @@ SincRecovery* SincWithEstimation::createRecovery() {
 
 RelationMiner* SincWithEstimation::createRelationMiner(int const targetRelationNum) {
     return new EstRelationMiner(
-        *kb, targetRelationNum, config->evalMetric, config->beamwidth, config->observationRatio, config->stopCompressionRatio,
+        *kb, targetRelationNum, config->evalMetric, config->beamwidth, config->maxMemGByte * 1024 * 1024, config->observationRatio, config->stopCompressionRatio,
         predicate2NodeMap, dependencyGraph, compressedKb->getHypothesis(), compressedKb->getCounterexampleSet(targetRelationNum),
         *logger
     );

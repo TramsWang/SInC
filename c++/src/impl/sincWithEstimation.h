@@ -465,7 +465,7 @@ namespace sinc {
          * @param logger               A logger
          */
         EstRelationMiner(
-            SimpleKb& kb, int const targetRelation, EvalMetric::Value evalMetric, int const beamwidth, double const observationRatio,
+            SimpleKb& kb, int const targetRelation, EvalMetric::Value evalMetric, int const beamwidth, int const maxMemKByte, double const observationRatio,
             double const stopCompressionRatio, nodeMapType& predicate2NodeMap, depGraphType& dependencyGraph,
             std::vector<Rule*>& hypothesis, std::unordered_set<Record>& counterexamples, std::ostream& logger
         );

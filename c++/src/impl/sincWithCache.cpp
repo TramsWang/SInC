@@ -2473,11 +2473,11 @@ void CachedRule::expandHeadUvs4CounterExamples(
 using sinc::RelationMinerWithCachedRule;
 
 RelationMinerWithCachedRule::RelationMinerWithCachedRule(
-    SimpleKb& kb, int const targetRelation, EvalMetric::Value evalMetric, int const beamwidth, double const stopCompressionRatio,
+    SimpleKb& kb, int const targetRelation, EvalMetric::Value evalMetric, int const beamwidth, int const maxMemKByte, double const stopCompressionRatio,
     nodeMapType& predicate2NodeMap, depGraphType& dependencyGraph, std::vector<Rule*>& hypothesis,
     std::unordered_set<Record>& counterexamples, std::ostream& logger
 ) : RelationMiner(
-        kb, targetRelation, evalMetric, beamwidth, stopCompressionRatio, predicate2NodeMap, dependencyGraph, hypothesis,
+        kb, targetRelation, evalMetric, beamwidth, maxMemKByte, stopCompressionRatio, predicate2NodeMap, dependencyGraph, hypothesis,
         counterexamples, logger
 ) {}
 
@@ -2584,7 +2584,7 @@ sinc::SincRecovery* SincWithCache::createRecovery() {
 
 sinc::RelationMiner* SincWithCache::createRelationMiner(int const targetRelationNum) {
     return new RelationMinerWithCachedRule(
-        *kb, targetRelationNum, config->evalMetric, config->beamwidth, config->stopCompressionRatio, predicate2NodeMap,
+        *kb, targetRelationNum, config->evalMetric, config->beamwidth, config->maxMemGByte * 1024 * 1024, config->stopCompressionRatio, predicate2NodeMap,
         dependencyGraph, compressedKb->getHypothesis(), compressedKb->getCounterexampleSet(targetRelationNum), *logger
     );
 }

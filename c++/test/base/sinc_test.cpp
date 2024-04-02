@@ -18,7 +18,7 @@ public:
             nodeMapType& predicate2NodeMap, depGraphType& dependencyGraph, std::vector<Rule*>& hypothesis,
             std::unordered_set<Record>& counterexamples, std::ostream& logger
     ) : RelationMiner(
-        kb, targetRelation, evalMetric, beamwidth, stopCompressionRatio, predicate2NodeMap, dependencyGraph, hypothesis,
+        kb, targetRelation, evalMetric, beamwidth, 1024 * 1024 * 1024, stopCompressionRatio, predicate2NodeMap, dependencyGraph, hypothesis,
         counterexamples, logger
     ) {
         badRule = new BareRule(-1, 1, cache, tabuMap);
@@ -395,7 +395,7 @@ TestKbManager* TestSinc::testKb = nullptr;
 class Sinc4Test : public SInC {
 public:
     Sinc4Test(const char* basePath, const char* kbName) : SInC(new SincConfig(
-        basePath, kbName, MEM_DIR, "Sinc4TestComp", 1, false, 0, 5, EvalMetric::Value::CompressionCapacity, 0.05, 0.25, 1.0, 0,
+        basePath, kbName, MEM_DIR, "Sinc4TestComp", 1, false, 0, 1024, 5, EvalMetric::Value::CompressionCapacity, 0.05, 0.25, 1.0, 0,
         "", "", 0, true
     )) {
         // std::cout << "HERE\n";
@@ -426,7 +426,7 @@ protected:
                 nodeMapType& predicate2NodeMap, depGraphType& dependencyGraph, std::vector<Rule*>& hypothesis,
                 std::unordered_set<Record>& counterexamples, std::ostream& logger
         ) : RelationMiner(
-            kb, targetRelation, evalMetric, beamwidth, stopCompressionRatio, predicate2NodeMap, dependencyGraph, hypothesis,
+            kb, targetRelation, evalMetric, beamwidth, 1024 * 1024 * 1024, stopCompressionRatio, predicate2NodeMap, dependencyGraph, hypothesis,
             counterexamples, logger
         ) {
             SimpleRelation* rel_mother = kb.getRelation("mother");

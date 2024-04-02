@@ -88,6 +88,7 @@ DEFINE_double(f, 0.05, "Set fact coverage threshold (Default 0.05)");
 DEFINE_double(c, 0.25, "Set fact constant threshold (Default 0.25)");
 DEFINE_double(p, 1.0, "Set stopping compression rate (Default 1.0)");
 DEFINE_double(o, 0, "Use rule mining estimation and set observation ratio (Default 0.0). If the value is set >= 1.0, estimation is turned on and the rule mining estimation model is applied.");
+DEFINE_int32(M, 1024, "Set the maximum memory consumption (GByte) during compression (Default 1024)");
 
 DEFINE_validator(I, &validateInputPath);
 DEFINE_validator(O, &validateOutputPath);
@@ -100,6 +101,7 @@ DEFINE_validator(f, &validateNormalizedDouble);
 DEFINE_validator(c, &validateNormalizedDouble);
 DEFINE_validator(p, &validateNormalizedDouble);
 DEFINE_validator(o, &validateNonNegativeDouble);
+DEFINE_validator(M, &validatePositiveInt);
 
 SincConfig* Main::parseConfig(int argc, char** argv) {
     gflags::ParseCommandLineFlags(&argc, &argv, false);
@@ -150,6 +152,9 @@ SincConfig* Main::parseConfig(int argc, char** argv) {
     if (FLAGS_r) {
         std::cout << "Max Number of Relations: " << FLAGS_r << std::endl;
     }
+    if (1024 != FLAGS_M) {
+        std::cout << "Maximum memory: " << FLAGS_o << " (GByte)" << std::endl;
+    }
     if (5 != FLAGS_b) {
         std::cout << "Beamwidth: " << FLAGS_b << std::endl;
     }
@@ -170,7 +175,7 @@ SincConfig* Main::parseConfig(int argc, char** argv) {
     }
 
     return new sinc::SincConfig(
-        input_path.c_str(), input_name.c_str(), output_path.c_str(), output_name.c_str(), FLAGS_t, FLAGS_v, FLAGS_r, FLAGS_b,
+        input_path.c_str(), input_name.c_str(), output_path.c_str(), output_name.c_str(), FLAGS_t, FLAGS_v, FLAGS_r, FLAGS_M, FLAGS_b,
         EvalMetric::getBySymbol(FLAGS_e), FLAGS_f, FLAGS_c, FLAGS_p, FLAGS_o, negkb_path.c_str(), negkb_name.c_str(), FLAGS_g, FLAGS_w
     );
 }

@@ -12,11 +12,11 @@
 using sinc::SincConfig;
 SincConfig::SincConfig(
     const char* _basePath, const char* _kbName, const char* _dumpPath, const char* _dumpName,
-    int const _threads, bool const _validation, int const _maxRelations, int const _beamwidth, EvalMetric::Value _evalMetric,
+    int const _threads, bool const _validation, int const _maxRelations, int const _maxMemGByte, int const _beamwidth, EvalMetric::Value _evalMetric,
     double const _minFactCoverage, double const _minConstantCoverage, double const _stopCompressionRatio,
     double const _observationRatio, const char* _negKbBasePath, const char* _negKbName, double const _budgetFactor, bool const _weightedNegSamples
 ) : basePath(_basePath), kbName(strdup(_kbName)), dumpPath(_dumpPath), dumpName(strdup(_dumpName)),
-    threads(_threads), validation(_validation), maxRelations(_maxRelations), beamwidth(_beamwidth), evalMetric(_evalMetric),
+    threads(_threads), validation(_validation), maxRelations(_maxRelations), maxMemGByte(_maxMemGByte), beamwidth(_beamwidth), evalMetric(_evalMetric),
     minFactCoverage(_minFactCoverage), minConstantCoverage(_minConstantCoverage), stopCompressionRatio(_stopCompressionRatio),
     observationRatio(_observationRatio), negKbBasePath(_negKbBasePath), negKbName(strdup(_negKbName)), budgetFactor(_budgetFactor), weightedNegSamples(_weightedNegSamples)
 {}
@@ -91,10 +91,10 @@ RelationMiner::AxiomNodeType::~AxiomNodeType() {
 RelationMiner::AxiomNodeType RelationMiner::AxiomNode;
 
 RelationMiner::RelationMiner(
-    SimpleKb& _kb, int const _targetRelation, EvalMetric::Value _evalMetric, int const _beamwidth, double const _stopCompressionRatio,
+    SimpleKb& _kb, int const _targetRelation, EvalMetric::Value _evalMetric, int const _beamwidth, int const _maxMemKByte, double const _stopCompressionRatio,
     nodeMapType& _predicate2NodeMap, depGraphType& _dependencyGraph, std::vector<Rule*>& _hypothesis,
     std::unordered_set<Record>& _counterexamples, std::ostream& _logger
-) : kb(_kb), targetRelation(_targetRelation), evalMetric(_evalMetric), beamwidth(_beamwidth), stopCompressionRatio(_stopCompressionRatio),
+) : kb(_kb), targetRelation(_targetRelation), evalMetric(_evalMetric), beamwidth(_beamwidth), maxMemKByte(_maxMemKByte), stopCompressionRatio(_stopCompressionRatio),
     predicate2NodeMap(_predicate2NodeMap), dependencyGraph(_dependencyGraph), hypothesis(_hypothesis), counterexamples(_counterexamples),
     logger(_logger), logFormatter(_logger) {}
 
@@ -153,7 +153,7 @@ Rule* RelationMiner::findRule() {
     while (true) {
         /* Find the candidates in the next round according to current beams */
         Rule** top_candidates = new Rule*[beamwidth]{};
-        for (int i = 0; i < beamwidth && nullptr != beams[i]; i++) {
+        for (int i = 0; i < beamwidth && nullptr != beams[i] && maxMemKByte >= getMaxRss(); i++) {
             Rule* const r = beams[i];
             selectAsBeam(r);
             logFormatter.printf("Extend: %s\n", r->toString(kb.getRelationNames()).c_str());
@@ -171,7 +171,7 @@ Rule* RelationMiner::findRule() {
                 }
             }
         }
-        if (!shouldContinue) {
+        if (!shouldContinue || (maxMemKByte < getMaxRss())) {
             /* Stop the finding procedure at the current stage and return the best rule */
             Rule* best_rule = beams[0];
             for (int i = 1; i < beamwidth && nullptr != beams[i]; i++) {
@@ -281,6 +281,9 @@ int RelationMiner::findSpecializations(Rule& rule, Rule** const candidates) {
             Rule* const new_rule = rule.clone();
             UpdateStatus const update_status = new_rule->specializeCase1(vacant.predIdx, vacant.argIdx, var_id);
             added_candidate_cnt += checkThenAddRule(update_status, new_rule, rule, candidates);
+            if (maxMemKByte < getMaxRss()) {
+                return added_candidate_cnt;
+            }
         }
 
         /* Case 2 */
@@ -291,6 +294,9 @@ int RelationMiner::findSpecializations(Rule& rule, Rule** const candidates) {
                         relation->id, relation->getTotalCols(), arg_idx, var_id
                 );
                 added_candidate_cnt += checkThenAddRule(update_status, new_rule, rule, candidates);
+                if (maxMemKByte < getMaxRss()) {
+                    return added_candidate_cnt;
+                }
             }
         }
     }
@@ -309,6 +315,9 @@ int RelationMiner::findSpecializations(Rule& rule, Rule** const candidates) {
                     empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx, constant
             );
             added_candidate_cnt += checkThenAddRule(update_status, new_rule, rule, candidates);
+            if (maxMemKByte < getMaxRss()) {
+                return added_candidate_cnt;
+            }
         }
 
         /* Case 3 */
@@ -320,6 +329,9 @@ int RelationMiner::findSpecializations(Rule& rule, Rule** const candidates) {
                     empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx, empty_arg_loc_2.predIdx, empty_arg_loc_2.argIdx
             );
             added_candidate_cnt += checkThenAddRule(update_status, new_rule, rule, candidates);
+            if (maxMemKByte < getMaxRss()) {
+                return added_candidate_cnt;
+            }
         }
 
         /* Case 4 */
@@ -330,6 +342,9 @@ int RelationMiner::findSpecializations(Rule& rule, Rule** const candidates) {
                         relation->id, relation->getTotalCols(), arg_idx, empty_arg_loc_1.predIdx, empty_arg_loc_1.argIdx
                 );
                 added_candidate_cnt += checkThenAddRule(update_status, new_rule, rule, candidates);
+                if (maxMemKByte < getMaxRss()) {
+                    return added_candidate_cnt;
+                }
             }
         }
     }
@@ -346,6 +361,9 @@ int RelationMiner::findGeneralizations(Rule& rule, Rule** const candidates) {
                 Rule* const new_rule = rule.clone();
                 UpdateStatus const update_status = new_rule->generalize(pred_idx, arg_idx);
                 added_candidate_cnt += checkThenAddRule(update_status, new_rule, rule, candidates);
+                if (maxMemKByte < getMaxRss()) {
+                    return added_candidate_cnt;
+                }
             }
         }
     }

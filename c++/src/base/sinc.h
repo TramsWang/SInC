@@ -57,6 +57,8 @@ namespace sinc {
         bool validation;
         /** Take first `maxRelations` relations as targets if this is larger than 0 */
         int maxRelations;
+        /** Restrict the maximum memory limit (KByte) during compression */
+        int maxMemGByte;
 
         /* Algorithm Strategy Config */
         /** The beamwidth */
@@ -86,7 +88,7 @@ namespace sinc {
 
         SincConfig(
             const char* basePath, const char* kbName, const char* dumpPath, const char* dumpName,
-            int const threads, bool const validation, int const maxRelations, int const beamwidth, EvalMetric::Value evalMetric,
+            int const threads, bool const validation, int const maxRelations, int const maxMem, int const beamwidth, EvalMetric::Value evalMetric,
             double const minFactCoverage, double const minConstantCoverage, double const stopCompressionRatio,
             double const observationRatio, const char* negKbBasePath, const char* negKbName, double const budgetFactor, bool const weightedNegSamples
         );
@@ -183,7 +185,7 @@ namespace sinc {
          * @param logger A logger
          */
         RelationMiner(
-            SimpleKb& kb, int const targetRelation, EvalMetric::Value evalMetric, int const beamwidth, double const stopCompressionRatio,
+            SimpleKb& kb, int const targetRelation, EvalMetric::Value evalMetric, int const beamwidth, int const maxMem, double const stopCompressionRatio,
             nodeMapType& predicate2NodeMap, depGraphType& dependencyGraph, std::vector<Rule*>& hypothesis,
             std::unordered_set<Record>& counterexamples, std::ostream& logger
         );
@@ -216,6 +218,8 @@ namespace sinc {
         int const beamwidth;
         /** The stopping compression ratio for inducing a single rule */
         double const stopCompressionRatio;
+        /** Restrict the maximum memory limit (KByte) during compression */
+        int const maxMemKByte;
         /** A mapping from predicates to the nodes in the dependency graph */
         nodeMapType& predicate2NodeMap;
         /** The dependency graph, in the form of an adjacent list */
