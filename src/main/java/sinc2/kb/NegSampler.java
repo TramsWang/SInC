@@ -387,53 +387,53 @@ public class NegSampler {
 //        completeWeight(neg_kb_name, basePath, kb);
 //    }
 
-//    /**
-//     * This method generates a negative KB by constant relevance. The method reads a partially completed KB data, where
-//     * negative samples are given without weight, from the dump written by a Python script "gen_neg_con_rel.py" in this
-//     * package. The parameters of this method are used to find the intermediate dump. This method will generate kdn
-//     * negative samples, where k is the parameter "TopK", d is the arity of the relation, and n is the number of records
-//     * in the positive relation.
-//     *
-//     * @param kb     The positive KB
-//     * @param hop    The number of hops used to calculate the relevance matrix
-//     * @param rounds The number of alternated constants generated from one argument in a positive record
-//     */
-//    public static void constantRelevanceSampling(SimpleKb kb, int hop, int rounds, String basePath) throws IOException {
-//        String neg_kb_name = String.format("%s_neg_con_rel_h%dr%d", kb.name, hop, rounds);
-//        completeWeight(neg_kb_name, basePath, kb);
-//    }
+    /**
+     * This method generates a negative KB by constant relevance. The method reads a partially completed KB data, where
+     * negative samples are given without weight, from the dump written by a Python script "gen_neg_con_rel.py" in this
+     * package. The parameters of this method are used to find the intermediate dump. This method will generate kdn
+     * negative samples, where k is the parameter "TopK", d is the arity of the relation, and n is the number of records
+     * in the positive relation.
+     *
+     * @param kb     The positive KB
+     * @param hop    The number of hops used to calculate the relevance matrix
+     * @param rounds The number of alternated constants generated from one argument in a positive record
+     */
+    public static void constantRelevanceSampling(SimpleKb kb, int hop, int rounds, String basePath) throws IOException {
+        String neg_kb_name = String.format("%s_neg_con_rel_h%dr%d", kb.name, hop, rounds);
+        completeWeight(neg_kb_name, basePath, kb);
+    }
 
-//    /**
-//     * This method is only used to complete the weight of negative samples in a partially completed neg KB and dump the
-//     * completed KB to the original location.
-//     */
-//    protected static void completeWeight(String negKbName, String basePath, SimpleKb kb) throws IOException {
-//        /* Load relation information */
-//        String dir_path = NumeratedKb.getKbPath(negKbName, basePath).toString();
-//        File rel_info_file = Paths.get(dir_path, NegSampleKb.REL_INFO_FILE_NAME).toFile();
-//        IntReader rel_info_reader = new IntReader(rel_info_file);
-//        int total_relations = rel_info_reader.next();
-//
-//        IntTable[] negSampleTabs = new IntTable[total_relations];
-//        Map<Record, Float>[] negSampleWeightMaps = new Map[total_relations];
-//        for (int rel_id = 0; rel_id < total_relations; rel_id++) {
-//            /* Load negative samples and weight */
-//            int arity = rel_info_reader.next();
-//            int total_records = rel_info_reader.next();
-//            int[][] neg_samples = SimpleRelation.loadFile(
-//                    Paths.get(dir_path, NegSampleKb.getNegRelFileName(rel_id)).toFile(), arity, total_records
-//            );
-//            IntTable neg_table = new IntTable(neg_samples);
-//            Map<Record, Float> weight_map = calcNegSampleWeight(kb.getRelation(rel_id), neg_table, kb.totalConstants());
-//            negSampleWeightMaps[rel_id] = weight_map;
-//            negSampleTabs[rel_id] = neg_table;
-//        }
-//        rel_info_reader.close();
-//
-//        /* Dump new neg KB */
-//        NegSampleKb neg_kb = new NegSampleKb(negKbName, negSampleTabs, negSampleWeightMaps);
-//        neg_kb.dump(basePath);
-//    }
+    /**
+     * This method is only used to complete the weight of negative samples in a partially completed neg KB and dump the
+     * completed KB to the original location.
+     */
+    protected static void completeWeight(String negKbName, String basePath, SimpleKb kb) throws IOException {
+        /* Load relation information */
+        String dir_path = NumeratedKb.getKbPath(negKbName, basePath).toString();
+        File rel_info_file = Paths.get(dir_path, NegSampleKb.REL_INFO_FILE_NAME).toFile();
+        IntReader rel_info_reader = new IntReader(rel_info_file);
+        int total_relations = rel_info_reader.next();
+
+        IntTable[] negSampleTabs = new IntTable[total_relations];
+        Map<Record, Float>[] negSampleWeightMaps = new Map[total_relations];
+        for (int rel_id = 0; rel_id < total_relations; rel_id++) {
+            /* Load negative samples and weight */
+            int arity = rel_info_reader.next();
+            int total_records = rel_info_reader.next();
+            int[][] neg_samples = SimpleRelation.loadFile(
+                    Paths.get(dir_path, NegSampleKb.getNegRelFileName(rel_id)).toFile(), arity, total_records
+            );
+            IntTable neg_table = new IntTable(neg_samples);
+            Map<Record, Float> weight_map = calcNegSampleWeight(kb.getRelation(rel_id), neg_table, kb.totalConstants());
+            negSampleWeightMaps[rel_id] = weight_map;
+            negSampleTabs[rel_id] = neg_table;
+        }
+        rel_info_reader.close();
+
+        /* Dump new neg KB */
+        NegSampleKb neg_kb = new NegSampleKb(negKbName, negSampleTabs, negSampleWeightMaps);
+        neg_kb.dump(basePath);
+    }
 
     /**
      * This method is used for sampling according to constant relevance. The total number of negative samples generated
@@ -473,7 +473,7 @@ public class NegSampler {
         System.out.printf("Time Cost: %d(ms)\n", time_done - time_start);
         System.out.printf("Memory Cost: %d(B)\n", mem_done - mem_start);
         System.out.println();
-        return new NegSampleKb(String.format("%s_neg_con_rel_h%dr%d", kb.getName(), steps - 1, rounds), neg_tables, weight_maps);
+        return new NegSampleKb(String.format("%s_neg_det_h%dr%d", kb.getName(), steps - 1, rounds), neg_tables, weight_maps);
     }
 
     protected static int[][] calcRelevantConstants(SimpleKb kb) {
@@ -844,11 +844,11 @@ public class NegSampler {
         String base_path = args[0];
         String neg_base_path = args[1];
 //        float[] budget_factors = new float[] {0.5f, 1, 1.5f, 2, 2.5f, 3, 3.5f, 4, 4.5f, 5};
-//        float[] budget_factors = new float[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-        float[] budget_factors = new float[] {2, 4, 6, 8, 10, 12, 14, 16, 18, 20};
-//        int[] rounds_list = new int[] {1, 2, 3, 4, 5};
+        float[] budget_factors = new float[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+//        float[] budget_factors = new float[] {2, 4, 6, 8, 10, 12, 14, 16, 18, 20};
+        int[] rounds_list = new int[] {1, 2, 3, 4, 5};
 //        int[] steps_list = new int[] {1, 2, 3, 4};
-        int[] rounds_list = new int[] {5};
+//        int[] rounds_list = new int[] {5};
         int[] steps_list = new int[] {4};
         File base_path_file = new File(base_path);
         for (File kb_dir_file: base_path_file.listFiles()) {
@@ -858,12 +858,18 @@ public class NegSampler {
                 SimpleKb kb = new SimpleKb(kb_name, base_path);
 
 //                for (float budget_factor: budget_factors) {
-//                    System.out.printf("Uniform (%.2f) ...\n", budget_factor);
+//                    System.out.printf("Uniform (%.2f) ... ", budget_factor);
+//                    long time_start = System.currentTimeMillis();
 //                    NegSampleKb uniform_neg_kb = uniformGenerator(kb, budget_factor);
+//                    long time_done = System.currentTimeMillis();
+//                    System.out.printf("%dms\n", time_done - time_start);
 //                    uniform_neg_kb.dump(neg_base_path);
 //
-//                    System.out.printf("Pos Relative (%.2f) ...\n", budget_factor);
+//                    System.out.printf("Pos Relative (%.2f) ... ", budget_factor);
+//                    time_start = System.currentTimeMillis();
 //                    NegSampleKb pos_rel_neg_kb = posRelativeGenerator(kb, budget_factor);
+//                    time_done = System.currentTimeMillis();
+//                    System.out.printf("%dms\n", time_done - time_start);
 //                    pos_rel_neg_kb.dump(neg_base_path);
 //                }
 
@@ -885,14 +891,14 @@ public class NegSampler {
 //                    anu_neg_kb.dump(neg_base_path);
 //                }
 
-//                constRelevanceGenerator(kb, neg_base_path);
+                constRelevanceGenerator(kb, neg_base_path);
 
-                for (int steps: steps_list) {
-                    for (int rounds : rounds_list) {
-                        NegSampleKb con_rel_neg_kb = constantRelevanceSampling(kb, steps, rounds);
-                        con_rel_neg_kb.dump(neg_base_path);
-                    }
-                }
+//                for (int steps: steps_list) {
+//                    for (int rounds : rounds_list) {
+//                        NegSampleKb con_rel_neg_kb = constantRelevanceSampling(kb, steps, rounds);
+//                        con_rel_neg_kb.dump(neg_base_path);
+//                    }
+//                }
             }
         }
     }
@@ -1017,28 +1023,30 @@ public class NegSampler {
         return new NegSampleKb(String.format(enhance ? "%s_neg_ANU+" : "%s_neg_ANU", kb.getName()), neg_tables, weight_maps);
     }
 
-//    protected static void constRelevanceGenerator(SimpleKb kb, String negBasePath) throws IOException {
-////        for (int hop : new int[]{0, 1, 2, 3}) {
-////            for (int top_k: new int[]{1, 2, 3, 4, 5}) {
-////                System.out.printf("Hop = %d, K = %d\n", hop, top_k);
-////                constantRelevanceSampling(kb, hop, top_k, negBasePath);
-////            }
-////        }
-//
-////        for (int hop : new int[]{0, 1, 2, 3}) {
+    protected static void constRelevanceGenerator(SimpleKb kb, String negBasePath) throws IOException {
+//        for (int hop : new int[]{0, 1, 2, 3}) {
+//            for (int top_k: new int[]{1, 2, 3, 4, 5}) {
+//                System.out.printf("Hop = %d, K = %d\n", hop, top_k);
+//                constantRelevanceSampling(kb, hop, top_k, negBasePath);
+//            }
+//        }
+
+//        for (int hop : new int[]{0, 1, 2, 3}) {
 ////            for (int percentage: new int[]{10, 20, 30, 40, 50}) {
-////                for (int rounds: new int[]{1, 2, 3, 4, 5}) {
-////                    System.out.printf("Hop = %d, Percentage = %d, R = %d\n", hop, percentage, rounds);
-////                    constantRelevanceSampling(kb, hop, percentage, rounds, negBasePath);
-////                }
-////            }
-////        }
-//
-////        for (int hop : new int[]{0, 1, 2, 3}) {
-////            for (int rounds: new int[]{1, 2, 3, 4, 5}) {
-////                System.out.printf("Hop = %d, Rounds = %d\n", hop, rounds);
-////                constantRelevanceSampling(kb, hop, rounds, negBasePath);
-////            }
-////        }
-//    }
+//            for (int percentage: new int[]{60, 70, 80, 90, 100}) {
+//                for (int rounds: new int[]{1, 2, 3, 4, 5}) {
+//                    System.out.printf("Hop = %d, Percentage = %d, R = %d\n", hop, percentage, rounds);
+//                    constantRelevanceSampling(kb, hop, percentage, rounds, negBasePath);
+//                }
+//            }
+//        }
+
+//        for (int hop : new int[]{0, 1, 2, 3}) {
+            for (int hop : new int[]{3}) {
+            for (int rounds: new int[]{1, 2, 3, 4, 5}) {
+                System.out.printf("Hop = %d, Rounds = %d\n", hop, rounds);
+                constantRelevanceSampling(kb, hop, rounds, negBasePath);
+            }
+        }
+    }
 }

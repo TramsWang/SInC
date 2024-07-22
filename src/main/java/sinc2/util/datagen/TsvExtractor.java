@@ -12,7 +12,7 @@ import java.util.Map;
 
 public class TsvExtractor {
     public static void main(String[] args) throws KbException, IOException {
-        extract("NELL-", "datasets/SimpleFormat/nell.tsv", 500, "datasets/SimpleFormat");
+        extract("FB-500", "datasets/SimpleFormat/FB15K.tsv", 500, "datasets/SimpleFormat");
 //        extract("FB-", "datasets/SimpleFormat/FB15K.tsv", "datasets/SimpleFormat");
     }
     static void extract(String kbName, String tsvFileName, int threshold, String outputPath) throws IOException, KbException {

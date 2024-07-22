@@ -6,3 +6,12 @@
 !/.gitignore
 !/pom.xml
 !/datasets.7z
+
+# Track C++ code
+!/c++
+/c++/*
+!/c++/src/
+!/c++/test/
+!/c++/CMakeLists.txt
+!/c++/main.cpp
+!/c++/test_sinc.cpp
