@@ -5,7 +5,10 @@ import sinc2.common.ParsedPred;
 import sinc2.rule.Rule;
 import sinc2.rule.RuleParseException;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.*;
 
 public class RuleSpecializationChecker {
@@ -24,6 +27,8 @@ public class RuleSpecializationChecker {
         BufferedReader reader = new BufferedReader(new FileReader(args[0]));
         PrintWriter positive_writer = new PrintWriter("spec_rules_positive.txt");
         PrintWriter negative_writer = new PrintWriter("spec_rules_negative.txt");
+        int tp = 0;
+        int fp = 0;
         while (true) {
             String rule1_str = reader.readLine();
             String rule2_str = reader.readLine();
@@ -36,15 +41,18 @@ public class RuleSpecializationChecker {
                 /* True positive */
                 positive_writer.println(rule1_str);
                 positive_writer.println(rule2_str);
+                tp++;
             } else {
                 /* False positive */
                 negative_writer.println(rule1_str);
                 negative_writer.println(rule2_str);
+                fp++;
             }
         }
         reader.close();
         positive_writer.close();
         negative_writer.close();
+        System.out.printf("True Pos: %d\nFalse Pos: %d\n", tp, fp);
     }
 
     /**
