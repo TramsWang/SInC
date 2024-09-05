@@ -7,9 +7,9 @@ import java.io.IOException;
 import java.io.PrintWriter;
 
 public class DBpediaSimplifier {
-    static int THRESHOLD = 1000;
+    static int THRESHOLD = 6000;
     public static void main(String[] args) throws KbException, IOException {
-        NumeratedKb kb = new NumeratedKb("DBpedia", ".");
+        NumeratedKb kb = new NumeratedKb("DBpedia-27M", ".");
         PrintWriter writer = new PrintWriter("simplified.tsv");
         int cnt_rels = 0;
         System.out.println("KB Loaded");

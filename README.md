@@ -3,8 +3,16 @@ SInC is a **S**emantic **In**ductive **C**ompressor on relational data (knowledg
 It splits DBs into two parts where one can be semantically inferred by the other, thus the inferable part is reduced for compression.
 The compression is realized by iteratively mining for first-order Horn rules until there are no more records that can be effectively covered by any other pattern.
 Followings are related research papers of this project:
-- Wang, R., Sun, D., & Wong, R. (2022). SInC: Semantic Approach and Enhancement for Relational Data Compression.
-- Wang, R., Sun, D., & Wong, R. RDF Knowledge Base Summarization by Inducing First-order Horn Rules.
+- R. Wang, D. Sun, and R. K. Wong, “Symbolic minimization on relational data,” *IEEE Transactions on Knowledge and Data Engineering*, vol. 35, no. 9, pp. 9307-9318, 2023.
+- R. Wang, R. Wong, and D. Sun, “Estimation-based optimizations for the semantic compression of RDF knowledge bases,” *Information Processsing and Management* vol. 61, no. 5, p. 103799, 2024.
+- R. Wang, D. Sun, and R. K. Wong, “RDF knowledge base summarization by inducing first-order horn rules,” in *Machine Learning and Knowledge Discovery in Databases - European Conference, ECML PKDD,Proceedings, Part II* ser. Lecture Notes in Computer Science, vol. 13714. Springer, 2022, pp. 188-204.
+- R. Wang, D. Sun, R. K. Wong, R. Ranjan, and A. Y. Zomaya, “Sinc: Semantic approach and enhancement for relational data compression,” *Knowledge-Based Systems* vol. 258, p. 110001, 2022.
+- R. Wang, D. Sun, R. K. Wong, and R. Ranjan, “Horn rule discovery with batched caching and rule identifier for proficient compressor of knowledge data,” *Software: Practice and Experience* vol. 53, no. 3, pp. 682-703, 2023.
+
+## 0. NOTE
+The Java version of SInC is outdated and will no longer be updated.
+The latest version of SInC is in the dir `c++`, written in C++.
+Please refer to `/c++/README.md` for specifications of this project.
 
 ## 1. Prerequisites
 SInC is implemented in Java and require version 11+.

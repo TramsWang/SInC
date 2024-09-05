@@ -3,6 +3,7 @@
 #include <functional>
 #include <unordered_set>
 #include <unordered_map>
+#include <string>
 
 /**
  * The following macros in namespace "sinc" specify debug levels, indicating "conditional compilation". The higher the level is,

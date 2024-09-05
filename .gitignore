@@ -12,6 +12,7 @@
 /c++/*
 !/c++/src/
 !/c++/test/
+!/c++/README.md
 !/c++/CMakeLists.txt
 !/c++/main.cpp
 !/c++/test_sinc.cpp
